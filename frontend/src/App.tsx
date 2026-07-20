@@ -156,22 +156,26 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen text-slate-100 flex flex-col pb-12">
+    <div className="min-h-screen text-slate-100 flex flex-col pb-16">
       {/* Top Glass Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-purple-500/20 px-6 py-4">
+      <header className="sticky top-0 z-40 bg-[#05040a]/90 backdrop-blur-xl border-b border-amber-500/30 px-6 py-4 shadow-2xl">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-amber-500 flex items-center justify-center font-bold text-slate-950 shadow-glow-gold">
-              ✦
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-purple-600 to-cyan-500 p-0.5 shadow-glow-gold">
+              <div className="w-full h-full bg-[#080711] rounded-[14px] flex items-center justify-center font-black text-amber-400 text-xl font-cinzel">
+                ✦
+              </div>
             </div>
             <div>
-              <h1 className="text-xl font-bold font-cinzel text-slate-100 tracking-wider">SOULSMITH</h1>
-              <p className="text-[11px] text-slate-400">Living Mythology Engine • Persistent AI Canon</p>
+              <h1 className="text-2xl font-black font-cinzel text-gold-gradient tracking-widest">SOULSMITH</h1>
+              <p className="text-[11px] text-purple-300/80 font-light tracking-wide">
+                Living Mythology Engine • Persistent AI Canon
+              </p>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex flex-wrap justify-center items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+          <nav className="flex flex-wrap justify-center items-center gap-1.5 bg-[#0e0d1a]/90 p-1.5 rounded-2xl border border-amber-500/20 shadow-xl">
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
@@ -187,10 +191,10 @@ export function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold font-cinzel transition-all duration-300 ${
                     isActive
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-glow-purple'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-600 text-white shadow-glow-gold scale-105'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
                   }`}
                 >
                   <Icon size={14} />
@@ -200,10 +204,10 @@ export function App() {
             })}
           </nav>
 
-          {/* Soulprint Button */}
+          {/* Soulprint Lens Button */}
           <button
             onClick={() => setShowSoulprintModal(true)}
-            className="glass-pill text-xs font-semibold text-amber-300 border-amber-500/30 hover:border-amber-400/60 transition flex items-center gap-1.5 py-1.5 px-3"
+            className="mythic-pill hover:border-amber-400 transition flex items-center gap-2 py-2 px-4 shadow-lg cursor-pointer"
           >
             <Moon size={14} className="text-amber-400" />
             <span>Soulprint Lens</span>
@@ -224,28 +228,28 @@ export function App() {
             />
 
             {/* Action Approach & Intent Framing */}
-            <div className="glass-panel p-6 space-y-6">
+            <div className="mythic-card p-6 md:p-8 space-y-6">
               <div>
-                <span className="text-xs uppercase tracking-widest text-cyan-400 font-semibold flex items-center gap-1">
-                  <Zap size={14} /> Encounter Action Framework
+                <span className="text-xs uppercase tracking-widest text-cyan-400 font-bold flex items-center gap-1.5">
+                  <Zap size={16} /> Encounter Action Framework
                 </span>
-                <h3 className="text-2xl font-bold font-cinzel text-slate-100">Commit Intent & Approach</h3>
+                <h3 className="text-2xl font-bold font-cinzel text-slate-100 mt-1">Commit Stated Intent & Approach</h3>
               </div>
 
               {/* Action Approach Selection */}
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
                   Select Action Approach:
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5">
                   {['Edge', 'Grace', 'Guile', 'Lore', 'Empathy', 'Craft'].map((app) => (
                     <button
                       key={app}
                       onClick={() => setChosenApproach(app)}
-                      className={`p-3 rounded-xl border text-xs font-bold font-cinzel transition-all ${
+                      className={`p-3.5 rounded-xl border text-xs font-bold font-cinzel transition-all ${
                         chosenApproach === app
-                          ? 'bg-cyan-950/80 border-cyan-400 text-cyan-300 shadow-lg'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-900'
+                          ? 'bg-gradient-to-r from-cyan-900 to-purple-900 border-cyan-400 text-cyan-200 shadow-glow-purple scale-102'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-900'
                       }`}
                     >
                       {app}
@@ -256,35 +260,35 @@ export function App() {
 
               {/* Player Intent Input */}
               <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                  Stated Intent:
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
+                  Stated Intent Narrative:
                 </label>
                 <textarea
                   rows={2}
                   value={playerIntent}
                   onChange={(e) => setPlayerIntent(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-xs text-slate-200 focus:outline-none focus:border-amber-500 shadow-inner"
                 />
               </div>
 
               {/* Resource Investment Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 rounded-2xl bg-slate-950/90 border border-slate-800">
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-xs font-semibold text-amber-400 block">Spend Resonance</span>
-                    <span className="text-[11px] text-slate-400">Boosts outcome ladder score</span>
+                    <span className="text-xs font-bold text-amber-400 block">Spend Resonance</span>
+                    <span className="text-[11px] text-slate-400">Boosts outcome ladder score (+1)</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setResonanceSpent(Math.max(0, resonanceSpent - 1))}
-                      className="w-8 h-8 rounded bg-slate-800 text-amber-400 font-bold"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/30 text-amber-400 font-bold hover:bg-amber-950"
                     >
                       -
                     </button>
-                    <span className="text-sm font-bold font-cinzel text-amber-300 w-6 text-center">{resonanceSpent}</span>
+                    <span className="text-base font-bold font-cinzel text-amber-300 w-6 text-center">{resonanceSpent}</span>
                     <button
                       onClick={() => setResonanceSpent(Math.min(soulSheet.resources.resonance, resonanceSpent + 1))}
-                      className="w-8 h-8 rounded bg-slate-800 text-amber-400 font-bold"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/30 text-amber-400 font-bold hover:bg-amber-950"
                     >
                       +
                     </button>
@@ -293,20 +297,20 @@ export function App() {
 
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-xs font-semibold text-red-400 block">Accept Strain Overreach</span>
+                    <span className="text-xs font-bold text-rose-400 block">Accept Strain Overreach</span>
                     <span className="text-[11px] text-slate-400">Forces outcome at cost of Strain</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setStrainAccepted(Math.max(0, strainAccepted - 1))}
-                      className="w-8 h-8 rounded bg-slate-800 text-red-400 font-bold"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-400 font-bold hover:bg-rose-950"
                     >
                       -
                     </button>
-                    <span className="text-sm font-bold font-cinzel text-red-300 w-6 text-center">{strainAccepted}</span>
+                    <span className="text-base font-bold font-cinzel text-rose-300 w-6 text-center">{strainAccepted}</span>
                     <button
                       onClick={() => setStrainAccepted(Math.min(6 - soulSheet.resources.strain, strainAccepted + 1))}
-                      className="w-8 h-8 rounded bg-slate-800 text-red-400 font-bold"
+                      className="w-9 h-9 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-400 font-bold hover:bg-rose-950"
                     >
                       +
                     </button>
@@ -319,7 +323,7 @@ export function App() {
                 <button
                   onClick={handleResolveScene}
                   disabled={isResolving}
-                  className={`btn-primary text-sm py-3 px-8 ${isResolving ? 'opacity-50 animate-pulse' : ''}`}
+                  className={`btn-gold text-sm py-4 px-10 ${isResolving ? 'opacity-50 animate-pulse' : ''}`}
                 >
                   <Play size={18} />
                   {isResolving ? 'Resolving via Soulkeeper AI...' : 'Resolve Encounter Scene'}
