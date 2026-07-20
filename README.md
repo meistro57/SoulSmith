@@ -471,6 +471,9 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 * API Health Check: `http://localhost:8000/api/v1/health`
+* Optical CV Photo Ingest API: `POST /api/v1/dice/photo-ingest`
+* Phenomena Codex API: `GET /api/v1/phenomena`
+* Relic Attunement API: `POST /api/v1/relics/attune`
 * WebSocket Convergence Endpoint: `ws://localhost:8000/ws/v1/convergence/{room_id}`
 
 ### 2. Frontend Web Application (React, Vite, Three.js, PWA)
@@ -487,9 +490,16 @@ npm run dev
 
 ## Project Status
 
-SoulSmith has progressed to **Playable Engine Foundation (Phase 1–4 Functional Core)**.
+SoulSmith has progressed to **Advanced Playable Engine (Phase 1–4 Complete Core)**.
 
-The full stack includes a FastAPI rules engine with Canon Guardian audit validation, interactive 3D dice sanctuary, Soul Sheet resource manager, World Chronicle memory archive, Astrological Soulprint lens, and real-time Convergence multiplayer room simulator.
+The full stack now includes:
+1. **3D Polyhedral Dice Sanctuary**: Real-time canvas dice roll physics and 7-dice grammar inspector.
+2. **Optical CV Camera Scanner**: Computer Vision preprocessing & YOLO face detection confidence scoring with manual 1-tap face overrides.
+3. **Living Phenomena Codex**: World-scale non-monster encounters (*Echoes, Knots, Veils, Wells, Awakenings, Mirrors*) with escalation meters, hidden needs, and transformation payoffs.
+4. **Relic Attunement Ledger**: Evolving relic lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*).
+5. **Canon Guardian 5-Gate Audit**: Automated verification (*Schema, Rules, Canon Contradictions, Moderation, Memory Routing*).
+6. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`).
+7. **Real-time Convergence Sanctuary**: WebSocket multi-player room role rotation (*Focus, Anchor, Witness, Tempest*).
 
 Expect experiments, strange relics, architectural revisions, and the occasional door that should probably have remained asleep.
 

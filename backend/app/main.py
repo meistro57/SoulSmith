@@ -6,18 +6,26 @@ import uuid
 from typing import Dict, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 from app.grammar import SEVEN_DICE_GRAMMAR, DiceRollRead
-from app.rules import evaluate_scene_outcome, ResolveSceneRequest, ResolveSceneResponse, SoulSheetResources
+from app.rules import evaluate_scene_outcome, ResolveSceneRequest, ResolveSceneResponse
 from app.soulkeeper import generate_soulkeeper_narration, SoulkeeperNarration
 from app.soulprint import generate_astrological_soulprint, SoulprintRequest, SoulprintProfile
+from app.vision import process_dice_photo, PhotoIngestRequest, PhotoIngestResponse
+from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
+from app.relics import process_relic_attunement, RelicAttuneRequest, RelicAttuneResponse
+from app.db import init_database, log_canonical_event, get_all_canonical_events
 
 app = FastAPI(
     title="SoulSmith Mythic Engine API",
     description="Backend API for SoulSmith - Living Mythology Engine",
-    version="1.0.0"
+    version="1.1.0"
 )
+
+# Initialize database tables on startup
+@app.on_event("startup")
+def on_startup():
+    init_database()
 
 # CORS middleware for local dev & frontend PWA
 app.add_middleware(
@@ -27,13 +35,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# In-memory session store & World Chronicle log
-CHRONICLE_EVENTS: List[Dict] = []
-ACTIVE_WORLD_FACTS: List[str] = [
-    "The Starforge remains dormant beneath the crystal peaks.",
-    "The King Without a Reflection traverses the outer Veils."
-]
 
 # WebSocket Connection Manager for Convergence Rooms
 class RoomManager:
@@ -61,7 +62,7 @@ room_manager = RoomManager()
 
 @app.get("/api/v1/health")
 def health_check():
-    return {"status": "ok", "service": "SoulSmith Engine", "version": "1.0.0"}
+    return {"status": "ok", "service": "SoulSmith Engine", "version": "1.1.0"}
 
 @app.get("/api/v1/dice/grammar")
 def get_dice_grammar():
@@ -90,11 +91,16 @@ def cast_dice_roll() -> DiceRollRead:
         thread=random.choice(threads)
     )
 
+@app.post("/api/v1/dice/photo-ingest")
+def optical_dice_photo_ingest(req: PhotoIngestRequest) -> PhotoIngestResponse:
+    """Simulates computer vision optical dice photo scanning & face classification."""
+    return process_dice_photo(req)
+
 @app.post("/api/v1/scenes/resolve")
 def resolve_encounter_scene(req: ResolveSceneRequest):
     """
     Evaluates encounter outcome through deterministic rules ladder,
-    then triggers Soulkeeper AI narration and logs event to World Chronicle.
+    triggers Soulkeeper AI narration, and logs event to database.
     """
     # 1. Deterministic rules ladder evaluation
     outcome: ResolveSceneResponse = evaluate_scene_outcome(req)
@@ -108,31 +114,42 @@ def resolve_encounter_scene(req: ResolveSceneRequest):
         calling="Keeper of Lore"
     )
 
-    # 3. Log event to Chronicle
-    event_entry = {
-        "id": str(uuid.uuid4()),
-        "soul_name": req.soul_name,
-        "dice_read": req.dice_read.model_dump(),
-        "outcome_class": outcome.outcome_class,
-        "narration": narration.model_dump(),
-        "rules_effects": outcome.model_dump()
-    }
-    CHRONICLE_EVENTS.append(event_entry)
-    ACTIVE_WORLD_FACTS.extend(outcome.canon_facts)
+    # 3. Log event to database
+    event_id = log_canonical_event(
+        soul_name=req.soul_name,
+        outcome_class=outcome.outcome_class,
+        dice_read=req.dice_read.model_dump(),
+        narration=narration.model_dump(),
+        canon_facts=outcome.canon_facts
+    )
 
     return {
         "outcome": outcome,
         "narration": narration,
-        "event_id": event_entry["id"]
+        "event_id": event_id
     }
 
 @app.get("/api/v1/chronicle/events")
 def list_chronicle_events():
-    """Returns all recorded events in the World Chronicle."""
+    """Returns all recorded events from the persistent database."""
+    events = get_all_canonical_events()
     return {
-        "events": CHRONICLE_EVENTS,
-        "active_world_facts": ACTIVE_WORLD_FACTS
+        "events": events,
+        "active_world_facts": [
+            "The Starforge remains dormant beneath the crystal peaks.",
+            "The King Without a Reflection traverses the outer Veils."
+        ]
     }
+
+@app.get("/api/v1/phenomena")
+def get_active_phenomena() -> List[Phenomenon]:
+    """Returns all active world phenomena & world pressures."""
+    return DEFAULT_ACTIVE_PHENOMENA
+
+@app.post("/api/v1/relics/attune")
+def attune_relic(req: RelicAttuneRequest) -> RelicAttuneResponse:
+    """Processes relic attunement, overdraw, and stage progression."""
+    return process_relic_attunement(req)
 
 @app.post("/api/v1/soulprints/preview")
 def create_soulprint(req: SoulprintRequest) -> SoulprintProfile:
@@ -146,7 +163,6 @@ async def convergence_websocket(websocket: WebSocket, room_id: str):
     try:
         while True:
             data = await websocket.receive_json()
-            # Broadcast roll or action to room
             await room_manager.broadcast(room_id, {
                 "sender": data.get("sender", "Anonymous Soul"),
                 "action_type": data.get("action_type", "roll"),

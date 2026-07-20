@@ -6,11 +6,13 @@ import { EncounterResolutionModal } from './components/EncounterResolutionModal'
 import { ChronicleView } from './components/ChronicleView';
 import { SoulprintModal } from './components/SoulprintModal';
 import { ConvergenceView } from './components/ConvergenceView';
+import { DiceScanView } from './components/DiceScanView';
+import { PhenomenaView } from './components/PhenomenaView';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'sheet' | 'chronicle' | 'convergence'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'phenomena' | 'chronicle' | 'convergence'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<DiceRollRead>({
@@ -156,7 +158,7 @@ export function App() {
     <div className="min-h-screen text-slate-100 flex flex-col pb-12">
       {/* Top Glass Navigation Bar */}
       <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-purple-500/20 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-amber-500 flex items-center justify-center font-bold text-slate-950 shadow-glow-gold">
               ✦
@@ -168,10 +170,12 @@ export function App() {
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+          <nav className="flex flex-wrap justify-center items-center gap-1 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
+              { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
+              { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
               { id: 'convergence', label: 'Convergence', icon: Radio }
             ].map((tab) => {
@@ -181,7 +185,7 @@ export function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                     isActive
                       ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-glow-purple'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -323,9 +327,20 @@ export function App() {
           </div>
         )}
 
+        {activeTab === 'scan' && (
+          <DiceScanView
+            onApplyScanRead={(read) => {
+              setCurrentRead(read);
+              setActiveTab('sanctuary');
+            }}
+          />
+        )}
+
         {activeTab === 'sheet' && (
           <SoulSheetView sheet={soulSheet} onUpdateSheet={(updated) => setSoulSheet(updated)} />
         )}
+
+        {activeTab === 'phenomena' && <PhenomenaView />}
 
         {activeTab === 'chronicle' && (
           <ChronicleView history={chronicleHistory} worldFacts={worldFacts} />
