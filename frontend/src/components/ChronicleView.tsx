@@ -31,7 +31,7 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ history, worldFact
             <h2 className="text-2xl font-bold font-cinzel text-slate-100">World Chronicle & Immutable Facts</h2>
           </div>
           <span className="glass-pill text-xs text-purple-300 border-purple-500/30 flex items-center gap-1">
-            <Database size={12} /> Postgres + Qdrant Vector Memory
+            <Database size={12} /> SQLite Chronicle Memory
           </span>
         </div>
 
@@ -100,13 +100,13 @@ export const ChronicleView: React.FC<ChronicleViewProps> = ({ history, worldFact
 
               {entry.dice_read && (
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-950 text-xs">
-                  <span className="text-gold-glow">Spark: {entry.dice_read.spark}</span>
+                  <span className="text-gold-glow">Spark: {entry.dice_read.interpretation.spark}</span>
                   <span className="text-slate-600">•</span>
-                  <span className="text-cyan-glow">Domain: {entry.dice_read.domain}</span>
+                  <span className="text-cyan-glow">Domain: {entry.dice_read.interpretation.domain}</span>
                   <span className="text-slate-600">•</span>
-                  <span className="text-purple-glow">Verdict: {entry.dice_read.verdict}</span>
+                  <span className="text-purple-glow">Verdict: {entry.dice_read.interpretation.verdict}</span>
                   <span className="text-slate-600">•</span>
-                  <span className="text-pink-400">Thread: {entry.dice_read.thread}</span>
+                  <span className="text-pink-400">Thread: {entry.dice_read.interpretation.thread}</span>
                 </div>
               )}
             </div>

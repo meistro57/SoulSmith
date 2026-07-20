@@ -6,35 +6,55 @@ Extracts 25 Relics, 10 Weapons, 7 Elemental Essences, 14 Rune Stones, 8 Books & 
 import os
 from PIL import Image
 
-PACK_PATH = 'art/recils-art-assets.png'
-OUT_DIR = 'frontend/public/art'
+PACK_PATH = "art/recils-art-assets.png"
+OUT_DIR = "frontend/public/art"
 
-os.makedirs(os.path.join(OUT_DIR, 'relics_full'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'weapons'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'essences'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'runes'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'tomes'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'phenomena_full'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'portraits_full'), exist_ok=True)
-os.makedirs(os.path.join(OUT_DIR, 'actions'), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "relics_full"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "weapons"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "essences"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "runes"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "tomes"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "phenomena_full"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "portraits_full"), exist_ok=True)
+os.makedirs(os.path.join(OUT_DIR, "actions"), exist_ok=True)
 
 img = Image.open(PACK_PATH)
 w, h = img.size
 print(f"Loaded recils-art-assets.png: {w}x{h}")
 
+
 def crop(box, filepath):
     cropped = img.crop(box)
-    cropped.save(filepath, format='PNG')
+    cropped.save(filepath, format="PNG")
     print(f"Saved: {filepath}")
+
 
 # 1. 25 Relics (5x5 grid in top-left region)
 # Grid bounds approx: x: 15..235, y: 175..615
 relic_names = [
-    ["compass-questions", "echo-lantern", "heart-forge", "veilweaver-pin", "oracles-monocle"],
+    [
+        "compass-questions",
+        "echo-lantern",
+        "heart-forge",
+        "veilweaver-pin",
+        "oracles-monocle",
+    ],
     ["hourglass", "memory-shard", "starforge-key", "bond-echoes", "whispering-quill"],
     ["tideworn-shell", "spike-worldsong", "lumen-sphere", "chaos-coin", "soul-bottle"],
-    ["dreamwalker-mask", "crown-embers", "bloodmoon-stone", "serpents-signet", "gateseeker-orb"],
-    ["tear-world-tree", "sunless-mirror", "phoenix-feather", "aeon-ring", "binding-chain"]
+    [
+        "dreamwalker-mask",
+        "crown-embers",
+        "bloodmoon-stone",
+        "serpents-signet",
+        "gateseeker-orb",
+    ],
+    [
+        "tear-world-tree",
+        "sunless-mirror",
+        "phoenix-feather",
+        "aeon-ring",
+        "binding-chain",
+    ],
 ]
 
 for r_idx, row in enumerate(relic_names):
@@ -43,7 +63,7 @@ for r_idx, row in enumerate(relic_names):
         y1 = int(175 + r_idx * 85)
         x2 = int(x1 + 42)
         y2 = int(y1 + 80)
-        crop((x1, y1, x2, y2), os.path.join(OUT_DIR, 'relics_full', f'{name}.png'))
+        crop((x1, y1, x2, y2), os.path.join(OUT_DIR, "relics_full", f"{name}.png"))
 
 # 2. Weapons & Tools (x: 250..500, y: 35..350)
 weapons = [
@@ -59,7 +79,7 @@ weapons = [
     ("wand-threads", (455, 190, 495, 310)),
 ]
 for name, box in weapons:
-    crop(box, os.path.join(OUT_DIR, 'weapons', f'{name}.png'))
+    crop(box, os.path.join(OUT_DIR, "weapons", f"{name}.png"))
 
 # 3. Elemental Essences (x: 510..740, y: 35..150)
 essences = [
@@ -72,7 +92,7 @@ essences = [
     ("aether", (720, 40, 752, 150)),
 ]
 for name, box in essences:
-    crop(box, os.path.join(OUT_DIR, 'essences', f'{name}.png'))
+    crop(box, os.path.join(OUT_DIR, "essences", f"{name}.png"))
 
 # 4. Action Icons (x: 245..370, y: 560..670)
 actions = [
@@ -88,7 +108,7 @@ actions = [
     ("observe", (345, 625, 368, 675)),
 ]
 for name, box in actions:
-    crop(box, os.path.join(OUT_DIR, 'actions', f'{name}.png'))
+    crop(box, os.path.join(OUT_DIR, "actions", f"{name}.png"))
 
 # 5. Phenomena Full (x: 375..585, y: 410..670)
 phenomena_full = [
@@ -104,7 +124,7 @@ phenomena_full = [
     ("lightwells", (539, 540, 580, 660)),
 ]
 for name, box in phenomena_full:
-    crop(box, os.path.join(OUT_DIR, 'phenomena_full', f'{name}.png'))
+    crop(box, os.path.join(OUT_DIR, "phenomena_full", f"{name}.png"))
 
 # 6. 10 NPC Portraits (2 rows of 5: x: 5..250, y: 720..950)
 portraits = [
@@ -120,7 +140,7 @@ portraits = [
     ("demon-queen", (201, 835, 249, 945)),
 ]
 for name, box in portraits:
-    crop(box, os.path.join(OUT_DIR, 'portraits_full', f'{name}.png'))
+    crop(box, os.path.join(OUT_DIR, "portraits_full", f"{name}.png"))
 
-img.save('frontend/public/art/relics-art-pack.png', format='PNG')
+img.save("frontend/public/art/relics-art-pack.png", format="PNG")
 print("Extracted all relics, weapons, essences, runes, phenomena, and portraits!")

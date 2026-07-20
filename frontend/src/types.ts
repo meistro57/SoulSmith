@@ -1,4 +1,16 @@
-export interface DiceRollRead {
+// frontend/src/types.ts
+export interface NumericDiceRoll {
+  d20: number;
+  d12: number;
+  d10: number;
+  percentile: number;
+  d8: number;
+  d6: number;
+  d4: number;
+  grammar_version: string;
+}
+
+export interface DiceInterpretation {
   spark: string;
   domain: string;
   pressure: string;
@@ -8,76 +20,37 @@ export interface DiceRollRead {
   thread: string;
 }
 
-export interface SoulResources {
-  resonance: number;
-  strain: number;
-  thread_count: number;
+/** @deprecated Use DiceInterpretation for symbols and CanonicalDiceRead for canonical records. */
+export type DiceRollRead = DiceInterpretation;
+
+export interface CanonicalDiceRead {
+  raw: Omit<NumericDiceRoll, 'grammar_version'>;
+  grammar_version: string;
+  interpretation: DiceInterpretation;
+  grammar_sentence: string;
 }
 
-export interface Relic {
-  id: string;
-  name: string;
-  stage: 'Dormant' | 'Remembered' | 'Awakened' | 'Overdrawn' | 'Fractured' | 'Transfigured';
-  effect: string;
-  overdraw_consequence: string;
-}
+export interface SoulResources { resonance: number; strain: number; thread_count: number; }
+export interface Relic { id: string; name: string; stage: 'Dormant' | 'Remembered' | 'Awakened' | 'Overdrawn' | 'Fractured' | 'Transfigured'; effect: string; overdraw_consequence: string; }
+export interface SoulSheet { name: string; calling: string; origin: string; desire: string; fear: string; wound: string; resources: SoulResources; relics: Relic[]; bonds: string[]; scars: string[]; }
+export interface CanonGuardianAudit { passed: boolean; gate_name: string; details: string; }
+export interface SoulkeeperNarration { title: string; prose: string; tone: string; scene_beats: string[]; canon_writeback: string[]; guardian_audit: CanonGuardianAudit[]; }
+export interface ResolveOutcome { outcome_class: 'ascendancy' | 'marked_success' | 'revelatory_failure' | 'collapse'; outcome_title: string; rules_summary: string; resonance_delta: number; strain_delta: number; thread_delta: number; new_resources: SoulResources; fracture_triggered: boolean; canon_facts: string[]; }
+export interface ResolvedScene { outcome: ResolveOutcome; narration: SoulkeeperNarration; event_id: string; timestamp?: string; dice_read?: CanonicalDiceRead; }
+export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
-export interface SoulSheet {
-  name: string;
-  calling: string;
-  origin: string;
-  desire: string;
-  fear: string;
-  wound: string;
-  resources: SoulResources;
-  relics: Relic[];
-  bonds: string[];
-  scars: string[];
-}
+export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;
 
-export interface CanonGuardianAudit {
-  passed: boolean;
-  gate_name: string;
-  details: string;
-}
+export const isNumericDiceRoll = (value: unknown): value is NumericDiceRoll => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return Object.entries(DIE_LIMITS).every(([die, limit]) => Number.isInteger(candidate[die]) && (candidate[die] as number) >= 1 && (candidate[die] as number) <= limit) && typeof candidate.grammar_version === 'string';
+};
 
-export interface SoulkeeperNarration {
-  title: string;
-  prose: string;
-  tone: string;
-  scene_beats: string[];
-  canon_writeback: string[];
-  guardian_audit: CanonGuardianAudit[];
-}
+export const isCanonicalDiceRead = (value: unknown): value is CanonicalDiceRead => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as CanonicalDiceRead;
+  return Boolean(candidate.raw && candidate.interpretation && candidate.grammar_version && candidate.grammar_sentence);
+};
 
-export interface ResolveOutcome {
-  outcome_class: 'ascendancy' | 'marked_success' | 'revelatory_failure' | 'collapse';
-  outcome_title: string;
-  rules_summary: string;
-  resonance_delta: number;
-  strain_delta: number;
-  thread_delta: number;
-  new_resources: SoulResources;
-  fracture_triggered: boolean;
-  canon_facts: string[];
-}
-
-export interface ResolvedScene {
-  outcome: ResolveOutcome;
-  narration: SoulkeeperNarration;
-  event_id: string;
-  timestamp?: string;
-  dice_read?: DiceRollRead;
-}
-
-export interface SoulprintProfile {
-  sun_sign: string;
-  moon_sign: string;
-  ascendant_sign: string;
-  elemental_balance: Record<string, number>;
-  motifs: Array<{ tag: string; weight: number; description: string }>;
-  favored_domains: string[];
-  favored_threads: string[];
-  narrative_hooks: string[];
-  privacy_notice: string;
-}
+export const toNumericDiceRoll = (raw: CanonicalDiceRead['raw'], grammarVersion: string): NumericDiceRoll => ({ ...raw, grammar_version: grammarVersion });

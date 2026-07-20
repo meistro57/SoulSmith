@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { SoulprintProfile } from '../types';
+import { apiClient } from '../lib/api';
 import { Moon, Sun, ShieldCheck, Sparkles, X, Check } from 'lucide-react';
 
 interface SoulprintModalProps {
@@ -20,17 +21,12 @@ export const SoulprintModal: React.FC<SoulprintModalProps> = ({ onClose, onApply
     setIsGenerating(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/soulprints/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_consent: userConsent,
-          birth_date: birthDate,
-          birth_time: birthTime,
-          birth_location: birthLocation
-        })
+      const data = await apiClient.previewSoulprint({
+        user_consent: userConsent,
+        birth_date: birthDate,
+        birth_time: birthTime,
+        birth_location: birthLocation
       });
-      const data = res.ok ? await res.json() : generateFallbackSoulprint();
       setProfile(data);
     } catch {
       setProfile(generateFallbackSoulprint());
