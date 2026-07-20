@@ -1,0 +1,4 @@
+interface:
+  display_name: "Three.js Procedural Vegetation"
+  short_description: "Generate ivy, trees, grass, and foliage"
+  default_prompt: "Use $threejs-procedural-vegetation to build deterministic surface ivy, tree growth, authored foliage, or rooted grass with coherent wind and diagnostics."

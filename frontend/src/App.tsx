@@ -156,26 +156,21 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen text-slate-100 flex flex-col pb-16">
-      {/* Top Glass Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-[#05040a]/90 backdrop-blur-xl border-b border-amber-500/30 px-6 py-4 shadow-2xl">
+    <div className="min-h-screen text-[var(--parchment)] flex flex-col pb-16">
+      {/* Top Glass Navigation Bar with Expanded Logo Bounding Box */}
+      <header className="sticky top-0 z-40 bg-[var(--void)]/90 backdrop-blur-xl border-b border-[var(--line)] px-6 py-3 shadow-2xl">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-purple-600 to-cyan-500 p-0.5 shadow-glow-gold">
-              <div className="w-full h-full bg-[#080711] rounded-[14px] flex items-center justify-center font-black text-amber-400 text-xl font-cinzel">
-                ✦
-              </div>
-            </div>
+            <img src="/art/soulsmith-logo.png" alt="SoulSmith Logo" className="h-12 w-auto object-contain py-0.5" />
             <div>
-              <h1 className="text-2xl font-black font-cinzel text-gold-gradient tracking-widest">SOULSMITH</h1>
-              <p className="text-[11px] text-purple-300/80 font-light tracking-wide">
-                Living Mythology Engine • Persistent AI Canon
+              <p className="text-[11px] text-[var(--spark)] font-mono tracking-widest uppercase">
+                Living Mythology Engine
               </p>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex flex-wrap justify-center items-center gap-1.5 bg-[#0e0d1a]/90 p-1.5 rounded-2xl border border-amber-500/20 shadow-xl">
+          <nav className="flex flex-wrap justify-center items-center gap-1.5 bg-[var(--deep)]/90 p-1.5 rounded-2xl border border-[var(--line)] shadow-xl">
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
@@ -191,10 +186,10 @@ export function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold font-cinzel transition-all duration-300 ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono tracking-wider transition-all duration-300 ${
                     isActive
-                      ? 'bg-gradient-to-r from-amber-600 via-purple-600 to-indigo-600 text-white shadow-glow-gold scale-105'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                      ? 'bg-[var(--gold)] text-[var(--void)] font-bold shadow-lg scale-105'
+                      : 'text-[var(--parchment)] opacity-80 hover:opacity-100 hover:bg-[var(--void)]/50'
                   }`}
                 >
                   <Icon size={14} />
@@ -207,9 +202,9 @@ export function App() {
           {/* Soulprint Lens Button */}
           <button
             onClick={() => setShowSoulprintModal(true)}
-            className="mythic-pill hover:border-amber-400 transition flex items-center gap-2 py-2 px-4 shadow-lg cursor-pointer"
+            className="mythic-pill hover:border-[var(--gold)] transition flex items-center gap-2 py-2 px-4 shadow-lg cursor-pointer"
           >
-            <Moon size={14} className="text-amber-400" />
+            <Moon size={14} className="text-[var(--gold)]" />
             <span>Soulprint Lens</span>
           </button>
         </div>
@@ -230,15 +225,15 @@ export function App() {
             {/* Action Approach & Intent Framing */}
             <div className="mythic-card p-6 md:p-8 space-y-6">
               <div>
-                <span className="text-xs uppercase tracking-widest text-cyan-400 font-bold flex items-center gap-1.5">
-                  <Zap size={16} /> Encounter Action Framework
+                <span className="eyebrow flex items-center gap-1.5">
+                  <Zap size={14} /> Encounter Action Framework
                 </span>
-                <h3 className="text-2xl font-bold font-cinzel text-slate-100 mt-1">Commit Stated Intent & Approach</h3>
+                <h3 className="text-2xl font-bold font-cinzel text-[var(--gold)] mt-1">Commit Stated Intent & Approach</h3>
               </div>
 
               {/* Action Approach Selection */}
               <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-mono text-[var(--parchment)] uppercase tracking-wider block mb-2 opacity-80">
                   Select Action Approach:
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5">
@@ -246,10 +241,10 @@ export function App() {
                     <button
                       key={app}
                       onClick={() => setChosenApproach(app)}
-                      className={`p-3.5 rounded-xl border text-xs font-bold font-cinzel transition-all ${
+                      className={`p-3 rounded-xl border text-xs font-mono font-bold transition-all ${
                         chosenApproach === app
-                          ? 'bg-gradient-to-r from-cyan-900 to-purple-900 border-cyan-400 text-cyan-200 shadow-glow-purple scale-102'
-                          : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-900'
+                          ? 'bg-[var(--spark)] text-[var(--void)] border-[var(--spark)] shadow-lg scale-102'
+                          : 'bg-[var(--deep)] border-[var(--line)] text-[var(--parchment)] hover:border-[var(--spark-dim)]'
                       }`}
                     >
                       {app}
@@ -260,35 +255,35 @@ export function App() {
 
               {/* Player Intent Input */}
               <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-2">
+                <label className="text-xs font-mono text-[var(--parchment)] uppercase tracking-wider block mb-2 opacity-80">
                   Stated Intent Narrative:
                 </label>
                 <textarea
                   rows={2}
                   value={playerIntent}
                   onChange={(e) => setPlayerIntent(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-xs text-slate-200 focus:outline-none focus:border-amber-500 shadow-inner"
+                  className="w-full bg-[var(--deep)] border border-[var(--line)] rounded-2xl p-4 text-xs font-body text-[var(--parchment)] focus:outline-none focus:border-[var(--spark)] shadow-inner"
                 />
               </div>
 
               {/* Resource Investment Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 rounded-2xl bg-slate-950/90 border border-slate-800">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 rounded-2xl bg-[var(--deep)]/90 border border-[var(--line)]">
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-xs font-bold text-amber-400 block">Spend Resonance</span>
-                    <span className="text-[11px] text-slate-400">Boosts outcome ladder score (+1)</span>
+                    <span className="text-xs font-mono font-bold text-[var(--gold)] block">Spend Resonance</span>
+                    <span className="text-[11px] text-[var(--parchment)] opacity-70">Boosts outcome ladder score (+1)</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setResonanceSpent(Math.max(0, resonanceSpent - 1))}
-                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/30 text-amber-400 font-bold hover:bg-amber-950"
+                      className="w-8 h-8 rounded-lg bg-[var(--void)] border border-[var(--gold-dim)] text-[var(--gold)] font-bold"
                     >
                       -
                     </button>
-                    <span className="text-base font-bold font-cinzel text-amber-300 w-6 text-center">{resonanceSpent}</span>
+                    <span className="text-base font-bold font-cinzel text-[var(--gold-bright)] w-6 text-center">{resonanceSpent}</span>
                     <button
                       onClick={() => setResonanceSpent(Math.min(soulSheet.resources.resonance, resonanceSpent + 1))}
-                      className="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/30 text-amber-400 font-bold hover:bg-amber-950"
+                      className="w-8 h-8 rounded-lg bg-[var(--void)] border border-[var(--gold-dim)] text-[var(--gold)] font-bold"
                     >
                       +
                     </button>
@@ -297,20 +292,20 @@ export function App() {
 
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-xs font-bold text-rose-400 block">Accept Strain Overreach</span>
-                    <span className="text-[11px] text-slate-400">Forces outcome at cost of Strain</span>
+                    <span className="text-xs font-mono font-bold text-rose-400 block">Accept Strain Overreach</span>
+                    <span className="text-[11px] text-[var(--parchment)] opacity-70">Forces outcome at cost of Strain</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setStrainAccepted(Math.max(0, strainAccepted - 1))}
-                      className="w-9 h-9 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-400 font-bold hover:bg-rose-950"
+                      className="w-8 h-8 rounded-lg bg-[var(--void)] border border-rose-500/30 text-rose-400 font-bold"
                     >
                       -
                     </button>
                     <span className="text-base font-bold font-cinzel text-rose-300 w-6 text-center">{strainAccepted}</span>
                     <button
                       onClick={() => setStrainAccepted(Math.min(6 - soulSheet.resources.strain, strainAccepted + 1))}
-                      className="w-9 h-9 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-400 font-bold hover:bg-rose-950"
+                      className="w-8 h-8 rounded-lg bg-[var(--void)] border border-rose-500/30 text-rose-400 font-bold"
                     >
                       +
                     </button>
@@ -323,7 +318,7 @@ export function App() {
                 <button
                   onClick={handleResolveScene}
                   disabled={isResolving}
-                  className={`btn-gold text-sm py-4 px-10 ${isResolving ? 'opacity-50 animate-pulse' : ''}`}
+                  className={`btn-gold text-sm py-3 px-8 ${isResolving ? 'opacity-50 animate-pulse' : ''}`}
                 >
                   <Play size={18} />
                   {isResolving ? 'Resolving via Soulkeeper AI...' : 'Resolve Encounter Scene'}

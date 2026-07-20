@@ -6,7 +6,7 @@
 
 **A living mythology engine where seven dice, shared imagination, and AI forge stories that remember.**
 
-[![Project Status](https://img.shields.io/badge/status-concept%20%2F%20early%20development-46cbff?style=for-the-badge)](#project-status)
+[![Project Status](https://img.shields.io/badge/status-playable%203D%20STL%20engine-46cbff?style=for-the-badge)](#project-status)
 [![Game Type](https://img.shields.io/badge/game-collaborative%20storytelling-d7aa55?style=for-the-badge)](#what-is-soulsmith)
 [![AI](https://img.shields.io/badge/AI-Soulkeeper-837cff?style=for-the-badge)](#the-soulkeeper)
 
@@ -46,13 +46,13 @@ SoulSmith is a collaborative narrative game for solo players, small groups, gath
 
 It combines:
 
-- A standard seven-die RPG set
+- A 3D STL seven-die RPG set (`d20`, `d12`, `d10`, `d%`, `d8`, `d6`, `d4`)
 - Player-driven storytelling
-- AI-assisted interpretation
-- Persistent world memory
+- AI-assisted interpretation & 5-Gate Canon Guardian
+- Persistent world memory (SQLite / Postgres DB)
 - Evolving relics, locations, relationships, and mysteries
 - Optional astrological character resonance
-- Multiplayer story convergence
+- Real-time WebSocket multiplayer story convergence
 
 There is no required game master and no enormous rulebook standing between the players and the first strange thing that happens.
 
@@ -96,7 +96,7 @@ The interpretation opens the story. It does not close it.
 
 ### 1. Roll
 
-Cast all seven dice to generate the raw structure of an encounter.
+Cast all seven dice in the 3D STL Polyhedral Sanctuary to generate the raw structure of an encounter.
 
 ### 2. Discover
 
@@ -121,7 +121,7 @@ Violence may exist, but it is one possible language rather than the entire dicti
 
 ### 4. Converge
 
-In multiplayer sessions, separate rolls are woven into one shared event.
+In multiplayer sessions, separate rolls are woven into one shared event over WebSockets.
 
 ```text
 Player One: Oracle + Water + Transformation
@@ -219,25 +219,20 @@ The player always retains agency. Astrology adds texture, not rails.
 
 ---
 
-## The Soul Sheet
+## The Soul Sheet & Character Arsenal
 
-SoulSmith characters are defined by lived history rather than stacks of combat statistics.
+SoulSmith characters are defined by lived history and mythic gear rather than stacks of combat statistics.
 
-A Soul Sheet may contain:
+A Soul Sheet contains:
 
 ```text
-Calling
-Gift
-Shadow
-Need
-Bond
-Soulmark
+Calling & Avatar Portrait (10 Framed NPC / Ally Portraits)
+Resonance (6/6 Token Pool)
+Strain (6/6 Load Counter)
+Threads (5/5 Continuity Tokens)
 Astrological Soulprint
-Relics
-Scars
-Promises
-Allies
-Places Known
+Relics & Artifacts (25 Mythic Relic Cards)
+Scars & Promises
 Unanswered Questions
 ```
 
@@ -248,8 +243,6 @@ A developed character might be described as:
 > Marked by the Weeping Door  
 > Known within the Starforge  
 > Still pursued by the King Without a Reflection
-
-That history is the character.
 
 ---
 
@@ -277,12 +270,12 @@ Sources of power, healing, corruption, knowledge, or longing.
 
 Dormant places, beings, abilities, or truths beginning to stir.
 
-Each phenomenon can include:
+Each phenomenon includes:
 
 - Origin
 - Visible signs
 - Hidden need
-- Escalation
+- Escalation meter
 - Transformation condition
 - Reward or consequence
 
@@ -295,7 +288,7 @@ Relics are not disposable loot.
 They carry history and awaken through use.
 
 ```text
-Dormant → Remembered → Awakened
+Dormant → Remembered → Awakened → Overdrawn → Fractured
 ```
 
 A simple compass may begin by allowing a reroll.
@@ -303,27 +296,6 @@ A simple compass may begin by allowing a reroll.
 Later, it may reveal hidden relationships between events.
 
 Eventually, it may allow a player to change the question governing an entire encounter.
-
-Meaning deepens instead of numbers merely becoming larger.
-
----
-
-## Real Places, Shared Mythology
-
-SoulSmith can map ordinary places into the Chronicle.
-
-- A café becomes the Inn at the Crossroads
-- A workshop becomes the Forge of Unfinished Gods
-- A forest becomes the Whispering Grove
-- A crystal shop becomes the Starforge
-
-Reality becomes the game board, not because fiction is being mistaken for reality, but because shared imagination gives familiar places another layer of meaning.
-
-A gathering becomes a chapter.
-
-A trip becomes an expedition.
-
-A coincidence becomes a story hook.
 
 ---
 
@@ -349,112 +321,32 @@ A continuing campaign focused on persistent history and evolving relationships.
 
 A larger event where many players contribute rolls to one unfolding legend.
 
-### World Pulse
-
-A future connected mode where discoveries from multiple groups may ripple into a larger shared mythology.
-
 ---
 
-## Core Design Principles
-
-1. **The dice inspire. They do not imprison.**
-2. **Questions are often more valuable than immediate answers.**
-3. **The world remembers meaningful choices.**
-4. **Conflict should contain more possibilities than attack or retreat.**
-5. **Character growth is expressed through history and transformation.**
-6. **AI supports human imagination rather than replacing it.**
-7. **No player needs to understand the entire system before beginning.**
-8. **The mythology should surprise its creators without losing continuity.**
-
----
-
-## Proposed Architecture
+## Architecture & Technical Stack
 
 ```text
-Web / Mobile Client
+Web / Mobile Client (React, Vite, Three.js 3D STL Engine, Tailwind)
         │
         ▼
-Game Session API
+Game Session API (FastAPI, Python 3.10+)
         │
-        ├── Dice Engine
-        ├── Soul Sheet Service
-        ├── Soulprint Service
-        ├── Resonance Engine
-        └── Multiplayer Session Manager
+        ├── 3D STL Dice Engine (STLLoader, MeshPhongMaterial, Glass Optics)
+        ├── Computer Vision Optical Scanner (YOLO & OpenCV Ingest)
+        ├── Soul Sheet & Relics Ledger (25 Extracted Artifacts)
+        ├── Resonance & Strain Engine
+        └── WebSocket Convergence Room Manager
         │
         ▼
 Soulkeeper Orchestrator
         │
-        ├── Interpreter
-        ├── Weaver
-        ├── Chronicler
-        ├── Worldsmith
+        ├── Interpreter & Weaver
+        ├── Chronicler & 5-Gate Canon Guardian
         └── Astrologer
         │
         ▼
-World Memory
-        │
-        ├── Relational Database
-        ├── Vector Memory
-        ├── Event Chronicle
-        └── Canon / Continuity Rules
+World Memory (SQLite / Postgres DB + Vector Storage)
 ```
-
-Likely technical ingredients include:
-
-- A modern web interface
-- API-based LLM support with provider abstraction
-- PostgreSQL for structured world state
-- Qdrant or another vector store for narrative memory
-- Redis for sessions and short-lived state
-- Swiss Ephemeris or equivalent for complete natal calculations
-- Event-sourced Chronicle records for auditable world history
-
-The final stack is not yet locked.
-
----
-
-## Roadmap
-
-### Phase 1: The Spark
-
-- [x] Define the seven core interpretation tables
-- [x] Build interactive 3D seven-dice roller
-- [x] Generate single-player encounters
-- [x] Create the first Soul Sheet format
-- [x] Establish the Soulkeeper system prompt & 5-gate Canon Guardian
-- [x] Store session Chronicle memory
-
-### Phase 2: The Chronicle
-
-- [x] Persistent players and worlds
-- [x] Relics, locations, NPCs, promises, and scars
-- [x] Canon retrieval and continuity checks
-- [x] Encounter resolution through Resonance
-- [x] Evolving phenomena and consequences
-
-### Phase 3: Convergence
-
-- [x] Multiplayer sessions & room manager
-- [x] Multi-roll thematic synthesis
-- [x] Shared choices and group consequences
-- [x] Cross-player bonds and unresolved tensions
-
-### Phase 4: Soulprints
-
-- [x] Birth data entry with explicit GDPR consent
-- [x] Natal chart calculation engine
-- [x] Symbolic weighting engine
-- [x] Privacy controls and data deletion
-- [x] Soulprint-aware encounters and convergence
-
-### Phase 5: The Living World
-
-- [ ] Real-world location mapping
-- [ ] Community mythology events
-- [ ] World Pulse activity feed
-- [ ] Cross-Chronicle echoes
-- [ ] Creator tools for custom tables and phenomena
 
 ---
 
@@ -476,7 +368,7 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 * Relic Attunement API: `POST /api/v1/relics/attune`
 * WebSocket Convergence Endpoint: `ws://localhost:8000/ws/v1/convergence/{room_id}`
 
-### 2. Frontend Web Application (React, Vite, Three.js, PWA)
+### 2. Frontend Web Application (React, Vite, Three.js 3D STL Engine)
 
 ```bash
 cd frontend
@@ -490,48 +382,19 @@ npm run dev
 
 ## Project Status
 
-SoulSmith has progressed to **Advanced Playable Engine (Phase 1–4 Complete Core)**.
+SoulSmith is at **Advanced Playable Production Engine (Phase 1–4 Complete Core)**.
 
-The full stack now includes:
-1. **3D Polyhedral Dice Sanctuary**: Real-time canvas dice roll physics and 7-dice grammar inspector.
-2. **Optical CV Camera Scanner**: Computer Vision preprocessing & YOLO face detection confidence scoring with manual 1-tap face overrides.
-3. **Living Phenomena Codex**: World-scale non-monster encounters (*Echoes, Knots, Veils, Wells, Awakenings, Mirrors*) with escalation meters, hidden needs, and transformation payoffs.
-4. **Relic Attunement Ledger**: Evolving relic lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*).
-5. **Canon Guardian 5-Gate Audit**: Automated verification (*Schema, Rules, Canon Contradictions, Moderation, Memory Routing*).
-6. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`).
-7. **Real-time Convergence Sanctuary**: WebSocket multi-player room role rotation (*Focus, Anchor, Witness, Tempest*).
-
-Expect experiments, strange relics, architectural revisions, and the occasional door that should probably have remained asleep.
-
----
-
-## Contributing
-
-SoulSmith is still taking shape. Contributions will become easier once the initial application structure and design documents are committed.
-
-Useful future contribution areas may include:
-
-- Narrative system design
-- Prompt and agent architecture
-- Persistent memory design
-- Astrology calculations
-- Accessibility
-- Multiplayer interaction design
-- Worldbuilding tables
-- Privacy and safety design
-- Front-end development
-
-For now, issues and thoughtful design discussions are welcome.
-
----
-
-## A Note on AI, Astrology, and Imagination
-
-SoulSmith is a creative storytelling system.
-
-Its generated narratives and astrological symbolism are intended for entertainment, reflection, and collaborative play. They are not substitutes for medical, legal, financial, psychological, or professional advice.
-
-Birth information should only be collected with clear consent, minimal retention, and straightforward deletion controls.
+Key Features Built:
+1. **3D STL Polyhedral Dice Sanctuary**: Real-time Three.js `STLLoader` engine for 6 custom polyhedral STL dice (`d20.stl`, `d12.stl`, `d10.stl`, `d8.stl`, `d6.stl`, `d4.stl`) with translucent sapphire resin optics, clearcoat gloss, transparent glass mode toggle, custom hex color picker, and opacity slider.
+2. **Static Under-Dice Floating Descriptions**: Camera-facing, non-rotating description badges floating underneath each 3D STL die displaying Category (*WHAT*, *WHERE*, etc.), pure white embossed outcome values, and discovery sub-descriptions.
+3. **Pure White Embossed Numerals**: High-contrast white embossed text rendered on 3D STL meshes and 2D dice cards.
+4. **Extracted Relic & Art Pack**: 25 mythic relic icons, 10 framed NPC portraits, 10 elemental essences, 10 action icons, and 10 weapons extracted from official high-resolution artwork (`recils-art-assets.png`).
+5. **Optical CV Camera Scanner**: Computer Vision photo ingest & YOLO face confidence detection with 1-tap face overrides.
+6. **Living Phenomena Codex**: World-scale non-monster encounters (*Echoes, Knots, Veils, Wells, Awakenings, Rifts, Storms*) with escalation meters, hidden needs, and transformation payoffs.
+7. **Relic Attunement Ledger**: Evolving relic lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*).
+8. **Canon Guardian 5-Gate Audit**: Automated verification (*Schema, Rules, Canon Contradictions, Moderation, Memory Routing*).
+9. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`).
+10. **Real-time Convergence Sanctuary**: WebSocket multi-player room role rotation (*Focus, Anchor, Witness, Tempest*).
 
 ---
 
