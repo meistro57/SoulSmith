@@ -16,6 +16,9 @@
 
 ---
 
+<img width="1311" height="1775" alt="image" src="https://github.com/user-attachments/assets/4ecec4f9-1b58-4513-ba91-199186784f9b" />
+
+
 ## The Vision
 
 Most role-playing games invite players into a world that has already been written.
