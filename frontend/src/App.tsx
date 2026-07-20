@@ -8,11 +8,12 @@ import { SoulprintModal } from './components/SoulprintModal';
 import { ConvergenceView } from './components/ConvergenceView';
 import { DiceScanView } from './components/DiceScanView';
 import { PhenomenaView } from './components/PhenomenaView';
+import { MythicGalleryView } from './components/MythicGalleryView';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'phenomena' | 'chronicle' | 'convergence'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<DiceRollRead>({
@@ -177,7 +178,8 @@ export function App() {
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
-              { id: 'convergence', label: 'Convergence', icon: Radio }
+              { id: 'convergence', label: 'Convergence', icon: Radio },
+              { id: 'art', label: 'Mythic Art', icon: Image }
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -349,6 +351,8 @@ export function App() {
         {activeTab === 'convergence' && (
           <ConvergenceView currentRead={currentRead} soulName={soulSheet.name} />
         )}
+
+        {activeTab === 'art' && <MythicGalleryView />}
       </main>
 
       {/* Resolution Modal */}
