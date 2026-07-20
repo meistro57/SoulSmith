@@ -418,35 +418,35 @@ The final stack is not yet locked.
 
 ### Phase 1: The Spark
 
-- [ ] Define the seven core interpretation tables
-- [ ] Build a basic seven-dice roller
-- [ ] Generate single-player encounters
-- [ ] Create the first Soul Sheet format
-- [ ] Establish the Soulkeeper system prompt
-- [ ] Store a simple session Chronicle
+- [x] Define the seven core interpretation tables
+- [x] Build interactive 3D seven-dice roller
+- [x] Generate single-player encounters
+- [x] Create the first Soul Sheet format
+- [x] Establish the Soulkeeper system prompt & 5-gate Canon Guardian
+- [x] Store session Chronicle memory
 
 ### Phase 2: The Chronicle
 
-- [ ] Persistent players and worlds
-- [ ] Relics, locations, NPCs, promises, and scars
-- [ ] Canon retrieval and continuity checks
-- [ ] Encounter resolution through Resonance
-- [ ] Evolving phenomena and consequences
+- [x] Persistent players and worlds
+- [x] Relics, locations, NPCs, promises, and scars
+- [x] Canon retrieval and continuity checks
+- [x] Encounter resolution through Resonance
+- [x] Evolving phenomena and consequences
 
 ### Phase 3: Convergence
 
-- [ ] Multiplayer sessions
-- [ ] Multi-roll thematic synthesis
-- [ ] Shared choices and group consequences
-- [ ] Cross-player bonds and unresolved tensions
+- [x] Multiplayer sessions & room manager
+- [x] Multi-roll thematic synthesis
+- [x] Shared choices and group consequences
+- [x] Cross-player bonds and unresolved tensions
 
 ### Phase 4: Soulprints
 
-- [ ] Birth data entry with explicit consent
-- [ ] Natal chart calculation
-- [ ] Symbolic weighting engine
-- [ ] Privacy controls and data deletion
-- [ ] Soulprint-aware encounters and convergence
+- [x] Birth data entry with explicit GDPR consent
+- [x] Natal chart calculation engine
+- [x] Symbolic weighting engine
+- [x] Privacy controls and data deletion
+- [x] Soulprint-aware encounters and convergence
 
 ### Phase 5: The Living World
 
@@ -458,11 +458,38 @@ The final stack is not yet locked.
 
 ---
 
+## Quickstart & Running Locally
+
+### 1. Backend Engine (FastAPI & Python)
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+* API Health Check: `http://localhost:8000/api/v1/health`
+* WebSocket Convergence Endpoint: `ws://localhost:8000/ws/v1/convergence/{room_id}`
+
+### 2. Frontend Web Application (React, Vite, Three.js, PWA)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+* Local Web App URL: `http://localhost:5173`
+
+---
+
 ## Project Status
 
-SoulSmith is currently in **concept and early development**.
+SoulSmith has progressed to **Playable Engine Foundation (Phase 1–4 Functional Core)**.
 
-The mythology, core mechanics, agent architecture, visual identity, and initial website concept are being developed in public.
+The full stack includes a FastAPI rules engine with Canon Guardian audit validation, interactive 3D dice sanctuary, Soul Sheet resource manager, World Chronicle memory archive, Astrological Soulprint lens, and real-time Convergence multiplayer room simulator.
 
 Expect experiments, strange relics, architectural revisions, and the occasional door that should probably have remained asleep.
 
