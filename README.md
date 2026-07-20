@@ -410,3 +410,48 @@ Key Features Built:
 [Explore SoulSmith](https://quantummindsunited.com/soulsmith/)
 
 </div>
+
+---
+
+## Local Development
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+uvicorn app.main:app --reload
+```
+
+Useful backend checks:
+
+```bash
+python -m pytest
+ruff check .
+ruff format --check .
+```
+
+### Frontend
+
+Create `frontend/.env` from `frontend/.env.example` when the API URL differs from local defaults.
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Useful frontend checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+## Canonical Roll Contract
+
+SoulSmith now treats the seven numeric dice faces as the immutable roll record. Symbolic values are derived through a versioned grammar and persisted alongside the raw values in the Chronicle. See [`docs/ROLL_CONTRACT.md`](docs/ROLL_CONTRACT.md) for schemas, workflows, compatibility policy, and the initial `1.0.0` vocabulary.

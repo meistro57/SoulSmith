@@ -1,9 +1,30 @@
-# Dependencies & Build artifacts
-node_modules/
-dist/
-venv/
+# Python
 __pycache__/
-*.pyc
-.DS_Store
-*.log
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+venv/
+
+# Local databases
+*.db
+backend/soulsmith_canonical.db
+
+# Node/Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Environment files
 .env
+backend/.env
+!.env.example
+!frontend/.env.example
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store

@@ -2,14 +2,15 @@
 SoulSmith Relic Attunement & Evolution Engine
 """
 
-from typing import Dict, List, Optional
 from pydantic import BaseModel
+
 
 class RelicAttuneRequest(BaseModel):
     relic_id: str
     relic_name: str
     current_stage: str
     action: str  # attune | overdraw | repair | transfigure
+
 
 class RelicAttuneResponse(BaseModel):
     relic_id: str
@@ -18,10 +19,23 @@ class RelicAttuneResponse(BaseModel):
     strain_penalty: int
     canon_note: str
 
-RELIC_STAGES = ["Dormant", "Remembered", "Awakened", "Overdrawn", "Fractured", "Transfigured"]
+
+RELIC_STAGES = [
+    "Dormant",
+    "Remembered",
+    "Awakened",
+    "Overdrawn",
+    "Fractured",
+    "Transfigured",
+]
+
 
 def process_relic_attunement(req: RelicAttuneRequest) -> RelicAttuneResponse:
-    curr_idx = RELIC_STAGES.index(req.current_stage) if req.current_stage in RELIC_STAGES else 0
+    curr_idx = (
+        RELIC_STAGES.index(req.current_stage)
+        if req.current_stage in RELIC_STAGES
+        else 0
+    )
 
     strain_penalty = 0
     if req.action == "attune":
@@ -48,5 +62,5 @@ def process_relic_attunement(req: RelicAttuneRequest) -> RelicAttuneResponse:
         new_stage=new_stage,
         effect_unlocked=effect,
         strain_penalty=strain_penalty,
-        canon_note=note
+        canon_note=note,
     )

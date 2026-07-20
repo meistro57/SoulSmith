@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Flame, Eye, RefreshCw } from 'lucide-react';
+import { apiClient } from '../lib/api';
 
 interface Phenomenon {
   id: string;
@@ -34,8 +35,7 @@ export const PhenomenaView: React.FC = () => {
   const fetchPhenomena = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/phenomena');
-      const data = res.ok ? await res.json() : generateFallbackPhenomena();
+      const data = await apiClient.listPhenomena<Phenomenon[]>();
       setPhenomena(data);
     } catch {
       setPhenomena(generateFallbackPhenomena());

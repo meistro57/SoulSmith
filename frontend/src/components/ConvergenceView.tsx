@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import type { DiceRollRead } from '../types';
+import type { CanonicalDiceRead } from '../types';
 import { Users, Radio, Sparkles, Send, Zap } from 'lucide-react';
 
 interface ConvergenceViewProps {
-  currentRead: DiceRollRead;
+  currentRead: CanonicalDiceRead;
   soulName: string;
 }
 
@@ -54,7 +54,7 @@ export const ConvergenceView: React.FC<ConvergenceViewProps> = ({ currentRead, s
       id: Date.now().toString(),
       sender: 'SOULKEEPER WEAVER',
       role: 'Witness',
-      text: `SYNTHESIS BEAT: [Focus] ${soulName}'s Spark (${currentRead.spark}) merges with the [Tempest] pressure (${currentRead.pressure}). A shared revelation emerges at the ${currentRead.domain}!`,
+      text: `SYNTHESIS BEAT: [Focus] ${soulName}'s Spark (${currentRead.interpretation.spark}) merges with the [Tempest] pressure (${currentRead.interpretation.pressure}). A shared revelation emerges at the ${currentRead.interpretation.domain}!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages((prev) => [...prev, synMsg]);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { DiceRollRead, SoulSheet, ResolvedScene, SoulprintProfile } from './types';
+import type { CanonicalDiceRead, SoulSheet, ResolvedScene, SoulprintProfile } from './types';
+import { apiClient } from './lib/api';
 import { DiceRoller3D } from './components/DiceRoller3D';
 import { SoulSheetView } from './components/SoulSheetView';
 import { EncounterResolutionModal } from './components/EncounterResolutionModal';
@@ -16,14 +17,19 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
 
   // Core State
-  const [currentRead, setCurrentRead] = useState<DiceRollRead>({
-    spark: 'Heart',
-    domain: 'Relic',
-    pressure: 'Debt',
-    aim: 'Reveal',
-    approach: 'Guile',
-    verdict: 'Twist',
-    thread: 'Mark'
+  const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
+    raw: { d20: 1, d12: 9, d10: 5, percentile: 70, d8: 3, d6: 4, d4: 3 },
+    grammar_version: '1.0.0',
+    interpretation: {
+      spark: 'Heart',
+      domain: 'Relic',
+      pressure: 'Debt',
+      aim: 'Reveal',
+      approach: 'Guile',
+      verdict: 'Twist',
+      thread: 'Mark'
+    },
+    grammar_sentence: 'Driven by [Heart], the Soul attempts to [Reveal] upon [Relic] using [Guile] against the pressure of [Debt]. The immediate turn yields [Twist], weaving a lasting [Mark] Thread.'
   });
 
   const [soulSheet, setSoulSheet] = useState<SoulSheet>({
@@ -74,21 +80,15 @@ export function App() {
     setIsResolving(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/scenes/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dice_read: currentRead,
-          chosen_approach: chosenApproach,
-          resonance_spent: resonanceSpent,
-          strain_accepted: strainAccepted,
-          player_intent: playerIntent,
-          soul_name: soulSheet.name,
-          resources: soulSheet.resources
-        })
+      const data = await apiClient.resolveScene({
+        dice_read: currentRead,
+        chosen_approach: chosenApproach,
+        resonance_spent: resonanceSpent,
+        strain_accepted: strainAccepted,
+        player_intent: playerIntent,
+        soul_name: soulSheet.name,
+        resources: soulSheet.resources
       });
-
-      const data: ResolvedScene = res.ok ? await res.json() : generateFallbackResolution();
 
       setActiveSceneResult(data);
       setChronicleHistory((prev) => [data, ...prev]);
@@ -132,8 +132,8 @@ export function App() {
       ]
     },
     narration: {
-      title: `Marked Passage of ${currentRead.aim}`,
-      prose: `Driven by ${currentRead.spark}, ${soulSheet.name} presses hard against the resisting weight of ${currentRead.pressure}. Through calculated ${chosenApproach}, the target ${currentRead.domain} yields its hidden oath—yet the effort leaves a visible mark upon reality.`,
+      title: `Marked Passage of ${currentRead.interpretation.aim}`,
+      prose: `Driven by ${currentRead.interpretation.spark}, ${soulSheet.name} presses hard against the resisting weight of ${currentRead.interpretation.pressure}. Through calculated ${chosenApproach}, the target ${currentRead.interpretation.domain} yields its hidden oath—yet the effort leaves a visible mark upon reality.`,
       tone: 'Tense, Costly, Bittersweet',
       scene_beats: ['Direct confrontation', 'Target domain yielding', 'A heavy mark left behind'],
       canon_writeback: [`The lantern reveals one erased harbor oath.`],
@@ -142,7 +142,7 @@ export function App() {
         { passed: true, gate_name: '2. Rules Gate', details: 'Outcome rules respected.' },
         { passed: true, gate_name: '3. Canon Gate', details: 'No contradictions found.' },
         { passed: true, gate_name: '4. Safety Gate', details: 'Content cleared policy.' },
-        { passed: true, gate_name: '5. Memory Gate', details: 'Event logged into Postgres & Qdrant.' }
+        { passed: true, gate_name: '5. Memory Gate', details: 'Event logged into the local Chronicle; semantic indexing is planned.' }
       ]
     },
     event_id: Date.now().toString()

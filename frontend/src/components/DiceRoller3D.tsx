@@ -1,12 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
-import type { DiceRollRead } from '../types';
+import type { CanonicalDiceRead, DiceInterpretation } from '../types';
+import { apiClient } from '../lib/api';
 import { RefreshCw, Eye, BookOpen, Layers, Box, Sliders, Palette, EyeOff } from 'lucide-react';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 interface DiceRoller3DProps {
-  currentRead: DiceRollRead;
-  onRollComplete: (newRead: DiceRollRead) => void;
+  currentRead: CanonicalDiceRead;
+  onRollComplete: (newRead: CanonicalDiceRead) => void;
   isRolling: boolean;
   setIsRolling: (rolling: boolean) => void;
 }
@@ -21,7 +22,7 @@ const PRESET_COLORS = [
   { name: 'Obsidian', hex: '#12121c', emissive: '#05050a' }
 ];
 
-const DIE_ROLE_META: Record<keyof DiceRollRead, { category: string; poly: string; stlPath: string; icon: string; discovery: string }> = {
+const DIE_ROLE_META: Record<keyof DiceInterpretation, { category: string; poly: string; stlPath: string; icon: string; discovery: string }> = {
   spark: { category: 'WHAT', poly: 'd20', stlPath: '/art/stl/d20.stl', icon: '/art/dice/d20.png', discovery: 'What You Discover' },
   domain: { category: 'WHERE', poly: 'd12', stlPath: '/art/stl/d12.stl', icon: '/art/dice/d12.png', discovery: 'Where It Happens' },
   pressure: { category: 'HOW VIVID', poly: 'd10', stlPath: '/art/stl/d10.stl', icon: '/art/dice/d10.png', discovery: 'Intensity & Load' },
@@ -38,7 +39,7 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
   setIsRolling
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [activeDie, setActiveDie] = useState<keyof DiceRollRead>('spark');
+  const [activeDie, setActiveDie] = useState<keyof DiceInterpretation>('spark');
   const [showDestinyChart, setShowDestinyChart] = useState(false);
   const [stlLoadedCount, setStlLoadedCount] = useState(0);
 
@@ -54,8 +55,7 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
     setIsRolling(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/dice/roll', { method: 'POST' });
-      const data: DiceRollRead = res.ok ? await res.json() : generateFallbackRoll();
+      const data = await apiClient.rollDice();
 
       setTimeout(() => {
         onRollComplete(data);
@@ -69,24 +69,25 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
     }
   };
 
-  const generateFallbackRoll = (): DiceRollRead => {
+  const generateFallbackRoll = (): CanonicalDiceRead => {
     const sparks = ["Heart", "Mind", "Shadow", "Wild", "Wound", "Wonder"];
     const domains = ["Self", "Ally", "Foe", "Place", "Relic", "Omen"];
     const pressures = ["Time", "Fear", "Debt", "Exposure", "Corruption", "Scarcity"];
     const aims = ["Seek", "Protect", "Bind", "Break", "Reveal", "Transform"];
     const approaches = ["Edge", "Grace", "Guile", "Lore", "Empathy", "Craft"];
     const verdicts = ["Ascend", "Scar", "Stall", "Twist", "Reveal", "Collapse"];
-    const threads = ["Bond", "Memory", "Mark", "Debt", "Portal", "Prophecy"];
+    const threads = ["Bond", "Memory", "Mark", "Prophecy"];
 
     const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+    const interpretation = {
+      spark: pick(sparks), domain: pick(domains), pressure: pick(pressures), aim: pick(aims),
+      approach: pick(approaches), verdict: pick(verdicts), thread: pick(threads)
+    };
     return {
-      spark: pick(sparks),
-      domain: pick(domains),
-      pressure: pick(pressures),
-      aim: pick(aims),
-      approach: pick(approaches),
-      verdict: pick(verdicts),
-      thread: pick(threads)
+      raw: { d20: Math.ceil(Math.random() * 20), d12: Math.ceil(Math.random() * 12), d10: Math.ceil(Math.random() * 10), percentile: Math.ceil(Math.random() * 100), d8: Math.ceil(Math.random() * 8), d6: Math.ceil(Math.random() * 6), d4: Math.ceil(Math.random() * 4) },
+      grammar_version: '1.0.0',
+      interpretation,
+      grammar_sentence: `Driven by [${interpretation.spark}], the Soul attempts to [${interpretation.aim}] upon [${interpretation.domain}] using [${interpretation.approach}] against the pressure of [${interpretation.pressure}].`
     };
   };
 
@@ -188,12 +189,12 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
     const spacing = 2.05;
     const startX = -spacing * 3;
 
-    const dieRoles = Object.keys(DIE_ROLE_META) as Array<keyof DiceRollRead>;
+    const dieRoles = Object.keys(DIE_ROLE_META) as Array<keyof DiceInterpretation>;
     let loadedCounter = 0;
 
     dieRoles.forEach((role, idx) => {
       const meta = DIE_ROLE_META[role];
-      const actualRolledValue = currentRead[role];
+      const actualRolledValue = currentRead.interpretation[role];
       const posX = startX + idx * spacing;
 
       stlLoader.load(
@@ -442,9 +443,10 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
 
         {/* 7 Rolled Dice Outcome Cards displaying White Embossed Numbers */}
         <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4 mb-6">
-          {(Object.keys(DIE_ROLE_META) as Array<keyof DiceRollRead>).map((role) => {
+          {(Object.keys(DIE_ROLE_META) as Array<keyof DiceInterpretation>).map((role) => {
             const meta = DIE_ROLE_META[role];
-            const value = currentRead[role];
+            const value = currentRead.interpretation[role];
+            const numericValue = ({ spark: currentRead.raw.d20, domain: currentRead.raw.d12, pressure: currentRead.raw.d10, aim: currentRead.raw.percentile, approach: currentRead.raw.d8, verdict: currentRead.raw.d6, thread: currentRead.raw.d4 } as const)[role];
             const isSelected = activeDie === role;
 
             return (
@@ -468,7 +470,7 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
                     className="h-14 w-auto object-contain filter drop-shadow-[0_4px_12px_rgba(255,255,255,0.5)]"
                   />
                   <span className="absolute inset-0 flex items-center justify-center font-cinzel text-lg font-black text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.95)]">
-                    {value}
+                    {numericValue}
                   </span>
                 </div>
 
@@ -502,7 +504,7 @@ export const DiceRoller3D: React.FC<DiceRoller3DProps> = ({
             <img src={DIE_ROLE_META[activeDie].icon} alt={activeDie} className="h-10 w-auto object-contain" />
             <div>
               <span className="text-[var(--spark)] font-bold">{DIE_ROLE_META[activeDie].category} ({DIE_ROLE_META[activeDie].poly})</span> →{' '}
-              <span className="font-cinzel text-base text-white font-black drop-shadow-[0_1px_4px_rgba(255,255,255,0.9)]">{currentRead[activeDie]}</span>
+              <span className="font-cinzel text-base text-white font-black drop-shadow-[0_1px_4px_rgba(255,255,255,0.9)]">{currentRead.interpretation[activeDie]}</span>
               <div className="text-[10px] opacity-75 text-[var(--parchment)] italic">{DIE_ROLE_META[activeDie].discovery}</div>
             </div>
           </div>

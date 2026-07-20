@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "typecheck": "tsc -b --noEmit",
+    "test": "node scripts/run-tests.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

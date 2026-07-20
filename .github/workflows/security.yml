@@ -1,0 +1,36 @@
+name: Security
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+  audits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npm audit --audit-level=high
+        working-directory: frontend
+      - run: python -m pip install --upgrade pip pip-audit
+      - run: pip-audit -r backend/requirements.txt --severity high

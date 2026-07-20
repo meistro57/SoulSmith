@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import type { DiceRollRead } from '../types';
+import type { CanonicalDiceRead, DiceInterpretation, NumericDiceRoll } from '../types';
+import { apiClient } from '../lib/api';
 import { Camera, CheckCircle2, Sparkles, Sliders } from 'lucide-react';
 
 interface DiceScanViewProps {
-  onApplyScanRead: (read: DiceRollRead) => void;
+  onApplyScanRead: (read: CanonicalDiceRead) => void;
 }
 
 interface DetectedDie {
-  die_role: keyof DiceRollRead;
+  die_role: keyof DiceInterpretation;
   poly_type: string;
-  detected_face: string;
+  detected_value: number;
   confidence: number;
-  alternates: string[];
+  alternates: number[];
 }
 
 export const DiceScanView: React.FC<DiceScanViewProps> = ({ onApplyScanRead }) => {
@@ -25,12 +26,7 @@ export const DiceScanView: React.FC<DiceScanViewProps> = ({ onApplyScanRead }) =
   const handleCapturePhoto = async () => {
     setIsScanning(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/dice/photo-ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expected_set: 'standard_mythic_v1' })
-      });
-      const data = res.ok ? await res.json() : generateFallbackScan();
+      const data = await apiClient.ingestDicePhoto<{ status: string; detected_dice: DetectedDie[]; overall_confidence: number }>();
       setScanResult(data);
     } catch {
       setScanResult(generateFallbackScan());
@@ -43,36 +39,39 @@ export const DiceScanView: React.FC<DiceScanViewProps> = ({ onApplyScanRead }) =
     status: 'needs_confirmation',
     overall_confidence: 0.89,
     detected_dice: [
-      { die_role: 'spark' as const, poly_type: 'd20', detected_face: 'Wonder', confidence: 0.96, alternates: ['Heart', 'Wild'] },
-      { die_role: 'domain' as const, poly_type: 'd12', detected_face: 'Omen', confidence: 0.91, alternates: ['Relic'] },
-      { die_role: 'pressure' as const, poly_type: 'd10', detected_face: 'Corruption', confidence: 0.76, alternates: ['Fear', 'Debt'] },
-      { die_role: 'aim' as const, poly_type: 'd%', detected_face: 'Reveal', confidence: 0.94, alternates: ['Seek'] },
-      { die_role: 'approach' as const, poly_type: 'd8', detected_face: 'Lore', confidence: 0.88, alternates: ['Craft'] },
-      { die_role: 'verdict' as const, poly_type: 'd6', detected_face: 'Ascend', confidence: 0.92, alternates: ['Scar'] },
-      { die_role: 'thread' as const, poly_type: 'd4', detected_face: 'Prophecy', confidence: 0.95, alternates: ['Mark'] }
+      { die_role: 'spark' as const, poly_type: 'd20', detected_value: 17, confidence: 0.96, alternates: [1, 10] },
+      { die_role: 'domain' as const, poly_type: 'd12', detected_value: 11, confidence: 0.91, alternates: [9] },
+      { die_role: 'pressure' as const, poly_type: 'd10', detected_value: 8, confidence: 0.76, alternates: [3, 5] },
+      { die_role: 'aim' as const, poly_type: 'd%', detected_value: 70, confidence: 0.94, alternates: [1] },
+      { die_role: 'approach' as const, poly_type: 'd8', detected_value: 5, confidence: 0.88, alternates: [8] },
+      { die_role: 'verdict' as const, poly_type: 'd6', detected_value: 1, confidence: 0.92, alternates: [2] },
+      { die_role: 'thread' as const, poly_type: 'd4', detected_value: 4, confidence: 0.95, alternates: [3] }
     ]
   });
 
-  const handleFaceOverride = (role: keyof DiceRollRead, newFace: string) => {
+  const handleFaceOverride = (role: keyof DiceInterpretation, newFace: number) => {
     if (!scanResult) return;
     const updated = scanResult.detected_dice.map((d) =>
-      d.die_role === role ? { ...d, detected_face: newFace, confidence: 1.0 } : d
+      d.die_role === role ? { ...d, detected_value: newFace, confidence: 1.0 } : d
     );
     setScanResult({ ...scanResult, detected_dice: updated });
   };
 
-  const handleConfirmAndApply = () => {
+  const handleConfirmAndApply = async () => {
     if (!scanResult) return;
-    const read: DiceRollRead = {
-      spark: scanResult.detected_dice.find((d) => d.die_role === 'spark')?.detected_face || 'Heart',
-      domain: scanResult.detected_dice.find((d) => d.die_role === 'domain')?.detected_face || 'Relic',
-      pressure: scanResult.detected_dice.find((d) => d.die_role === 'pressure')?.detected_face || 'Debt',
-      aim: scanResult.detected_dice.find((d) => d.die_role === 'aim')?.detected_face || 'Reveal',
-      approach: scanResult.detected_dice.find((d) => d.die_role === 'approach')?.detected_face || 'Guile',
-      verdict: scanResult.detected_dice.find((d) => d.die_role === 'verdict')?.detected_face || 'Twist',
-      thread: scanResult.detected_dice.find((d) => d.die_role === 'thread')?.detected_face || 'Mark'
+    const valueFor = (role: keyof DiceInterpretation, fallback: number) =>
+      scanResult.detected_dice.find((d) => d.die_role === role)?.detected_value || fallback;
+    const roll: NumericDiceRoll = {
+      d20: valueFor('spark', 1),
+      d12: valueFor('domain', 1),
+      d10: valueFor('pressure', 1),
+      percentile: valueFor('aim', 1),
+      d8: valueFor('approach', 1),
+      d6: valueFor('verdict', 1),
+      d4: valueFor('thread', 1),
+      grammar_version: '1.0.0'
     };
-    onApplyScanRead(read);
+    onApplyScanRead(await apiClient.interpretDice(roll));
   };
 
   return (
@@ -100,7 +99,7 @@ export const DiceScanView: React.FC<DiceScanViewProps> = ({ onApplyScanRead }) =
         <div className="absolute inset-0 bg-radial-glow opacity-20 pointer-events-none" />
         <Camera size={48} className="text-cyan-400 opacity-60 mb-2 animate-pulse" />
         <p className="text-sm font-semibold text-slate-200">Position 7 Polyhedral Dice in Tray</p>
-        <p className="text-xs text-slate-400">Adaptive thresholding & YOLO face classification auto-detects face values.</p>
+        <p className="text-xs text-slate-400">Adaptive thresholding & Simulated optical recognition proposes numeric face values for confirmation.</p>
       </div>
 
       {/* Scan Results */}
@@ -132,17 +131,17 @@ export const DiceScanView: React.FC<DiceScanViewProps> = ({ onApplyScanRead }) =
                     </span>
                   </div>
 
-                  <div className="text-base font-bold font-cinzel text-cyan-300">{d.detected_face}</div>
+                  <div className="text-base font-bold font-cinzel text-cyan-300">{d.detected_value}</div>
 
                   {/* Manual Face Override selector */}
                   <div className="pt-1 flex items-center gap-1">
                     <Sliders size={12} className="text-slate-500" />
                     <select
-                      value={d.detected_face}
-                      onChange={(e) => handleFaceOverride(d.die_role, e.target.value)}
+                      value={d.detected_value}
+                      onChange={(e) => handleFaceOverride(d.die_role, Number(e.target.value))}
                       className="w-full bg-slate-900 border border-slate-800 text-[11px] text-slate-300 rounded px-1.5 py-0.5"
                     >
-                      <option value={d.detected_face}>{d.detected_face} (Detected)</option>
+                      <option value={d.detected_value}>{d.detected_value} (Detected)</option>
                       {d.alternates.map((alt) => (
                         <option key={alt} value={alt}>
                           {alt} (Candidate)
