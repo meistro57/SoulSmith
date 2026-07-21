@@ -132,6 +132,39 @@ def test_scene_resolution_preserves_raw_values_and_chronicle(monkeypatch, tmp_pa
     assert events[0]["grammar_version"] == "1.0.0"
 
 
+def test_scene_resolution_rejects_unpayable_resource_investment():
+    dice = client.post("/api/v1/dice/interpret", json=VALID).json()
+    payload = {
+        "dice_read": dice,
+        "chosen_approach": "Guile",
+        "resonance_spent": 4,
+        "strain_accepted": 0,
+        "player_intent": "Overpay resonance that is not present.",
+        "soul_name": "Test Soul",
+        "resources": {"resonance": 3, "strain": 1, "thread_count": 2},
+    }
+
+    response = client.post("/api/v1/scenes/resolve", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_scene_resolution_rejects_strain_beyond_capacity():
+    dice = client.post("/api/v1/dice/interpret", json=VALID).json()
+    payload = {
+        "dice_read": dice,
+        "chosen_approach": "Guile",
+        "resonance_spent": 0,
+        "strain_accepted": 2,
+        "player_intent": "Overreach past the fracture threshold.",
+        "soul_name": "Test Soul",
+        "resources": {"resonance": 3, "strain": 5, "thread_count": 2},
+    }
+
+    response = client.post("/api/v1/scenes/resolve", json=payload)
+
+    assert response.status_code == 422
+
 def test_encounter_frame_is_deterministic_and_pre_action():
     dice = client.post("/api/v1/dice/interpret", json=VALID).json()
     payload = {
