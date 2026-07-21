@@ -1,27 +1,44 @@
+# backend/app/rules.py
 """
 SoulSmith Deterministic Rules Engine
 Calculates outcome classes, resource deltas, and state progression.
 """
 
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from app.grammar import InterpretedDiceRoll
 
 
 class SoulSheetResources(BaseModel):
-    resonance: int = 3  # 0 to 6
-    strain: int = 0  # 0 to 6
-    thread_count: int = 1  # 0 to 5
+    resonance: int = Field(default=3, ge=0, le=6)  # 0 to 6
+    strain: int = Field(default=0, ge=0, le=6)  # 0 to 6
+    thread_count: int = Field(default=1, ge=0, le=5)  # 0 to 5
 
 
 class ResolveSceneRequest(BaseModel):
     dice_read: InterpretedDiceRoll
     chosen_approach: str
-    resonance_spent: int = 0
-    strain_accepted: int = 0
+    resonance_spent: int = Field(default=0, ge=0, le=6)
+    strain_accepted: int = Field(default=0, ge=0, le=6)
     player_intent: str
     soul_name: str = "Unbound Soul"
     resources: SoulSheetResources
+
+    @model_validator(mode="after")
+    def validate_resource_investment(self) -> "ResolveSceneRequest":
+        # Canon safety: players may invest only resources their current Soul can actually pay.
+        if self.resonance_spent > self.resources.resonance:
+            raise ValueError(
+                "resonance_spent cannot exceed the Soul's available resonance"
+            )
+
+        remaining_strain_capacity = 6 - self.resources.strain
+        if self.strain_accepted > remaining_strain_capacity:
+            raise ValueError(
+                "strain_accepted cannot exceed the Soul's remaining strain capacity"
+            )
+
+        return self
 
 
 class ResolveSceneResponse(BaseModel):
