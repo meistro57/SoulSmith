@@ -76,6 +76,7 @@ def generate_encounter_frame(req: EncounterFrameRequest) -> EncounterFrame:
     This is intentionally deterministic and bounded: it establishes what exists before
     the player chooses an intent, without resolving the scene or prescribing meaning.
     """
+    from app.db import get_all_open_questions, get_all_seeds
 
     read = req.dice_read.interpretation
     phenomenon = PHENOMENA_BY_PRESSURE.get(read.pressure, "Echo")
@@ -87,11 +88,20 @@ def generate_encounter_frame(req: EncounterFrameRequest) -> EncounterFrame:
         else "an old promise no one present remembers making"
     )
 
+    # Check for active seeds or open questions for context richness
+    seeds = get_all_seeds()
+    questions_list = get_all_open_questions()
+    active_seed = seeds[0] if seeds else None
+    active_question = questions_list[0]["question_text"] if questions_list else None
+
     title = f"The {read.spark} {domain_noun.title()} Under {read.pressure}"
     visible = (
         f"A {domain_noun} touched by {phenomenon.lower()}-light {aim_phrase}; "
         f"every attempt to ignore it makes the air taste faintly of {read.thread.lower()}."
     )
+    if active_seed:
+        visible += f" (Echo of symbol '{active_seed['symbol']}' [{active_seed['stage']} stage])."
+
     hidden = (
         f"It needs {req.soul_name} to notice how {read.pressure.lower()} has bent the shape of {context_hint}, "
         "but it will not explain itself first."
@@ -101,6 +111,14 @@ def generate_encounter_frame(req: EncounterFrameRequest) -> EncounterFrame:
         f"next {read.thread} Thread will arrive already tangled."
     )
 
+    frame_questions = [
+        f"What part of the {read.domain.lower()} feels too familiar?",
+        f"Who benefits if the {read.pressure.lower()} remains unnamed?",
+        f"What would {read.aim.lower()} change that mere success would not?",
+    ]
+    if active_question:
+        frame_questions.append(f"Unresolved Question: {active_question}")
+
     return EncounterFrame(
         title=title,
         phenomenon_type=phenomenon,
@@ -108,11 +126,7 @@ def generate_encounter_frame(req: EncounterFrameRequest) -> EncounterFrame:
         hidden_need=hidden,
         stakes=stakes,
         pressure_clock=_stable_clock(req.dice_read),
-        questions=[
-            f"What part of the {read.domain.lower()} feels too familiar?",
-            f"Who benefits if the {read.pressure.lower()} remains unnamed?",
-            f"What would {read.aim.lower()} change that mere success would not?",
-        ],
+        questions=frame_questions,
         suggested_actions=[
             f"Approach with {read.approach} and ask what the {domain_noun} refuses to show directly.",
             "Spend Resonance to stabilise one vivid clue before acting.",

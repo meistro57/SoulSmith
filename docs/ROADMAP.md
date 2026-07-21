@@ -268,6 +268,8 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 
 ### Phase 2: Curiosity Engine
 
+**Status: completed**
+
 - Add a structured Question and Seed model.
 - Track open questions without forcing immediate resolution.
 - Generate clues with bounded information release.
@@ -282,6 +284,8 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - The system distinguishes productive ambiguity from missing information.
 
 ### Phase 3: Threads and Integration
+
+**Status: completed**
 
 - Implement Local Thread lifecycle.
 - Infer candidate patterns from Chronicle evidence.

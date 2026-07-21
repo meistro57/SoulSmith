@@ -364,7 +364,7 @@ The deterministic game engine is ideal for comprehensive automated testing, but 
 
 ## Recommended Build Order
 
-### Milestone 1: Canonical Roll Contract
+### Milestone 1: Canonical Roll Contract (Completed)
 
 - raw numeric seven-dice model
 - versioned numeric interpretation tables
@@ -373,7 +373,7 @@ The deterministic game engine is ideal for comprehensive automated testing, but 
 - frontend display of numeric and symbolic values
 - unit tests
 
-### Milestone 2: Encounter Frame
+### Milestone 2: Encounter Frame (Completed)
 
 - structured encounter schema
 - deterministic fallback generator
@@ -381,7 +381,7 @@ The deterministic game engine is ideal for comprehensive automated testing, but 
 - frame-generation endpoint
 - encounter presentation before intent selection
 
-### Milestone 3: Complete Resolution Transaction
+### Milestone 3: Complete Resolution Transaction (Completed)
 
 - server-side resource validation
 - relic and phenomenon modifiers
@@ -390,13 +390,13 @@ The deterministic game engine is ideal for comprehensive automated testing, but 
 - proposed canon writes
 - explicit commit transaction
 
-### Milestone 4: Chronicle Domain Model
+### Milestone 4: Curiosity & Thread Integration Engine (Completed)
 
-- normalized database schema
-- event ledger
-- world-state projections
-- session reload
-- relevant-memory retrieval
+- structured Seed and Open Question database models (`seeds`, `open_questions`, `local_threads`, `integration_events`)
+- auto-seed planting and stage progression (*planted → echoed → recognized → integrated → retired*)
+- open question tracking with resolution notes
+- local thread lifecycle and interactive Integration Event execution
+- Curiosity Engine UI view and unit test suite
 
 ### Milestone 5: Real Dice Camera Pipeline
 

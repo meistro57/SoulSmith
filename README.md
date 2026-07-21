@@ -396,8 +396,9 @@ Key Features Built:
 6. **Living Phenomena Codex**: World-scale non-monster encounters (*Echoes, Knots, Veils, Wells, Awakenings, Rifts, Storms*) with escalation meters, hidden needs, and transformation payoffs.
 7. **Relic Attunement Ledger**: Evolving relic lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*).
 8. **Canon Guardian 5-Gate Audit**: Automated verification (*Schema, Rules, Canon Contradictions, Moderation, Memory Routing*).
-9. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`).
+9. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`, `seeds`, `open_questions`, `local_threads`, `integration_events`).
 10. **Real-time Convergence Sanctuary**: WebSocket multi-player room role rotation (*Focus, Anchor, Witness, Tempest*).
+11. **Curiosity & Thread Integration Engine**: Persistent Seed planting and symbol tracking (*planted → echoed → recognized → integrated → retired*), open questions tracking with evidence logs, local thread evidence accumulation, and interactive Integration Events that transform player choices into canonical world progression.
 
 ---
 

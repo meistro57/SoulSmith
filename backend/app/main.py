@@ -11,7 +11,22 @@ from typing import Dict, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db import get_all_canonical_events, init_database, log_canonical_event
+from app.curiosity import (
+    IntegrateThreadRequest,
+    QuestionResolveRequest,
+    SeedPlantRequest,
+)
+from app.db import (
+    execute_integration_event,
+    get_all_canonical_events,
+    get_all_local_threads,
+    get_all_open_questions,
+    get_all_seeds,
+    init_database,
+    log_canonical_event,
+    plant_or_echo_seed,
+    resolve_open_question,
+)
 from app.encounters import (
     EncounterFrame,
     EncounterFrameRequest,
@@ -21,9 +36,9 @@ from app.grammar import (
     CURRENT_GRAMMAR_VERSION,
     NumericDiceRoll,
     RollRequest,
+    generate_numeric_roll,
     get_available_versions,
     get_versioned_grammar,
-    generate_numeric_roll,
     interpret_numeric_roll,
 )
 from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
@@ -143,11 +158,27 @@ def resolve_encounter_scene(req: ResolveSceneRequest):
         },
         deterministic_outcome=outcome.model_dump(),
     )
+
+    # Curiosity Engine: Auto-plant or echo seed if a Thread symbol is present in the roll
+    seed_result = None
+    thread_symbol = req.dice_read.interpretation.thread
+    if thread_symbol in ["Bond", "Memory", "Mark", "Prophecy"]:
+        symbol_name = f"{req.dice_read.interpretation.spark} {req.dice_read.interpretation.domain}"
+        question_text = f"What hidden connection does the {symbol_name} hold for {req.soul_name} under {req.dice_read.interpretation.pressure}?"
+        seed_result = plant_or_echo_seed(
+            symbol=symbol_name,
+            thread_type=thread_symbol,
+            narrative_context=req.player_intent,
+            soul_id=req.soul_name,
+            initial_question=question_text,
+        )
+
     return {
         "outcome": outcome,
         "narration": narration,
         "event_id": event_id,
         "dice_read": req.dice_read,
+        "seed": seed_result,
     }
 
 
@@ -161,6 +192,52 @@ def list_chronicle_events():
             "The King Without a Reflection traverses the outer Veils.",
         ],
     }
+
+
+@app.get("/api/v1/curiosity/seeds")
+def list_curiosity_seeds():
+    return {"seeds": get_all_seeds()}
+
+
+@app.post("/api/v1/curiosity/seeds/plant")
+def plant_curiosity_seed(req: SeedPlantRequest):
+    return plant_or_echo_seed(
+        symbol=req.symbol,
+        thread_type=req.thread_type,
+        narrative_context=req.narrative_context,
+        soul_id=req.soul_id,
+        initial_question=req.initial_question,
+    )
+
+
+@app.get("/api/v1/curiosity/questions")
+def list_curiosity_questions():
+    return {"questions": get_all_open_questions()}
+
+
+@app.post("/api/v1/curiosity/questions/resolve")
+def resolve_curiosity_question(req: QuestionResolveRequest):
+    success = resolve_open_question(
+        question_id=req.question_id,
+        resolution_notes=req.resolution_notes,
+        status=req.status,
+    )
+    return {"success": success}
+
+
+@app.get("/api/v1/curiosity/threads")
+def list_local_threads(soul_name: str = "Unbound Soul"):
+    return {"threads": get_all_local_threads(soul_id=soul_name)}
+
+
+@app.post("/api/v1/curiosity/integrate")
+def integrate_local_thread(req: IntegrateThreadRequest):
+    return execute_integration_event(
+        thread_id=req.thread_id,
+        soul_id=req.soul_name,
+        choice_made=req.choice_made,
+        target_relic_id=req.target_relic_id,
+    )
 
 
 @app.get("/api/v1/phenomena")
