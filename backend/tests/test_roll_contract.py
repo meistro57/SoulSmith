@@ -130,3 +130,19 @@ def test_scene_resolution_preserves_raw_values_and_chronicle(monkeypatch, tmp_pa
         events[0]["interpreted_roll"] == resolved.json()["dice_read"]["interpretation"]
     )
     assert events[0]["grammar_version"] == "1.0.0"
+
+
+def test_encounter_frame_is_deterministic_and_pre_action():
+    dice = client.post("/api/v1/dice/interpret", json=VALID).json()
+    payload = {
+        "dice_read": dice,
+        "soul_name": "Test Soul",
+        "world_context": ["The salt bell remembers the drowned quay."],
+    }
+    first = client.post("/api/v1/encounters/frame", json=payload)
+    second = client.post("/api/v1/encounters/frame", json=payload)
+    assert first.status_code == 200
+    assert first.json() == second.json()
+    assert first.json()["phenomenon_type"] == "Corruption"
+    assert 1 <= first.json()["pressure_clock"] <= 6
+    assert "outcome" not in first.json()
