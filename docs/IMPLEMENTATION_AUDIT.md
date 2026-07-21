@@ -437,3 +437,48 @@ class InterpretedDiceRoll(BaseModel):
 All input modes should produce `RawDiceRoll`. Only the grammar service should produce `DiceRollRead`.
 
 That one correction creates a stable foundation for digital rolling, manual rolling, photo recognition, replay, multiplayer convergence, testing, and persistent Chronicle history.
+
+---
+
+## CI Readiness Review — 2026-07-21
+
+The repository now mirrors the GitHub Actions checks locally as closely as the current environment allows.
+
+### Workflow compatibility
+
+- `frontend-ci.yml` uses currently supported checkout and Node setup actions and runs `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` from `frontend/`.
+- `backend-ci.yml` uses currently supported checkout, Python setup, and artifact upload actions before running Ruff, Ruff format checking, and pytest coverage.
+- `security.yml` uses currently supported checkout, dependency review, Node setup, and Python setup actions before running npm and pip vulnerability audits.
+
+### Local verification notes
+
+Frontend CI checks passed locally on Node with the existing lockfile. Vite emits a large-chunk advisory for the production bundle, but it does not fail the build.
+
+Backend formatting initially drifted in three files and has been normalised with `ruff format`. The local Python package index blocked installation of currently requested development dependencies, so the full coverage command could not be completed in this container. The GitHub-hosted workflow should install from normal package infrastructure and then execute the canonical `python -m pytest backend --cov=backend/app --cov-report=xml` command.
+
+### Maintainer checklist
+
+Run the following before opening or merging future changes:
+
+```bash
+# Backend
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements-dev.txt
+ruff check backend
+ruff format --check backend
+python -m pytest backend --cov=backend/app --cov-report=xml
+
+# Frontend
+cd frontend
+npm ci
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+
+# Security
+npm audit --audit-level=high
+cd ..
+python -m pip install --upgrade pip pip-audit
+pip-audit -r backend/requirements.txt --severity high
+```

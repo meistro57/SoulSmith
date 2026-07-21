@@ -1,32 +1,36 @@
-# React + TypeScript + Vite
+# frontend/README.md
+# SoulSmith Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The SoulSmith frontend is a React, TypeScript, Vite, Tailwind, and Three.js application that presents the dice sanctuary, narrative encounter flow, Soul sheet, Chronicle, phenomena, and mythic gallery experiences.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 22, matching the GitHub Actions workflow.
+- npm, using the committed `package-lock.json` for reproducible installs.
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The development server is provided by Vite. Configure API endpoints through `.env` values copied from `.env.example`; do not commit local secrets or machine-specific URLs.
+
+## Quality gates
+
+Run these commands before pushing frontend changes:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
+
+`npm run test` executes `scripts/run-tests.mjs`, which validates the frontend side of the canonical numeric dice roll contract. `npm run build` performs a TypeScript project build before creating the production Vite bundle.
+
+## CI parity
+
+The `Frontend CI` GitHub Actions workflow runs the same install, lint, typecheck, test, and build commands from this directory. A Vite large-chunk advisory is acceptable unless the command exits with a non-zero status.

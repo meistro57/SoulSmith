@@ -61,8 +61,7 @@ AIM_VERBS = {
 def _stable_clock(dice_read: InterpretedDiceRoll) -> int:
     raw = dice_read.raw
     seed = ":".join(
-        str(raw[die])
-        for die in ("d20", "d12", "d10", "percentile", "d8", "d6", "d4")
+        str(raw[die]) for die in ("d20", "d12", "d10", "percentile", "d8", "d6", "d4")
     )
     digest = hashlib.sha256(
         f"{dice_read.grammar_version}:{seed}".encode("utf-8")

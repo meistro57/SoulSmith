@@ -165,6 +165,7 @@ def test_scene_resolution_rejects_strain_beyond_capacity():
 
     assert response.status_code == 422
 
+
 def test_encounter_frame_is_deterministic_and_pre_action():
     dice = client.post("/api/v1/dice/interpret", json=VALID).json()
     payload = {

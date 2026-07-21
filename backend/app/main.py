@@ -12,7 +12,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import get_all_canonical_events, init_database, log_canonical_event
-from app.encounters import EncounterFrame, EncounterFrameRequest, generate_encounter_frame
+from app.encounters import (
+    EncounterFrame,
+    EncounterFrameRequest,
+    generate_encounter_frame,
+)
 from app.grammar import (
     CURRENT_GRAMMAR_VERSION,
     NumericDiceRoll,
