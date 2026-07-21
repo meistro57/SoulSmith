@@ -30,6 +30,18 @@ export interface CanonicalDiceRead {
   grammar_sentence: string;
 }
 
+
+export interface EncounterFrame {
+  title: string;
+  phenomenon_type: string;
+  visible_situation: string;
+  hidden_need: string;
+  stakes: string;
+  pressure_clock: number;
+  questions: string[];
+  suggested_actions: string[];
+}
+
 export interface SoulResources { resonance: number; strain: number; thread_count: number; }
 export interface Relic { id: string; name: string; stage: 'Dormant' | 'Remembered' | 'Awakened' | 'Overdrawn' | 'Fractured' | 'Transfigured'; effect: string; overdraw_consequence: string; }
 export interface SoulSheet { name: string; calling: string; origin: string; desire: string; fear: string; wound: string; resources: SoulResources; relics: Relic[]; bonds: string[]; scars: string[]; }

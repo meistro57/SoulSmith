@@ -1,5 +1,6 @@
+// frontend/src/App.tsx
 import { useState } from 'react';
-import type { CanonicalDiceRead, SoulSheet, ResolvedScene, SoulprintProfile } from './types';
+import type { CanonicalDiceRead, EncounterFrame, SoulSheet, ResolvedScene, SoulprintProfile } from './types';
 import { apiClient } from './lib/api';
 import { DiceRoller3D } from './components/DiceRoller3D';
 import { SoulSheetView } from './components/SoulSheetView';
@@ -65,6 +66,8 @@ export function App() {
   const [isRolling, setIsRolling] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [activeSceneResult, setActiveSceneResult] = useState<ResolvedScene | null>(null);
+  const [encounterFrame, setEncounterFrame] = useState<EncounterFrame | null>(null);
+  const [isFramingEncounter, setIsFramingEncounter] = useState(false);
 
   const [chronicleHistory, setChronicleHistory] = useState<ResolvedScene[]>([]);
   const [worldFacts, setWorldFacts] = useState<string[]>([
@@ -73,6 +76,34 @@ export function App() {
   ]);
 
   const [showSoulprintModal, setShowSoulprintModal] = useState(false);
+
+  const handleFrameEncounter = async (read: CanonicalDiceRead = currentRead) => {
+    if (isFramingEncounter) return;
+    setIsFramingEncounter(true);
+
+    try {
+      const frame = await apiClient.frameEncounter({
+        dice_read: read,
+        soul_name: soulSheet.name,
+        world_context: worldFacts.slice(0, 3)
+      });
+      setEncounterFrame(frame);
+      setPlayerIntent(`I want to understand what ${frame.title.toLowerCase()} is asking of me.`);
+    } catch {
+      setEncounterFrame({
+        title: `The ${read.interpretation.spark} ${read.interpretation.domain} Under ${read.interpretation.pressure}`,
+        phenomenon_type: 'Echo',
+        visible_situation: `A ${read.interpretation.domain.toLowerCase()} stirs with ${read.interpretation.spark.toLowerCase()} energy and refuses to become ordinary.`,
+        hidden_need: 'It wants a careful question before it will become useful truth.',
+        stakes: `If rushed, the next ${read.interpretation.thread} Thread will be harder to untangle.`,
+        pressure_clock: 2,
+        questions: ['What feels familiar here?', 'What changes if this pressure is named?', 'Who is not speaking yet?'],
+        suggested_actions: [`Approach with ${read.interpretation.approach}.`, 'Spend Resonance to stabilise a clue.', 'Accept Strain to force a revelation.']
+      });
+    } finally {
+      setIsFramingEncounter(false);
+    }
+  };
 
   // Execute Scene Resolution
   const handleResolveScene = async () => {
@@ -217,7 +248,10 @@ export function App() {
             {/* 3D Dice Roller Sanctuary */}
             <DiceRoller3D
               currentRead={currentRead}
-              onRollComplete={(newRead) => setCurrentRead(newRead)}
+              onRollComplete={(newRead) => {
+                setCurrentRead(newRead);
+                setEncounterFrame(null);
+              }}
               isRolling={isRolling}
               setIsRolling={setIsRolling}
             />
@@ -229,6 +263,41 @@ export function App() {
                   <Zap size={14} /> Encounter Action Framework
                 </span>
                 <h3 className="text-2xl font-bold font-cinzel text-[var(--gold)] mt-1">Commit Stated Intent & Approach</h3>
+              </div>
+
+              {/* Encounter Frame Generation */}
+              <div className="p-5 rounded-2xl bg-[var(--deep)]/90 border border-[var(--gold-dim)] space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-mono font-bold text-[var(--gold)] uppercase tracking-wider">Encounter Frame</span>
+                    <p className="text-xs text-[var(--parchment)] opacity-75 mt-1">Generate the pre-action situation before choosing what to do.</p>
+                  </div>
+                  <button onClick={() => handleFrameEncounter()} disabled={isFramingEncounter} className={`btn-gold text-xs py-2 px-5 ${isFramingEncounter ? 'opacity-50 animate-pulse' : ''}`}>
+                    {isFramingEncounter ? 'Framing the oddness...' : 'Frame Encounter'}
+                  </button>
+                </div>
+                {encounterFrame && (
+                  <div className="space-y-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-xl font-bold font-cinzel text-[var(--gold-bright)]">{encounterFrame.title}</h4>
+                      <span className="mythic-pill border-purple-500/30 text-purple-300">{encounterFrame.phenomenon_type}</span>
+                      <span className="mythic-pill border-rose-500/30 text-rose-300">Clock {encounterFrame.pressure_clock}/6</span>
+                    </div>
+                    <p className="text-[var(--parchment)] opacity-90">{encounterFrame.visible_situation}</p>
+                    <p className="text-[var(--parchment)] opacity-75 italic">Hidden need: {encounterFrame.hidden_need}</p>
+                    <p className="text-amber-200/90">Stakes: {encounterFrame.stakes}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="font-mono uppercase tracking-wider text-[var(--spark)] mb-1">Questions</div>
+                        <ul className="list-disc pl-5 space-y-1">{encounterFrame.questions.map((q) => <li key={q}>{q}</li>)}</ul>
+                      </div>
+                      <div>
+                        <div className="font-mono uppercase tracking-wider text-[var(--spark)] mb-1">Suggested Actions</div>
+                        <ul className="list-disc pl-5 space-y-1">{encounterFrame.suggested_actions.map((action) => <li key={action}>{action}</li>)}</ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Approach Selection */}

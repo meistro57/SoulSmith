@@ -1,3 +1,4 @@
+# backend/app/main.py
 """
 SoulSmith FastAPI Main Application.
 """
@@ -11,6 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import get_all_canonical_events, init_database, log_canonical_event
+from app.encounters import EncounterFrame, EncounterFrameRequest, generate_encounter_frame
 from app.grammar import (
     CURRENT_GRAMMAR_VERSION,
     NumericDiceRoll,
@@ -101,6 +103,11 @@ def cast_dice_roll(req: RollRequest | None = None):
 @app.post("/api/v1/dice/interpret")
 def interpret_dice_roll(req: NumericDiceRoll):
     return interpret_numeric_roll(req)
+
+
+@app.post("/api/v1/encounters/frame")
+def frame_encounter(req: EncounterFrameRequest) -> EncounterFrame:
+    return generate_encounter_frame(req)
 
 
 @app.post("/api/v1/dice/photo-ingest")
