@@ -43,6 +43,17 @@ def _add_column_if_missing(
 def _run_init_schema(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS worlds (
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
@@ -1026,5 +1037,86 @@ def _seed_default_probable_paths(conn: sqlite3.Connection, soul_id: str) -> None
             item,
         )
     conn.commit()
+
+
+# User Database Helpers
+
+
+def create_user_record(
+    *, email: str, username: str, password_hash: str, display_name: str
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    user_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO users (id, email, username, password_hash, display_name)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (user_id, email.lower().strip(), username.lower().strip(), password_hash, display_name.strip()),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": user_id,
+        "email": email.lower().strip(),
+        "username": username.lower().strip(),
+        "display_name": display_name.strip(),
+    }
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ?", (email.lower().strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "username": row["username"],
+        "password_hash": row["password_hash"],
+        "display_name": row["display_name"],
+        "created_at": row["created_at"],
+    }
+
+
+def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ?", (username.lower().strip(),))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "username": row["username"],
+        "password_hash": row["password_hash"],
+        "display_name": row["display_name"],
+        "created_at": row["created_at"],
+    }
+
+
+def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "username": row["username"],
+        "password_hash": row["password_hash"],
+        "display_name": row["display_name"],
+        "created_at": row["created_at"],
+    }
+
 
 

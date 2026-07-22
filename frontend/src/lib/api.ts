@@ -1,17 +1,55 @@
-import type { AlternateSceneResult, Aspect, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, ResolvedScene, Seed, SoulResources, SoulprintProfile } from '../types';
+import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
+const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
+
+export function getStoredAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setStoredAuthToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function removeStoredAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers,
   });
-  if (!response.ok) throw new Error(`SoulSmith API ${response.status}: ${response.statusText}`);
+
+  if (!response.ok) {
+    let errorDetail = `SoulSmith API ${response.status}: ${response.statusText}`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.detail) errorDetail = errBody.detail;
+    } catch {
+      // fallback
+    }
+    throw new Error(errorDetail);
+  }
   return response.json() as Promise<T>;
 }
 
 export const apiClient = {
+  // Auth
+  signup: (payload: { email: string; username: string; password: string; display_name: string }) => request<AuthResponse>('/api/v1/auth/signup', { method: 'POST', body: JSON.stringify(payload) }),
+  login: (payload: { username_or_email: string; password: string }) => request<AuthResponse>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  getMe: () => request<User>('/api/v1/auth/me'),
+
+  // Game Engine
   rollDice: (seed?: number | string) => request<CanonicalDiceRead>('/api/v1/dice/roll', { method: 'POST', body: JSON.stringify(seed === undefined ? {} : { seed }) }),
   interpretDice: (roll: NumericDiceRoll) => request<CanonicalDiceRead>('/api/v1/dice/interpret', { method: 'POST', body: JSON.stringify(roll) }),
   frameEncounter: (payload: { dice_read: CanonicalDiceRead; soul_name: string; world_context?: string[] }) => request<EncounterFrame>('/api/v1/encounters/frame', { method: 'POST', body: JSON.stringify(payload) }),

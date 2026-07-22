@@ -1,7 +1,7 @@
 // frontend/src/App.tsx
-import { useState } from 'react';
-import type { CanonicalDiceRead, EncounterFrame, SoulSheet, ResolvedScene, SoulprintProfile } from './types';
-import { apiClient } from './lib/api';
+import { useEffect, useState } from 'react';
+import type { CanonicalDiceRead, EncounterFrame, SoulSheet, ResolvedScene, SoulprintProfile, User } from './types';
+import { apiClient, removeStoredAuthToken } from './lib/api';
 import { DiceRoller3D } from './components/DiceRoller3D';
 import { SoulSheetView } from './components/SoulSheetView';
 import { EncounterResolutionModal } from './components/EncounterResolutionModal';
@@ -14,8 +14,9 @@ import { CuriosityView } from './components/CuriosityView';
 import { MythicGalleryView } from './components/MythicGalleryView';
 import { ConstellationView } from './components/ConstellationView';
 import { ProbablePathsView } from './components/ProbablePathsView';
+import { AuthModal } from './components/AuthModal';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound } from 'lucide-react';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
@@ -79,6 +80,23 @@ export function App() {
   ]);
 
   const [showSoulprintModal, setShowSoulprintModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Check if token exists in storage on app load
+    apiClient.getMe()
+      .then((user) => setCurrentUser(user))
+      .catch(() => {
+        // No active token or token expired
+        setCurrentUser(null);
+      });
+  }, []);
+
+  const handleLogout = () => {
+    removeStoredAuthToken();
+    setCurrentUser(null);
+  };
 
   const handleFrameEncounter = async (read: CanonicalDiceRead = currentRead) => {
     if (isFramingEncounter) return;
@@ -236,14 +254,38 @@ export function App() {
             })}
           </nav>
 
-          {/* Soulprint Lens Button */}
-          <button
-            onClick={() => setShowSoulprintModal(true)}
-            className="mythic-pill hover:border-[var(--gold)] transition flex items-center gap-2 py-2 px-4 shadow-lg cursor-pointer"
-          >
-            <Moon size={14} className="text-[var(--gold)]" />
-            <span>Soulprint Lens</span>
-          </button>
+          {/* Header Controls: Soulprint & Auth */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSoulprintModal(true)}
+              className="mythic-pill hover:border-[var(--gold)] transition flex items-center gap-2 py-2 px-3 shadow-lg cursor-pointer text-xs"
+            >
+              <Moon size={14} className="text-[var(--gold)]" />
+              <span className="hidden sm:inline">Soulprint Lens</span>
+            </button>
+
+            {currentUser ? (
+              <div className="flex items-center gap-2 bg-[var(--deep)]/90 px-3 py-1.5 rounded-xl border border-[var(--line)] text-xs font-mono">
+                <UserIcon size={14} className="text-amber-400" />
+                <span className="font-bold text-amber-200">{currentUser.display_name}</span>
+                <button
+                  onClick={handleLogout}
+                  title="Log Out"
+                  className="text-slate-400 hover:text-red-400 ml-1 transition cursor-pointer"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-amber-500/20 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 border border-amber-400/40 text-amber-200 transition-all cursor-pointer shadow-lg"
+              >
+                <KeyRound size={14} className="text-amber-400" />
+                <span>Log In</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -448,6 +490,14 @@ export function App() {
       {/* Astrological Soulprint Modal */}
       {showSoulprintModal && (
         <SoulprintModal onClose={() => setShowSoulprintModal(false)} onApplyMotifs={handleApplySoulprint} />
+      )}
+
+      {/* User Authentication Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(user) => setCurrentUser(user)}
+        />
       )}
     </div>
   );

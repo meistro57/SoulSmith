@@ -123,6 +123,20 @@ export interface ProbablePath {
   created_at?: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  display_name: string;
+  created_at?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface AlternateSceneResult {
   path_id: string;
   path_title: string;

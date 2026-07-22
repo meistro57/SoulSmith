@@ -6,11 +6,21 @@ SoulSmith FastAPI Main Application.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import (
+    AuthResponse,
+    UserLoginRequest,
+    UserModel,
+    UserSignupRequest,
+    create_access_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 from app.curiosity import (
     IntegrateThreadRequest,
     QuestionResolveRequest,
@@ -25,6 +35,7 @@ from app.constellation import (
 from app.db import (
     create_aspect_record,
     create_cross_aspect_bond_record,
+    create_user_record,
     execute_integration_event,
     get_all_canonical_events,
     get_all_local_threads,
@@ -32,6 +43,8 @@ from app.db import (
     get_all_seeds,
     get_or_create_primary_constellation,
     get_probable_paths_records,
+    get_user_by_email,
+    get_user_by_username,
     init_database,
     log_canonical_event,
     log_probable_path_record,
@@ -120,6 +133,61 @@ room_manager = RoomManager()
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok", "service": "SoulSmith Engine", "version": "1.2.0"}
+
+
+@app.post("/api/v1/auth/signup", response_model=AuthResponse)
+def signup(req: UserSignupRequest):
+    if get_user_by_email(req.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists",
+        )
+    if get_user_by_username(req.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is already taken",
+        )
+
+    hashed = hash_password(req.password)
+    user_record = create_user_record(
+        email=req.email,
+        username=req.username,
+        password_hash=hashed,
+        display_name=req.display_name,
+    )
+    user_model = UserModel(
+        id=user_record["id"],
+        email=user_record["email"],
+        username=user_record["username"],
+        display_name=user_record["display_name"],
+    )
+    token = create_access_token(user_model.id)
+    return AuthResponse(access_token=token, user=user_model)
+
+
+@app.post("/api/v1/auth/login", response_model=AuthResponse)
+def login(req: UserLoginRequest):
+    user_record = get_user_by_email(req.username_or_email) or get_user_by_username(req.username_or_email)
+    if not user_record or not verify_password(req.password, user_record["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username/email or password",
+        )
+
+    user_model = UserModel(
+        id=user_record["id"],
+        email=user_record["email"],
+        username=user_record["username"],
+        display_name=user_record["display_name"],
+        created_at=user_record.get("created_at"),
+    )
+    token = create_access_token(user_model.id)
+    return AuthResponse(access_token=token, user=user_model)
+
+
+@app.get("/api/v1/auth/me", response_model=UserModel)
+def get_me(authorization: Optional[str] = Header(None)):
+    return get_current_user(authorization=authorization)
 
 
 @app.get("/api/v1/dice/grammar")
