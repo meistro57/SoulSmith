@@ -547,15 +547,16 @@ Connect the structured identity data to a local/provider-abstracted image genera
 Formalize the `MemoryObject` schema as the first-class bridge between Chronicle events and visual generation.
 
 - Canonical event reference & participant list.
-- Participant historical appearance snapshots.
+- Strict participant `PortraitVersion` linkage validation (must exist and match participant soul).
+- Participant historical appearance snapshots (story marks + equipment) locked to event-time portraits.
 - Location, environment, and important relics.
 - Emotional tone, action composition, and lasting consequences.
-- Privacy and consent scope.
+- Privacy and consent scope with public-canon consent enforcement and real-person tag redaction.
 
 **Exit criteria**
 - Chronicle events compile into valid, auditable `MemoryObject` schemas.
-- Participants link to the exact `PortraitVersion` they had when the event occurred.
-- Private material is excluded unless each affected player permits it.
+- Participants link to the exact `PortraitVersion` they had when the event occurred, with hard rejection of unknown or mismatched portrait references.
+- Private material is excluded unless each affected player permits it, and real-person tags are auto-redacted when consent is absent.
 
 ### Phase 12: Chronicle Paintings `[Status: Designed]`
 

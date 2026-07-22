@@ -2435,22 +2435,32 @@ def compile_memory_object_record(
             redacted_real_person_tags.append(participant_soul_id)
 
         pv_id = p.get("portrait_version_id")
-        if pv_id and (
+        cursor.execute(
+            "SELECT * FROM portrait_versions WHERE version_id = ?",
+            (pv_id,),
+        )
+        pv_row = cursor.fetchone()
+        if not pv_row:
+            conn.close()
+            raise ValueError(
+                f"Participant '{participant_soul_id}' references unknown portrait version '{pv_id}'."
+            )
+        if pv_row["soul_id"] != participant_soul_id:
+            conn.close()
+            raise ValueError(
+                f"Portrait version '{pv_id}' does not belong to soul '{participant_soul_id}'."
+            )
+
+        if (
             "historical_story_marks_snapshot" not in p_copy
             or not p_copy["historical_story_marks_snapshot"]
         ):
-            cursor.execute(
-                "SELECT * FROM portrait_versions WHERE version_id = ?",
-                (pv_id,),
+            p_copy["historical_story_marks_snapshot"] = (
+                _json_or_none(pv_row["story_marks_snapshot_json"]) or []
             )
-            pv_row = cursor.fetchone()
-            if pv_row:
-                p_copy["historical_story_marks_snapshot"] = (
-                    _json_or_none(pv_row["story_marks_snapshot_json"]) or []
-                )
-                p_copy["historical_equipment_snapshot"] = _json_or_none(
-                    pv_row["equipment_snapshot_json"]
-                )
+            p_copy["historical_equipment_snapshot"] = _json_or_none(
+                pv_row["equipment_snapshot_json"]
+            )
         enriched_participants.append(p_copy)
 
     if redacted_real_person_tags:

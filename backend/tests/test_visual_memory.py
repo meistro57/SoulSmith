@@ -67,19 +67,12 @@ def test_visual_identity_and_memory_object_flow():
                     "portrait_version_id": v1_portrait_id,  # Historical pre-scar portrait
                     "role_in_event": "Focus",
                     "real_person_tag_opt_in": False,
-                },
-                {
-                    "soul_id": "Archivist Vael",
-                    "character_name": "Archivist Vael",
-                    "portrait_version_id": "pv_vael_1",
-                    "role_in_event": "Witness",
-                    "real_person_tag_opt_in": True,
-                },
+                }
             ],
             "location_environment": "Salt-encrusted subterranean sanctuary",
             "relics_involved": ["Dormant Salt Bell"],
             "emotional_tone": "Tense awakening, solemn reverence",
-            "action_composition": "Kaelen channels starlight while Vael anchors the physical altar.",
+            "action_composition": "Kaelen channels starlight to anchor the physical altar.",
             "lasting_consequence": "Kaelen received a prominent scar on left cheek; Salt Bell awakened.",
             "privacy_consent_scope": "public_canon",
         },
@@ -200,6 +193,47 @@ def test_phase_11_memory_object_enforces_consent_and_redacts_real_person_tags():
     memory_object = redacted_res.json()["memory_object"]
     assert memory_object["participants"][0]["real_person_tag_opt_in"] is False
     assert "missing consent" in memory_object["importance_rationale"].lower()
+
+
+def test_phase_11_memory_object_rejects_unknown_participant_portrait_version():
+    soul_id = f"Phase11_InvalidPV_{str(uuid.uuid4())[:6]}"
+
+    client.post(
+        "/api/v1/visual/avatar/create",
+        json={
+            "soul_id": soul_id,
+            "face": "Weathered features",
+            "hair": "Braided black hair",
+            "body": "Strong build",
+            "species": "Human Aspect",
+            "eyes": "Steel eyes",
+        },
+    )
+
+    invalid_res = client.post(
+        "/api/v1/visual/memory-objects/compile",
+        json={
+            "event_id": "evt_phase11_invalidpv_01",
+            "event_title": "Broken Link Event",
+            "participants": [
+                {
+                    "soul_id": soul_id,
+                    "character_name": "Broken Link",
+                    "portrait_version_id": "pv_unknown_123",
+                    "role_in_event": "Witness",
+                    "real_person_tag_opt_in": False,
+                }
+            ],
+            "location_environment": "Frost bridge",
+            "relics_involved": ["Veiled Dial"],
+            "emotional_tone": "Uneasy",
+            "action_composition": "A witness cannot be identified.",
+            "lasting_consequence": "Chronicle linkage fails audit.",
+            "privacy_consent_scope": "public_canon",
+        },
+    )
+    assert invalid_res.status_code == 400
+    assert "unknown portrait version" in invalid_res.json()["detail"].lower()
 
 
 def test_phase_10_portrait_candidate_generation_and_continuity_workflow():
