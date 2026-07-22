@@ -1,4 +1,4 @@
-import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonStatus, CanonicalDiceRead, CommunitySymbol, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, GatheringContribution, GatheringSession, IntegrationEvent, LocalThread, ManifestationType, NarrativeIntensity, NumericDiceRoll, OpenQuestion, PlayerPreferences, PrivateNote, ProbablePath, ProbablePathStatus, ReflectionSession, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, SpiritualFraming, User } from '../types';
+import type { AlternateSceneResult, Aspect, AuthResponse, AvatarIdentity, AwakeningStage, CanonStatus, CanonicalDiceRead, CommunitySymbol, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, GatheringContribution, GatheringSession, IntegrationEvent, LocalThread, ManifestationType, MemoryObject, NarrativeIntensity, NumericDiceRoll, OpenQuestion, ParticipantRef, PlayerPreferences, PortraitVersion, PrivateNote, ProbablePath, ProbablePathStatus, ReflectionSession, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, SpiritualFraming, StoryMark, User, VisualAvatarProfile } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
@@ -95,4 +95,12 @@ export const apiClient = {
   createReflectionSession: (payload: { soul_id?: string; prompt_question: string; player_reflection: string; share_with_ai?: boolean }) => request<{ session: ReflectionSession }>('/api/v1/reflection/sessions/create', { method: 'POST', body: JSON.stringify(payload) }),
   listPrivateNotes: (soulId = 'Kaelen the Star-Watcher') => request<{ notes: PrivateNote[] }>(`/api/v1/reflection/notes?soul_id=${encodeURIComponent(soulId)}`),
   createPrivateNote: (payload: { soul_id?: string; title: string; content: string; allow_ai_indexing?: boolean }) => request<{ note: PrivateNote }>('/api/v1/reflection/notes/create', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Visual Identity Foundation & Memory Objects
+  getVisualAvatarProfile: (soulId = 'Kaelen the Star-Watcher') => request<VisualAvatarProfile>(`/api/v1/visual/avatar/${encodeURIComponent(soulId)}`),
+  createAvatarIdentity: (payload: { soul_id?: string; face?: string; hair?: string; body?: string; species?: string; eyes?: string }) => request<{ identity: AvatarIdentity }>('/api/v1/visual/avatar/create', { method: 'POST', body: JSON.stringify(payload) }),
+  addStoryMark: (payload: { soul_id?: string; mark_type: string; location: string; origin_event_id: string; acquired_at?: string; visibility?: string; status?: string }) => request<{ story_mark: StoryMark }>('/api/v1/visual/story-marks/add', { method: 'POST', body: JSON.stringify(payload) }),
+  createPortraitSnapshot: (payload: { soul_id?: string; label: string; image_url?: string }) => request<{ portrait: PortraitVersion }>('/api/v1/visual/portraits/snapshot', { method: 'POST', body: JSON.stringify(payload) }),
+  compileMemoryObject: (payload: { event_id: string; event_title: string; participants: ParticipantRef[]; location_environment: string; relics_involved?: string[]; emotional_tone: string; action_composition: string; lasting_consequence: string; privacy_consent_scope?: string }) => request<{ memory_object: MemoryObject }>('/api/v1/visual/memory-objects/compile', { method: 'POST', body: JSON.stringify(payload) }),
+  listMemoryObjects: () => request<{ memory_objects: MemoryObject[] }>('/api/v1/visual/memory-objects'),
 };

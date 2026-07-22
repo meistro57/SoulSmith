@@ -460,49 +460,138 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - Players can understand the history of every relic state.
 - Relics create curiosity without becoming arbitrary puzzle locks.
 
-### Phase 7: Convergence and Community Mythology (Completed)
+### Status Hygiene System
 
-- Expand WebSocket multiplayer convergence.
-- Support consent-aware shared canon.
-- Add world-level symbols and community Threads.
-- Provide moderation, privacy, separation, and merge controls.
-- Enable gatherings where many rolls contribute to one evolving phenomenon.
-- Preserve individual agency when stories intersect.
+Rather than flat "Completed" flags, every phase is evaluated against a 5-tier project hygiene scale:
+
+1. **`Designed`**: Formal schema and architectural specification aligned.
+2. **`Prototype implemented`**: Working domain logic and unit tests exist.
+3. **`Integrated`**: API, persistence, and React frontend connected.
+4. **`Validated with players`**: End-to-end player usability and consent verified.
+5. **`Production ready`**: Deployed, optimized, and stress-tested.
+
+---
+
+### Delivery Phases
+
+### Phase 0: Canonical Roll Contract Migration `[Status: Production ready]`
+
+### Phase 1: Reliable Chronicle Provenance `[Status: Production ready]`
+
+### Phase 2: Curiosity Engine Core `[Status: Production ready]`
+
+### Phase 3: Threads and Integration Engine `[Status: Integrated]`
+
+### Phase 4: Soul Constellation Engine `[Status: Integrated]`
+
+### Phase 5: Probable Paths Engine `[Status: Integrated]`
+
+### Phase 6: Relic Recognition Engine & Ledger `[Status: Integrated]`
+
+### Phase 7: Convergence and Community Mythology `[Status: Integrated]`
+
+### Phase 8: Reflection and Accessibility `[Status: Integrated]`
+
+### Phase 9: Visual Identity Foundation `[Status: Integrated - Vertical Slice]`
+
+Build the character as structured data before generating art.
+
+This phase defines:
+- `AvatarIdentity`: Permanent identity (Face, Hair, Body, Species, Eyes).
+- `AppearanceState`: Current physical state.
+- `StoryMark`: Provenance-backed marks (Scars, Burns, Tattoos, Broken Horns, Wrinkles) linked to canonical event IDs.
+- `EquipmentAppearance`: Armor, clothing, relics, weapons layer.
+- `PortraitVersion`: Immutable snapshot of appearance at a point in time.
+- `ConsentSettings`: Explicit privacy and visual permission controls.
+
+*Critical Rule:* The portrait image is disposable. The structured history beneath it is canonical.
 
 **Exit criteria**
+- A player can create an avatar identity.
+- Every visible change has provenance linked to an event.
+- Old portrait versions remain accessible in an immutable timeline.
+- Regenerating an image cannot erase canonical scars, age, relics, or story marks.
 
-- Multiple campaigns can contribute to a shared mythology without exposing private Chronicle material.
-- Conflicting canon can coexist, branch, or reconcile explicitly.
-- Community events remain playable rather than becoming passive generated lore.
+### Phase 10: Portrait Generation and Continuity `[Status: Designed]`
 
-### Phase 8: Reflection and Accessibility (Completed)
+Connect the structured identity data to an image generation pipeline with character consistency across revisions.
 
-- Add optional end-of-session reflection prompts.
-- Support private notes that are never used by AI unless explicitly permitted.
-- Add content controls, intensity settings, and graceful disengagement.
-- Improve screen reader, keyboard, motion, contrast, and cognitive accessibility.
-- Add transparent explanations of memory, inference, and data controls.
-
-**Exit criteria**
-
-- Reflection is always optional.
-- Players control what the system remembers and interprets.
-- The experience remains useful without spiritual framing or personal disclosure.
-
-### Phase 9: Visual Memory System & Art Director AI
-
-- Implement Living Avatars with permanent identity, equipment, story, and reputation layers.
-- Build Emotional Portrait states driven by recent event dynamics.
-- Build Memory Object compiler and Art Director AI prompt orchestration layer.
-- Add Chronicle Paintings, Memory Importance Scoring, and Group Memory Albums.
-- Build Character Tags & Living Biography timeline view.
-- Support World Galleries, castle portraits, and legendary historical figures.
+- Prompt templates & provider abstraction layer.
+- Deterministic seeds or provider metadata.
+- Image moderation and retry/failure handling.
+- Manual review, approval, and rejection workflow.
 
 **Exit criteria**
+- Character remains recognizably consistent after scars, haircut, aging steps, or equipment updates.
+- Players can approve or reject visual updates before they enter canon.
+- Failed generations never mutate character canon.
 
-- Visual assets are generated only for high significance events based on structured Memory Objects.
-- Portraits preserve scars, age progression, and mythic titles across the character timeline.
-- Art Director AI maintains a coherent, storybook/painterly aesthetic voice across all Chronicle paintings.
+### Phase 11: Chronicle Memory Objects `[Status: Designed]`
+
+Formalize the `MemoryObject` schema as the first-class bridge between Chronicle events and visual generation.
+
+- Canonical event reference & participant list.
+- Participant historical appearance snapshots.
+- Location, environment, and important relics.
+- Emotional tone, action composition, and lasting consequences.
+- Privacy and consent scope.
+
+**Exit criteria**
+- Chronicle events compile into valid, auditable `MemoryObject` schemas.
+- Participants link to the exact `PortraitVersion` they had when the event occurred.
+- Private material is excluded unless each affected player permits it.
+
+### Phase 12: Chronicle Paintings `[Status: Designed]`
+
+Connect `MemoryObject` schemas to the event painting pipeline.
+
+- Event significance scoring & painting eligibility.
+- Historical appearance locking (older paintings do not acquire future scars).
+- Review and approval workflow.
+- Immutable event-to-image association.
+
+**Exit criteria**
+- High-significance events produce approved Chronicle paintings.
+- Historical paintings preserve the exact appearance of participants at the time of the event.
+- Regeneration creates candidate versions without replacing approved history.
+
+### Phase 13: Group Memories, Tags, and Recognition `[Status: Designed]`
+
+Implement distinct in-world character tags vs optional real-person profile tags.
+
+- In-World Character Tags (Avatar name, title, role, biography link).
+- Real-Person Group Tags (Profile photo, display name, optional group tagging).
+- World separation: Real photos never become source material for fantasy art unless explicitly opted-in.
+
+**Exit criteria**
+- Participants approve tagging before publication.
+- Players can hide real photos while retaining character tags.
+- Group event privacy operates independently for text, generated art, and profile photos.
+
+### Phase 14: Living Biography and Portrait Timeline `[Status: Designed]`
+
+Assemble character history into a chronological portrait timeline.
+
+- Portrait timeline displaying original avatar, appearance milestones, scars with event links, title changes, relic awakenings, and current appearance.
+- Historical event views display historical portraits; current profiles display current portraits.
+
+**Exit criteria**
+- Players can navigate a chronological portrait timeline.
+- Every visible change links directly to its originating event.
+- Reinterpreting appearance changes preserves prior historical records.
+
+### Phase 15: Art Director and World Gallery `[Status: Designed]`
+
+Campaign-level visual voice and world galleries.
+
+- Art Director controlling composition, medium, palette, and recurring motifs.
+- Libraries, settlement galleries, memorial walls, and historical figures.
+- Alternate cultural visual interpretations of the same event.
+
+**Exit criteria**
+- Campaign maintains a coherent visual style.
+- Distinguishes canonical facts from artistic framing.
+- World galleries contain only approved, permission-safe memories.
 
 ---
 

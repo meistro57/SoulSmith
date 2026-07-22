@@ -37,7 +37,10 @@ from app.db import (
     create_cross_aspect_bond_record,
     create_user_record,
     add_gathering_contribution,
+    add_story_mark_record,
+    compile_memory_object_record,
     create_community_symbol_record,
+    create_portrait_version_record,
     create_private_note_record,
     create_reflection_record,
     execute_integration_event,
@@ -46,14 +49,20 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_community_symbols_records,
+    get_memory_objects_records,
+    get_or_create_avatar_identity_record,
+    get_or_create_equipment_appearance_record,
     get_or_create_gathering_session,
     get_or_create_preferences_record,
     get_or_create_primary_constellation,
     get_or_create_relics_records,
+    get_or_create_visual_consent_record,
+    get_portrait_versions_records,
     get_private_notes_records,
     get_probable_paths_records,
     get_reflections_records,
     get_relic_history_records,
+    get_story_marks_records,
     get_user_by_email,
     get_user_by_username,
     init_database,
@@ -65,6 +74,18 @@ from app.db import (
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
+)
+from app.visual_memory import (
+    AddStoryMarkRequest,
+    AvatarIdentityModel,
+    CompileMemoryObjectRequest,
+    ConsentSettingsModel,
+    CreateAvatarIdentityRequest,
+    CreatePortraitVersionRequest,
+    EquipmentAppearanceModel,
+    MemoryObjectModel,
+    PortraitVersionModel,
+    StoryMarkModel,
 )
 from app.reflection import (
     CreatePrivateNoteRequest,
@@ -741,6 +762,84 @@ def create_private_note(req: CreatePrivateNoteRequest):
         allow_ai_indexing=req.allow_ai_indexing,
     )
     return {"note": PrivateNoteModel(**record)}
+
+
+# Phase 9: Visual Identity Foundation & Memory Objects Endpoints
+
+
+@app.get("/api/v1/visual/avatar/{soul_id}")
+def get_visual_avatar_profile(soul_id: str):
+    identity = get_or_create_avatar_identity_record(soul_id=soul_id)
+    story_marks = get_story_marks_records(soul_id=soul_id)
+    equipment = get_or_create_equipment_appearance_record(soul_id=soul_id)
+    portraits = get_portrait_versions_records(soul_id=soul_id)
+    consent = get_or_create_visual_consent_record(soul_id=soul_id)
+    return {
+        "identity": AvatarIdentityModel(**identity),
+        "story_marks": [StoryMarkModel(**m) for m in story_marks],
+        "equipment": EquipmentAppearanceModel(**equipment),
+        "portraits": [PortraitVersionModel(**p) for p in portraits],
+        "consent": ConsentSettingsModel(**consent),
+    }
+
+
+@app.post("/api/v1/visual/avatar/create")
+def create_avatar_identity(req: CreateAvatarIdentityRequest):
+    record = get_or_create_avatar_identity_record(
+        soul_id=req.soul_id,
+        face=req.face,
+        hair=req.hair,
+        body=req.body,
+        species=req.species,
+        eyes=req.eyes,
+    )
+    return {"identity": AvatarIdentityModel(**record)}
+
+
+@app.post("/api/v1/visual/story-marks/add")
+def add_story_mark(req: AddStoryMarkRequest):
+    record = add_story_mark_record(
+        soul_id=req.soul_id,
+        mark_type=req.mark_type,
+        location=req.location,
+        origin_event_id=req.origin_event_id,
+        acquired_at=req.acquired_at,
+        visibility=req.visibility,
+        status=req.status,
+    )
+    return {"story_mark": StoryMarkModel(**record)}
+
+
+@app.post("/api/v1/visual/portraits/snapshot")
+def create_portrait_snapshot(req: CreatePortraitVersionRequest):
+    record = create_portrait_version_record(
+        soul_id=req.soul_id,
+        label=req.label,
+        image_url=req.image_url,
+    )
+    return {"portrait": PortraitVersionModel(**record)}
+
+
+@app.post("/api/v1/visual/memory-objects/compile")
+def compile_memory_object(req: CompileMemoryObjectRequest):
+    record = compile_memory_object_record(
+        event_id=req.event_id,
+        event_title=req.event_title,
+        participants=[p.model_dump() for p in req.participants],
+        location_environment=req.location_environment,
+        relics_involved=req.relics_involved,
+        emotional_tone=req.emotional_tone,
+        action_composition=req.action_composition,
+        lasting_consequence=req.lasting_consequence,
+        privacy_consent_scope=req.privacy_consent_scope,
+    )
+    return {"memory_object": MemoryObjectModel(**record)}
+
+
+@app.get("/api/v1/visual/memory-objects")
+def list_memory_objects():
+    records = get_memory_objects_records()
+    return {"memory_objects": [MemoryObjectModel(**r) for r in records]}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

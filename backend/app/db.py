@@ -313,6 +313,81 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS avatar_identities (
+            soul_id TEXT PRIMARY KEY,
+            face TEXT NOT NULL,
+            hair TEXT NOT NULL,
+            body TEXT NOT NULL,
+            species TEXT NOT NULL,
+            eyes TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS story_marks (
+            id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            mark_type TEXT NOT NULL,
+            location TEXT NOT NULL,
+            origin_event_id TEXT NOT NULL,
+            acquired_at TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'prominent',
+            status TEXT NOT NULL DEFAULT 'permanent',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipment_appearances (
+            soul_id TEXT PRIMARY KEY,
+            armor TEXT NOT NULL,
+            clothing TEXT NOT NULL,
+            weapons_json TEXT NOT NULL DEFAULT '[]',
+            relics_json TEXT NOT NULL DEFAULT '[]',
+            backpacks_cloaks TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS portrait_versions (
+            version_id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            label TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            story_marks_snapshot_json TEXT NOT NULL DEFAULT '[]',
+            equipment_snapshot_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visual_consent_settings (
+            soul_id TEXT PRIMARY KEY,
+            allow_shared_gallery INTEGER DEFAULT 1,
+            allow_character_tagging INTEGER DEFAULT 1,
+            allow_real_person_tagging INTEGER DEFAULT 0,
+            real_person_photo_url TEXT,
+            real_person_display_name TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS memory_objects (
+            id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL,
+            event_title TEXT NOT NULL,
+            participants_json TEXT NOT NULL DEFAULT '[]',
+            location_environment TEXT NOT NULL,
+            relics_involved_json TEXT NOT NULL DEFAULT '[]',
+            emotional_tone TEXT NOT NULL,
+            action_composition TEXT NOT NULL,
+            lasting_consequence TEXT NOT NULL,
+            privacy_consent_scope TEXT NOT NULL DEFAULT 'public_canon',
+            visual_generation_status TEXT NOT NULL DEFAULT 'compiled',
+            painting_image_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -1890,6 +1965,387 @@ def get_private_notes_records(soul_id: str) -> List[Dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+# Phase 9: Visual Identity Foundation & Memory Objects DB Helpers
+
+
+def get_or_create_avatar_identity_record(
+    soul_id: str = "Kaelen the Star-Watcher",
+    face: str = "Defined features, sharp jawline, observant expression",
+    hair: str = "Dark raven hair worn tied back",
+    body: str = "Athletic build worn by travel",
+    species: str = "Human Aspect",
+    eyes: str = "Deep amber eyes reflecting starlight",
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM avatar_identities WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "soul_id": row["soul_id"],
+            "face": row["face"],
+            "hair": row["hair"],
+            "body": row["body"],
+            "species": row["species"],
+            "eyes": row["eyes"],
+        }
+
+    cursor.execute(
+        """
+        INSERT INTO avatar_identities (soul_id, face, hair, body, species, eyes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (soul_id, face, hair, body, species, eyes),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "soul_id": soul_id,
+        "face": face,
+        "hair": hair,
+        "body": body,
+        "species": species,
+        "eyes": eyes,
+    }
+
+
+def add_story_mark_record(
+    *,
+    soul_id: str,
+    mark_type: str,
+    location: str,
+    origin_event_id: str,
+    acquired_at: str,
+    visibility: str = "prominent",
+    status: str = "permanent",
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    mark_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO story_marks (
+            id, soul_id, mark_type, location, origin_event_id, acquired_at, visibility, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (mark_id, soul_id, mark_type, location, origin_event_id, acquired_at, visibility, status),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": mark_id,
+        "soul_id": soul_id,
+        "mark_type": mark_type,
+        "location": location,
+        "origin_event_id": origin_event_id,
+        "acquired_at": acquired_at,
+        "visibility": visibility,
+        "status": status,
+    }
+
+
+def get_story_marks_records(soul_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC", (soul_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "soul_id": r["soul_id"],
+            "mark_type": r["mark_type"],
+            "location": r["location"],
+            "origin_event_id": r["origin_event_id"],
+            "acquired_at": r["acquired_at"],
+            "visibility": r["visibility"],
+            "status": r["status"],
+        }
+        for r in rows
+    ]
+
+
+def get_or_create_equipment_appearance_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM equipment_appearances WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "soul_id": row["soul_id"],
+            "armor": row["armor"],
+            "clothing": row["clothing"],
+            "weapons": _json_or_none(row["weapons_json"]) or ["Seer's Starlight Blade"],
+            "relics": _json_or_none(row["relics_json"]) or ["Dormant Salt Bell"],
+            "backpacks_cloaks": row["backpacks_cloaks"],
+        }
+
+    default_equip = {
+        "soul_id": soul_id,
+        "armor": "Weathered iron pauldrons and salt-crusted leather doublet",
+        "clothing": "Ash-colored travel cloak with silver thread embroidery",
+        "weapons": ["Seer's Starlight Blade", "Etched Runic Dagger"],
+        "relics": ["Dormant Salt Bell"],
+        "backpacks_cloaks": "Heavy wool cloak with raven brooch",
+    }
+    cursor.execute(
+        """
+        INSERT INTO equipment_appearances (
+            soul_id, armor, clothing, weapons_json, relics_json, backpacks_cloaks
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            soul_id,
+            default_equip["armor"],
+            default_equip["clothing"],
+            json.dumps(default_equip["weapons"]),
+            json.dumps(default_equip["relics"]),
+            default_equip["backpacks_cloaks"],
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return default_equip
+
+
+def create_portrait_version_record(
+    *,
+    soul_id: str,
+    label: str,
+    image_url: str,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get current story marks and equipment
+    cursor.execute("SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC", (soul_id,))
+    marks_rows = cursor.fetchall()
+    marks_snapshot = [
+        {
+            "id": r["id"],
+            "soul_id": r["soul_id"],
+            "mark_type": r["mark_type"],
+            "location": r["location"],
+            "origin_event_id": r["origin_event_id"],
+            "acquired_at": r["acquired_at"],
+            "visibility": r["visibility"],
+            "status": r["status"],
+        }
+        for r in marks_rows
+    ]
+
+    cursor.execute("SELECT * FROM equipment_appearances WHERE soul_id = ?", (soul_id,))
+    eq_row = cursor.fetchone()
+    eq_snapshot = None
+    if eq_row:
+        eq_snapshot = {
+            "soul_id": eq_row["soul_id"],
+            "armor": eq_row["armor"],
+            "clothing": eq_row["clothing"],
+            "weapons": _json_or_none(eq_row["weapons_json"]) or [],
+            "relics": _json_or_none(eq_row["relics_json"]) or [],
+            "backpacks_cloaks": eq_row["backpacks_cloaks"],
+        }
+
+    cursor.execute("SELECT COUNT(*) as count FROM portrait_versions WHERE soul_id = ?", (soul_id,))
+    version_num = (cursor.fetchone()["count"] or 0) + 1
+    version_id = f"pv_{version_num}_{str(uuid.uuid4())[:8]}"
+
+    cursor.execute(
+        """
+        INSERT INTO portrait_versions (
+            version_id, soul_id, version_number, label, image_url,
+            story_marks_snapshot_json, equipment_snapshot_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            version_id,
+            soul_id,
+            version_num,
+            label,
+            image_url,
+            json.dumps(marks_snapshot),
+            json.dumps(eq_snapshot) if eq_snapshot else None,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "version_id": version_id,
+        "soul_id": soul_id,
+        "version_number": version_num,
+        "label": label,
+        "image_url": image_url,
+        "story_marks_snapshot": marks_snapshot,
+        "equipment_snapshot": eq_snapshot,
+    }
+
+
+def get_portrait_versions_records(soul_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM portrait_versions WHERE soul_id = ? ORDER BY version_number ASC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        # Seed default initial portrait version (v1 - original pre-scar)
+        v1 = create_portrait_version_record(
+            soul_id=soul_id,
+            label="Original Identity (v1)",
+            image_url="/assets/portraits/kaelen_original.png",
+        )
+        return [v1]
+
+    return [
+        {
+            "version_id": r["version_id"],
+            "soul_id": r["soul_id"],
+            "version_number": r["version_number"],
+            "label": r["label"],
+            "image_url": r["image_url"],
+            "story_marks_snapshot": _json_or_none(r["story_marks_snapshot_json"]) or [],
+            "equipment_snapshot": _json_or_none(r["equipment_snapshot_json"]),
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def get_or_create_visual_consent_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM visual_consent_settings WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "soul_id": row["soul_id"],
+            "allow_shared_gallery": bool(row["allow_shared_gallery"]),
+            "allow_character_tagging": bool(row["allow_character_tagging"]),
+            "allow_real_person_tagging": bool(row["allow_real_person_tagging"]),
+            "real_person_photo_url": row["real_person_photo_url"],
+            "real_person_display_name": row["real_person_display_name"],
+        }
+
+    cursor.execute(
+        """
+        INSERT INTO visual_consent_settings (
+            soul_id, allow_shared_gallery, allow_character_tagging, allow_real_person_tagging
+        ) VALUES (?, 1, 1, 0)
+    """,
+        (soul_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "soul_id": soul_id,
+        "allow_shared_gallery": True,
+        "allow_character_tagging": True,
+        "allow_real_person_tagging": False,
+        "real_person_photo_url": None,
+        "real_person_display_name": None,
+    }
+
+
+def compile_memory_object_record(
+    *,
+    event_id: str,
+    event_title: str,
+    participants: List[Dict[str, Any]],
+    location_environment: str,
+    relics_involved: List[str],
+    emotional_tone: str,
+    action_composition: str,
+    lasting_consequence: str,
+    privacy_consent_scope: str = "public_canon",
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    mem_id = f"mem_{str(uuid.uuid4())[:8]}"
+
+    cursor.execute(
+        """
+        INSERT INTO memory_objects (
+            id, event_id, event_title, participants_json, location_environment,
+            relics_involved_json, emotional_tone, action_composition, lasting_consequence,
+            privacy_consent_scope, visual_generation_status, painting_image_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'compiled', ?)
+    """,
+        (
+            mem_id,
+            event_id,
+            event_title,
+            json.dumps(participants),
+            location_environment,
+            json.dumps(relics_involved),
+            emotional_tone,
+            action_composition,
+            lasting_consequence,
+            privacy_consent_scope,
+            f"/assets/paintings/{event_id}_painting.png",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": mem_id,
+        "event_id": event_id,
+        "event_title": event_title,
+        "participants": participants,
+        "location_environment": location_environment,
+        "relics_involved": relics_involved,
+        "emotional_tone": emotional_tone,
+        "action_composition": action_composition,
+        "lasting_consequence": lasting_consequence,
+        "privacy_consent_scope": privacy_consent_scope,
+        "visual_generation_status": "compiled",
+        "painting_image_url": f"/assets/paintings/{event_id}_painting.png",
+    }
+
+
+def get_memory_objects_records() -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM memory_objects ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "event_id": r["event_id"],
+            "event_title": r["event_title"],
+            "participants": _json_or_none(r["participants_json"]) or [],
+            "location_environment": r["location_environment"],
+            "relics_involved": _json_or_none(r["relics_involved_json"]) or [],
+            "emotional_tone": r["emotional_tone"],
+            "action_composition": r["action_composition"],
+            "lasting_consequence": r["lasting_consequence"],
+            "privacy_consent_scope": r["privacy_consent_scope"],
+            "visual_generation_status": r["visual_generation_status"],
+            "painting_image_url": r["painting_image_url"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
 
 
 

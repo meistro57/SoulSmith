@@ -16,12 +16,13 @@ import { ConstellationView } from './components/ConstellationView';
 import { ProbablePathsView } from './components/ProbablePathsView';
 import { RelicLedgerView } from './components/RelicLedgerView';
 import { ReflectionAccessibilityView } from './components/ReflectionAccessibilityView';
+import { VisualMemoryView } from './components/VisualMemoryView';
 import { AuthModal } from './components/AuthModal';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -241,6 +242,7 @@ export function App() {
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
               { id: 'convergence', label: 'Convergence', icon: Radio },
               { id: 'reflection', label: 'Reflection', icon: HeartHandshake },
+              { id: 'visual_memory', label: 'Visual Memory', icon: Layers },
               { id: 'art', label: 'Mythic Art', icon: Image }
             ].map((tab) => {
               const Icon = tab.icon;
@@ -490,6 +492,8 @@ export function App() {
         )}
 
         {activeTab === 'reflection' && <ReflectionAccessibilityView soulName={soulSheet.name} />}
+
+        {activeTab === 'visual_memory' && <VisualMemoryView soulName={soulSheet.name} />}
 
         {activeTab === 'art' && <MythicGalleryView />}
       </main>

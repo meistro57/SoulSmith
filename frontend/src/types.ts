@@ -243,6 +243,87 @@ export interface PrivateNote {
   updated_at?: string;
 }
 
+export interface AvatarIdentity {
+  soul_id: string;
+  face: string;
+  hair: string;
+  body: string;
+  species: string;
+  eyes: string;
+}
+
+export interface StoryMark {
+  id: string;
+  soul_id: string;
+  mark_type: string;
+  location: string;
+  origin_event_id: string;
+  acquired_at: string;
+  visibility: 'prominent' | 'subtle' | 'hidden_under_armor';
+  status: 'permanent' | 'fading' | 'magically_sealed';
+}
+
+export interface EquipmentAppearance {
+  soul_id: string;
+  armor: string;
+  clothing: string;
+  weapons: string[];
+  relics: string[];
+  backpacks_cloaks: string;
+}
+
+export interface PortraitVersion {
+  version_id: string;
+  soul_id: string;
+  version_number: number;
+  label: string;
+  image_url: string;
+  story_marks_snapshot: StoryMark[];
+  equipment_snapshot?: EquipmentAppearance;
+  created_at?: string;
+}
+
+export interface ConsentSettings {
+  soul_id: string;
+  allow_shared_gallery: boolean;
+  allow_character_tagging: boolean;
+  allow_real_person_tagging: boolean;
+  real_person_photo_url?: string;
+  real_person_display_name?: string;
+}
+
+export interface ParticipantRef {
+  soul_id: string;
+  character_name: string;
+  portrait_version_id: string;
+  role_in_event: string;
+  real_person_tag_opt_in?: boolean;
+}
+
+export interface MemoryObject {
+  id: string;
+  event_id: string;
+  event_title: string;
+  participants: ParticipantRef[];
+  location_environment: string;
+  relics_involved: string[];
+  emotional_tone: string;
+  action_composition: string;
+  lasting_consequence: string;
+  privacy_consent_scope: string;
+  visual_generation_status: 'pending' | 'compiled' | 'painting_approved' | 'rejected';
+  painting_image_url?: string;
+  created_at?: string;
+}
+
+export interface VisualAvatarProfile {
+  identity: AvatarIdentity;
+  story_marks: StoryMark[];
+  equipment: EquipmentAppearance;
+  portraits: PortraitVersion[];
+  consent: ConsentSettings;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;
