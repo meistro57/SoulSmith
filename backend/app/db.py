@@ -4,6 +4,7 @@ SoulSmith Canonical Database Engine (SQLite-first storage abstraction).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import os
 import sqlite3
@@ -251,6 +252,32 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             new_stage TEXT NOT NULL,
             narrative_condition_met TEXT NOT NULL,
             chronicle_evidence_summary TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS community_symbols (
+            id TEXT PRIMARY KEY,
+            symbol_name TEXT NOT NULL,
+            world_id TEXT NOT NULL,
+            description TEXT NOT NULL,
+            significance_score INTEGER DEFAULT 1,
+            contributing_souls_json TEXT NOT NULL DEFAULT '[]',
+            canon_status TEXT NOT NULL DEFAULT 'opt_in_shared',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS convergence_gatherings (
+            id TEXT PRIMARY KEY,
+            room_id TEXT NOT NULL,
+            phenomenon_name TEXT NOT NULL,
+            target_resonance INTEGER DEFAULT 10,
+            current_resonance INTEGER DEFAULT 0,
+            roles_json TEXT NOT NULL DEFAULT '{}',
+            contributions_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'active',
+            outcome_summary TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -1381,6 +1408,261 @@ def _seed_default_relics(conn: sqlite3.Connection, soul_id: str) -> None:
         )
 
     conn.commit()
+
+
+# Convergence & Community Mythology Helpers
+
+
+def get_community_symbols_records() -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) as cnt FROM community_symbols")
+    if cursor.fetchone()["cnt"] == 0:
+        _seed_default_community_symbols(conn)
+
+    cursor.execute("SELECT * FROM community_symbols ORDER BY significance_score DESC, created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "symbol_name": r["symbol_name"],
+            "world_id": r["world_id"],
+            "description": r["description"],
+            "significance_score": r["significance_score"],
+            "contributing_souls": _json_or_none(r["contributing_souls_json"]) or [],
+            "canon_status": r["canon_status"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def create_community_symbol_record(
+    *,
+    symbol_name: str,
+    world_id: str = "world_starforge_01",
+    description: str,
+    contributing_souls: List[str],
+    canon_status: str = "opt_in_shared",
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    symbol_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO community_symbols (
+            id, symbol_name, world_id, description, significance_score,
+            contributing_souls_json, canon_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            symbol_id,
+            symbol_name,
+            world_id,
+            description,
+            len(contributing_souls),
+            json.dumps(contributing_souls),
+            canon_status,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": symbol_id,
+        "symbol_name": symbol_name,
+        "world_id": world_id,
+        "description": description,
+        "significance_score": len(contributing_souls),
+        "contributing_souls": contributing_souls,
+        "canon_status": canon_status,
+    }
+
+
+def get_or_create_gathering_session(
+    room_id: str = "convergence_alpha",
+    phenomenon_name: str = "Awakening of the Salt Spire",
+    target_resonance: int = 10,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM convergence_gatherings WHERE room_id = ? AND status = 'active' ORDER BY created_at DESC",
+        (room_id,),
+    )
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "id": row["id"],
+            "room_id": row["room_id"],
+            "phenomenon_name": row["phenomenon_name"],
+            "target_resonance": row["target_resonance"],
+            "current_resonance": row["current_resonance"],
+            "roles": _json_or_none(row["roles_json"]) or {},
+            "contributions": _json_or_none(row["contributions_json"]) or [],
+            "status": row["status"],
+            "outcome_summary": row["outcome_summary"],
+            "created_at": row["created_at"],
+        }
+
+    gathering_id = str(uuid.uuid4())
+    default_roles = {
+        "Focus": "Kaelen the Star-Watcher",
+        "Anchor": "Archivist Vael",
+        "Witness": "Mira the Seeker",
+        "Tempest": "Ember Vanguard",
+    }
+    cursor.execute(
+        """
+        INSERT INTO convergence_gatherings (
+            id, room_id, phenomenon_name, target_resonance, current_resonance,
+            roles_json, contributions_json, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            gathering_id,
+            room_id,
+            phenomenon_name,
+            target_resonance,
+            0,
+            json.dumps(default_roles),
+            json.dumps([]),
+            "active",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": gathering_id,
+        "room_id": room_id,
+        "phenomenon_name": phenomenon_name,
+        "target_resonance": target_resonance,
+        "current_resonance": 0,
+        "roles": default_roles,
+        "contributions": [],
+        "status": "active",
+        "outcome_summary": None,
+    }
+
+
+def add_gathering_contribution(
+    *,
+    gathering_id: str,
+    contributor_soul: str,
+    role: str,
+    resonance_amount: int,
+    notes: str,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM convergence_gatherings WHERE id = ?", (gathering_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Gathering session not found")
+
+    current_res = row["current_resonance"] + resonance_amount
+    target_res = row["target_resonance"]
+    contributions = _json_or_none(row["contributions_json"]) or []
+
+    contrib_id = str(uuid.uuid4())
+    new_contrib = {
+        "id": contrib_id,
+        "contributor_soul": contributor_soul,
+        "role": role,
+        "resonance_amount": resonance_amount,
+        "notes": notes,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    contributions.append(new_contrib)
+
+    status_val = "reconciled" if current_res >= target_res else "active"
+    outcome = (
+        f"The collective resonance reached {current_res}/{target_res}! Phenomenon '{row['phenomenon_name']}' awakened."
+        if status_val == "reconciled"
+        else None
+    )
+
+    cursor.execute(
+        """
+        UPDATE convergence_gatherings
+        SET current_resonance = ?, contributions_json = ?, status = ?, outcome_summary = ?
+        WHERE id = ?
+    """,
+        (current_res, json.dumps(contributions), status_val, outcome, gathering_id),
+    )
+
+    conn.commit()
+
+    cursor.execute("SELECT * FROM convergence_gatherings WHERE id = ?", (gathering_id,))
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    return {
+        "gathering": {
+            "id": updated_row["id"],
+            "room_id": updated_row["room_id"],
+            "phenomenon_name": updated_row["phenomenon_name"],
+            "target_resonance": updated_row["target_resonance"],
+            "current_resonance": updated_row["current_resonance"],
+            "roles": _json_or_none(updated_row["roles_json"]) or {},
+            "contributions": _json_or_none(updated_row["contributions_json"]) or [],
+            "status": updated_row["status"],
+            "outcome_summary": updated_row["outcome_summary"],
+        },
+        "latest_contribution": new_contrib,
+    }
+
+
+def _seed_default_community_symbols(conn: sqlite3.Connection) -> None:
+    cursor = conn.cursor()
+    seeds = [
+        (
+            "sym_01",
+            "The Starforge Emblem",
+            "world_starforge_01",
+            "A celestial anvil bound by five starlight chains, symbolizing shared convergence.",
+            5,
+            json.dumps(["Kaelen the Star-Watcher", "Archivist Vael", "Mira the Seeker"]),
+            "public_canon",
+        ),
+        (
+            "sym_02",
+            "Salt Spire Covenant",
+            "world_starforge_01",
+            "A salt-crusted bell that rings when three Souls share a memory across eras.",
+            3,
+            json.dumps(["Kaelen the Star-Watcher", "Ember Vanguard"]),
+            "opt_in_shared",
+        ),
+        (
+            "sym_03",
+            "Veil of Frost Lantern",
+            "world_starforge_01",
+            "A blue lantern lit during the Winter Lantern Gathering in Frost Hollow.",
+            4,
+            json.dumps(["Rowan", "Mira", "Elira"]),
+            "public_canon",
+        ),
+    ]
+
+    for item in seeds:
+        cursor.execute(
+            """
+            INSERT INTO community_symbols (
+                id, symbol_name, world_id, description, significance_score,
+                contributing_souls_json, canon_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            item,
+        )
+    conn.commit()
+
 
 
 

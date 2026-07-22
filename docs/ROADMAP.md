@@ -460,7 +460,7 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - Players can understand the history of every relic state.
 - Relics create curiosity without becoming arbitrary puzzle locks.
 
-### Phase 7: Convergence and Community Mythology
+### Phase 7: Convergence and Community Mythology (Completed)
 
 - Expand WebSocket multiplayer convergence.
 - Support consent-aware shared canon.

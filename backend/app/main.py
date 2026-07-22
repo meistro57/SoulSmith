@@ -37,10 +37,14 @@ from app.db import (
     create_cross_aspect_bond_record,
     create_user_record,
     execute_integration_event,
+    add_gathering_contribution,
+    create_community_symbol_record,
     get_all_canonical_events,
     get_all_local_threads,
     get_all_open_questions,
     get_all_seeds,
+    get_community_symbols_records,
+    get_or_create_gathering_session,
     get_or_create_primary_constellation,
     get_or_create_relics_records,
     get_probable_paths_records,
@@ -55,6 +59,14 @@ from app.db import (
     update_awakening_stage_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
+)
+from app.convergence import (
+    CanonForkRequest,
+    CanonMergeRequest,
+    CommunitySymbolModel,
+    CreateCommunitySymbolRequest,
+    GatheringContributeRequest,
+    GatheringSessionModel,
 )
 from app.relics import (
     RelicEventModel,
@@ -591,6 +603,73 @@ def transfigure_relic(req: RelicTransfigureRequest):
     return {
         "relic": RelicModel(**result["relic"]),
         "relic_event": RelicEventModel(**result["relic_event"]),
+    }
+
+
+# Phase 7: Convergence & Community Mythology Endpoints
+
+
+@app.get("/api/v1/convergence/symbols")
+def list_community_symbols():
+    records = get_community_symbols_records()
+    return {"symbols": [CommunitySymbolModel(**r) for r in records]}
+
+
+@app.post("/api/v1/convergence/symbols/create")
+def create_community_symbol(req: CreateCommunitySymbolRequest):
+    record = create_community_symbol_record(
+        symbol_name=req.symbol_name,
+        description=req.description,
+        contributing_souls=req.contributing_souls,
+        canon_status=req.canon_status,
+    )
+    return {"symbol": CommunitySymbolModel(**record)}
+
+
+@app.get("/api/v1/convergence/gatherings/{room_id}")
+def get_gathering_session(room_id: str, phenomenon_name: str = "Awakening of the Salt Spire"):
+    record = get_or_create_gathering_session(room_id=room_id, phenomenon_name=phenomenon_name)
+    return {"gathering": GatheringSessionModel(**record)}
+
+
+@app.post("/api/v1/convergence/gatherings/contribute")
+def contribute_to_gathering(req: GatheringContributeRequest):
+    try:
+        result = add_gathering_contribution(
+            gathering_id=req.gathering_id,
+            contributor_soul=req.contributor_soul,
+            role=req.role,
+            resonance_amount=req.resonance_amount,
+            notes=req.notes,
+        )
+        return {
+            "gathering": GatheringSessionModel(**result["gathering"]),
+            "latest_contribution": result["latest_contribution"],
+        }
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+
+
+@app.post("/api/v1/convergence/canon/merge")
+def merge_shared_canon(req: CanonMergeRequest):
+    symbol_record = create_community_symbol_record(
+        symbol_name=req.symbol_name,
+        description=req.description,
+        contributing_souls=req.consenting_souls,
+        canon_status="public_canon",
+    )
+    return {
+        "success": True,
+        "canon_merge_summary": f"Shared phenomenon '{req.symbol_name}' merged into public world canon with consent from {len(req.consenting_souls)} Souls.",
+        "symbol": CommunitySymbolModel(**symbol_record),
+    }
+
+
+@app.post("/api/v1/convergence/canon/fork")
+def fork_private_canon(req: CanonForkRequest):
+    return {
+        "success": True,
+        "fork_summary": f"Soul '{req.forking_soul}' forked shared gathering '{req.gathering_id}' into a private timeline branch. Reason: {req.reason}.",
     }
 
 

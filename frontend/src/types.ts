@@ -177,6 +177,40 @@ export interface AlternateSceneResult {
   suggested_insights: string[];
 }
 
+export type CanonStatus = 'private' | 'opt_in_shared' | 'public_canon';
+
+export interface CommunitySymbol {
+  id: string;
+  symbol_name: string;
+  world_id: string;
+  description: string;
+  significance_score: number;
+  contributing_souls: string[];
+  canon_status: CanonStatus;
+  created_at?: string;
+}
+
+export interface GatheringContribution {
+  id: string;
+  contributor_soul: string;
+  role: 'Focus' | 'Anchor' | 'Witness' | 'Tempest';
+  resonance_amount: number;
+  notes: string;
+  timestamp?: string;
+}
+
+export interface GatheringSession {
+  id: string;
+  room_id: string;
+  phenomenon_name: string;
+  target_resonance: number;
+  current_resonance: number;
+  roles: Record<string, string>;
+  contributions: GatheringContribution[];
+  status: 'active' | 'reconciled' | 'diverged';
+  outcome_summary?: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

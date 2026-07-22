@@ -1,4 +1,4 @@
-import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
+import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonStatus, CanonicalDiceRead, CommunitySymbol, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, GatheringContribution, GatheringSession, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
@@ -79,4 +79,12 @@ export const apiClient = {
   overdrawRelic: (payload: { relic_id: string; soul_id?: string; intensity_boost?: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/overdraw', { method: 'POST', body: JSON.stringify(payload) }),
   repairRelic: (payload: { relic_id: string; soul_id?: string; repair_evidence_summary: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/repair', { method: 'POST', body: JSON.stringify(payload) }),
   transfigureRelic: (payload: { relic_id: string; soul_id?: string; anchor_name: string; transfigured_form: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/transfigure', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Convergence & Community Mythology
+  listCommunitySymbols: () => request<{ symbols: CommunitySymbol[] }>('/api/v1/convergence/symbols'),
+  createCommunitySymbol: (payload: { symbol_name: string; description: string; contributing_souls?: string[]; canon_status?: CanonStatus }) => request<{ symbol: CommunitySymbol }>('/api/v1/convergence/symbols/create', { method: 'POST', body: JSON.stringify(payload) }),
+  getGatheringSession: (roomId = 'convergence_alpha', phenomenonName = 'Awakening of the Salt Spire') => request<{ gathering: GatheringSession }>(`/api/v1/convergence/gatherings/${encodeURIComponent(roomId)}?phenomenon_name=${encodeURIComponent(phenomenonName)}`),
+  contributeToGathering: (payload: { gathering_id: string; contributor_soul: string; role: 'Focus' | 'Anchor' | 'Witness' | 'Tempest'; resonance_amount: number; notes: string }) => request<{ gathering: GatheringSession; latest_contribution: GatheringContribution }>('/api/v1/convergence/gatherings/contribute', { method: 'POST', body: JSON.stringify(payload) }),
+  mergeSharedCanon: (payload: { gathering_id: string; symbol_name: string; description: string; consenting_souls: string[] }) => request<{ success: boolean; canon_merge_summary: string; symbol: CommunitySymbol }>('/api/v1/convergence/canon/merge', { method: 'POST', body: JSON.stringify(payload) }),
+  forkPrivateCanon: (payload: { gathering_id: string; forking_soul: string; reason: string }) => request<{ success: boolean; fork_summary: string }>('/api/v1/convergence/canon/fork', { method: 'POST', body: JSON.stringify(payload) }),
 };
