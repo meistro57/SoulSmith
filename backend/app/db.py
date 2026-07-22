@@ -392,10 +392,27 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    _add_column_if_missing(cursor, "memory_objects", "importance_tier", "importance_tier TEXT NOT NULL DEFAULT 'personal'")
-    _add_column_if_missing(cursor, "memory_objects", "importance_score", "importance_score INTEGER NOT NULL DEFAULT 5")
-    _add_column_if_missing(cursor, "memory_objects", "is_painting_eligible", "is_painting_eligible INTEGER NOT NULL DEFAULT 1")
-    _add_column_if_missing(cursor, "memory_objects", "importance_rationale", "importance_rationale TEXT")
+    _add_column_if_missing(
+        cursor,
+        "memory_objects",
+        "importance_tier",
+        "importance_tier TEXT NOT NULL DEFAULT 'personal'",
+    )
+    _add_column_if_missing(
+        cursor,
+        "memory_objects",
+        "importance_score",
+        "importance_score INTEGER NOT NULL DEFAULT 5",
+    )
+    _add_column_if_missing(
+        cursor,
+        "memory_objects",
+        "is_painting_eligible",
+        "is_painting_eligible INTEGER NOT NULL DEFAULT 1",
+    )
+    _add_column_if_missing(
+        cursor, "memory_objects", "importance_rationale", "importance_rationale TEXT"
+    )
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS portrait_generation_candidates (
             candidate_id TEXT PRIMARY KEY,
@@ -2419,7 +2436,9 @@ def compile_memory_object_record(
             (participant_soul_id,),
         )
         consent_row = cursor.fetchone()
-        allow_shared_gallery = bool(consent_row["allow_shared_gallery"]) if consent_row else True
+        allow_shared_gallery = (
+            bool(consent_row["allow_shared_gallery"]) if consent_row else True
+        )
         allow_real_person_tagging = (
             bool(consent_row["allow_real_person_tagging"]) if consent_row else False
         )
