@@ -12,11 +12,12 @@ import { DiceScanView } from './components/DiceScanView';
 import { PhenomenaView } from './components/PhenomenaView';
 import { CuriosityView } from './components/CuriosityView';
 import { MythicGalleryView } from './components/MythicGalleryView';
+import { ConstellationView } from './components/ConstellationView';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'phenomena' | 'curiosity' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'curiosity' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -207,6 +208,7 @@ export function App() {
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
+              { id: 'constellation', label: 'Constellation', icon: Sparkles },
               { id: 'curiosity', label: 'Curiosity Engine', icon: Compass },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
@@ -410,6 +412,13 @@ export function App() {
 
         {activeTab === 'sheet' && (
           <SoulSheetView sheet={soulSheet} onUpdateSheet={(updated) => setSoulSheet(updated)} />
+        )}
+
+        {activeTab === 'constellation' && (
+          <ConstellationView
+            currentSoulName={soulSheet.name}
+            onSelectAspect={(name) => setSoulSheet((s) => ({ ...s, name }))}
+          />
         )}
 
         {activeTab === 'curiosity' && <CuriosityView soulName={soulSheet.name} />}

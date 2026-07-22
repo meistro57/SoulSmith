@@ -400,6 +400,7 @@ Key Features Built:
 9. **Persistent SQLite/Postgres Database**: Transactional event chronicle logging (`worlds`, `souls`, `scene_events`, `seeds`, `open_questions`, `local_threads`, `integration_events`).
 10. **Real-time Convergence Sanctuary**: WebSocket multi-player room role rotation (*Focus, Anchor, Witness, Tempest*).
 11. **Curiosity & Thread Integration Engine**: Persistent Seed planting and symbol tracking (*planted → echoed → recognized → integrated → retired*), open questions tracking with evidence logs, local thread evidence accumulation, and interactive Integration Events that transform player choices into canonical world progression.
+12. **Soul Constellation Engine**: Multi-Aspect identity management across eras, shared Deep Threads, Constellation Anchors, Cross-Aspect Bonds (scars, promises, memory echoes), and interactive Awakening Stage progression (*Veiled → Echoing → Recognizing → Resonant → Woven → Lucid*).
 
 ---
 

@@ -16,16 +16,26 @@ from app.curiosity import (
     QuestionResolveRequest,
     SeedPlantRequest,
 )
+from app.constellation import (
+    AWAKENING_STAGE_DESCRIPTIONS,
+    AdvanceAwakeningRequest,
+    CreateAspectRequest,
+    CreateBondRequest,
+)
 from app.db import (
+    create_aspect_record,
+    create_cross_aspect_bond_record,
     execute_integration_event,
     get_all_canonical_events,
     get_all_local_threads,
     get_all_open_questions,
     get_all_seeds,
+    get_or_create_primary_constellation,
     init_database,
     log_canonical_event,
     plant_or_echo_seed,
     resolve_open_question,
+    update_awakening_stage_record,
 )
 from app.encounters import (
     EncounterFrame,
@@ -253,6 +263,52 @@ def attune_relic(req: RelicAttuneRequest) -> RelicAttuneResponse:
 @app.post("/api/v1/soulprints/preview")
 def create_soulprint(req: SoulprintRequest) -> SoulprintProfile:
     return generate_astrological_soulprint(req)
+
+
+@app.get("/api/v1/constellation")
+def get_constellation():
+    constellation = get_or_create_primary_constellation()
+    stage_info = AWAKENING_STAGE_DESCRIPTIONS.get(constellation["awakening_stage"], {
+        "title": constellation["awakening_stage"].capitalize(),
+        "description": "The Constellation patterns unfold across Aspects.",
+    })
+    return {
+        "constellation": constellation,
+        "stage_info": stage_info,
+    }
+
+
+@app.post("/api/v1/constellation/aspects/create")
+def create_aspect(req: CreateAspectRequest):
+    aspect = create_aspect_record(
+        constellation_id=req.constellation_id,
+        aspect_name=req.aspect_name,
+        calling=req.calling,
+        origin=req.origin,
+        era_or_world=req.era_or_world,
+    )
+    return {"aspect": aspect}
+
+
+@app.post("/api/v1/constellation/bonds/create")
+def create_cross_aspect_bond(req: CreateBondRequest):
+    bond = create_cross_aspect_bond_record(
+        constellation_id=req.constellation_id,
+        source_aspect_id=req.source_aspect_id,
+        target_aspect_id=req.target_aspect_id,
+        bond_type=req.bond_type,
+        description=req.description,
+    )
+    return {"bond": bond}
+
+
+@app.post("/api/v1/constellation/advance")
+def advance_awakening_stage(req: AdvanceAwakeningRequest):
+    new_stage = update_awakening_stage_record(
+        constellation_id=req.constellation_id,
+        target_stage=req.target_stage,
+    )
+    return {"awakening_stage": new_stage}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

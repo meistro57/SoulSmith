@@ -1,5 +1,5 @@
 // frontend/src/components/CuriosityView.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '../lib/api';
 import type { LocalThread, OpenQuestion, Seed } from '../types';
 
@@ -29,7 +29,7 @@ export const CuriosityView: React.FC<CuriosityViewProps> = ({ soulName = 'Unboun
   const [integratingThreadId, setIntegratingThreadId] = useState<string | null>(null);
   const [choiceMade, setChoiceMade] = useState<string>('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [seedRes, qRes, threadRes] = await Promise.all([
@@ -45,11 +45,11 @@ export const CuriosityView: React.FC<CuriosityViewProps> = ({ soulName = 'Unboun
     } finally {
       setLoading(false);
     }
-  };
+  }, [soulName]);
 
   useEffect(() => {
     fetchData();
-  }, [soulName]);
+  }, [fetchData]);
 
   const handlePlantSeed = async (e: React.FormEvent) => {
     e.preventDefault();

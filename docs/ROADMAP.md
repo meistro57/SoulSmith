@@ -302,6 +302,8 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 
 ### Phase 4: Soul Constellation
 
+**Status: completed**
+
 - Add multiple playable Aspects per Constellation.
 - Separate Aspect-local state from shared Deep Threads.
 - Introduce cross-Aspect symbols, bonds, and anchors.

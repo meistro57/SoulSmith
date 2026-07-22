@@ -152,6 +152,52 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS constellations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            unresolved_pattern TEXT NOT NULL,
+            awakening_stage TEXT NOT NULL DEFAULT 'veiled',
+            deep_threads_json TEXT NOT NULL DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS aspects (
+            id TEXT PRIMARY KEY,
+            constellation_id TEXT NOT NULL,
+            aspect_name TEXT NOT NULL,
+            calling TEXT NOT NULL,
+            origin TEXT NOT NULL,
+            era_or_world TEXT NOT NULL,
+            sheet_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS constellation_anchors (
+            id TEXT PRIMARY KEY,
+            constellation_id TEXT NOT NULL,
+            anchor_name TEXT NOT NULL,
+            relic_id TEXT,
+            connected_aspect_ids_json TEXT NOT NULL DEFAULT '[]',
+            relic_form TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'dormant',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cross_aspect_bonds (
+            id TEXT PRIMARY KEY,
+            constellation_id TEXT NOT NULL,
+            source_aspect_id TEXT NOT NULL,
+            target_aspect_id TEXT NOT NULL,
+            bond_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -512,3 +558,274 @@ def execute_integration_event(
         "relic_awakened_id": target_relic_id,
         "transformation_summary": transformation,
     }
+
+
+# Constellation & Aspect Database Helpers
+
+
+def get_or_create_primary_constellation() -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM constellations ORDER BY created_at ASC LIMIT 1")
+    row = cursor.fetchone()
+
+    if not row:
+        const_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO constellations (id, name, unresolved_pattern, awakening_stage, deep_threads_json)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (
+                const_id,
+                "Constellation of the Weeping Star",
+                "The mystery of why the Starforge erased its own name across eras.",
+                "echoing",
+                json.dumps([
+                    "Memory of the Erased Sun",
+                    "The Unbroken Promise of Cinder"
+                ]),
+            ),
+        )
+
+        # Add initial Aspects
+        aspect1_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO aspects (id, constellation_id, aspect_name, calling, origin, era_or_world)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+            (
+                aspect1_id,
+                const_id,
+                "Kaelen the Star-Watcher",
+                "Keeper of the Salt Compass",
+                "Flooded Archives of Cinder",
+                "Present Era (Age of Echoes)",
+            ),
+        )
+
+        aspect2_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO aspects (id, constellation_id, aspect_name, calling, origin, era_or_world)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+            (
+                aspect2_id,
+                const_id,
+                "Archivist Vael",
+                "Forge-Maiden of the Celestial Ring",
+                "Spire of Sunken Memory",
+                "Ancient Era (Age of Starforge)",
+            ),
+        )
+
+        # Add initial Anchors
+        anchor_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO constellation_anchors (id, constellation_id, anchor_name, relic_id, connected_aspect_ids_json, relic_form, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                anchor_id,
+                const_id,
+                "Compass of Better Questions",
+                "relic_compass_01",
+                json.dumps([aspect1_id, aspect2_id]),
+                "Astro-Chronometer",
+                "awakened",
+            ),
+        )
+
+        # Add initial Cross-Aspect Bond
+        bond_id = str(uuid.uuid4())
+        cursor.execute(
+            """
+            INSERT INTO cross_aspect_bonds (id, constellation_id, source_aspect_id, target_aspect_id, bond_type, description)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """,
+            (
+                bond_id,
+                const_id,
+                aspect1_id,
+                aspect2_id,
+                "memory_echo",
+                "Both Aspects remember the exact moment the Salt Bell tolled backwards.",
+            ),
+        )
+        conn.commit()
+        cursor.execute("SELECT * FROM constellations WHERE id = ?", (const_id,))
+        row = cursor.fetchone()
+
+    constellation_id = row["id"]
+
+    # Fetch aspects
+    cursor.execute("SELECT * FROM aspects WHERE constellation_id = ?", (constellation_id,))
+    aspect_rows = cursor.fetchall()
+    aspects = [
+        {
+            "id": r["id"],
+            "constellation_id": r["constellation_id"],
+            "aspect_name": r["aspect_name"],
+            "calling": r["calling"],
+            "origin": r["origin"],
+            "era_or_world": r["era_or_world"],
+            "sheet": _json_or_none(r["sheet_json"]) or {},
+            "created_at": r["created_at"],
+        }
+        for r in aspect_rows
+    ]
+
+    # Fetch anchors
+    cursor.execute("SELECT * FROM constellation_anchors WHERE constellation_id = ?", (constellation_id,))
+    anchor_rows = cursor.fetchall()
+    anchors = [
+        {
+            "id": r["id"],
+            "constellation_id": r["constellation_id"],
+            "anchor_name": r["anchor_name"],
+            "relic_id": r["relic_id"],
+            "connected_aspect_ids": _json_or_none(r["connected_aspect_ids_json"]) or [],
+            "relic_form": r["relic_form"],
+            "status": r["status"],
+            "created_at": r["created_at"],
+        }
+        for r in anchor_rows
+    ]
+
+    # Fetch bonds
+    cursor.execute("SELECT * FROM cross_aspect_bonds WHERE constellation_id = ?", (constellation_id,))
+    bond_rows = cursor.fetchall()
+    bonds = [
+        {
+            "id": r["id"],
+            "constellation_id": r["constellation_id"],
+            "source_aspect_id": r["source_aspect_id"],
+            "target_aspect_id": r["target_aspect_id"],
+            "bond_type": r["bond_type"],
+            "description": r["description"],
+            "created_at": r["created_at"],
+        }
+        for r in bond_rows
+    ]
+
+    conn.close()
+
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "unresolved_pattern": row["unresolved_pattern"],
+        "awakening_stage": row["awakening_stage"],
+        "deep_threads": _json_or_none(row["deep_threads_json"]) or [],
+        "aspects": aspects,
+        "anchors": anchors,
+        "bonds": bonds,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def create_aspect_record(
+    *,
+    constellation_id: str,
+    aspect_name: str,
+    calling: str,
+    origin: str,
+    era_or_world: str,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    aspect_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO aspects (id, constellation_id, aspect_name, calling, origin, era_or_world)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (aspect_id, constellation_id, aspect_name, calling, origin, era_or_world),
+    )
+    conn.commit()
+    conn.close()
+
+    # Re-evaluate awakening stage
+    update_awakening_stage_record(constellation_id=constellation_id)
+
+    return {
+        "id": aspect_id,
+        "constellation_id": constellation_id,
+        "aspect_name": aspect_name,
+        "calling": calling,
+        "origin": origin,
+        "era_or_world": era_or_world,
+    }
+
+
+def create_cross_aspect_bond_record(
+    *,
+    constellation_id: str,
+    source_aspect_id: str,
+    target_aspect_id: str,
+    bond_type: str,
+    description: str,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    bond_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO cross_aspect_bonds (id, constellation_id, source_aspect_id, target_aspect_id, bond_type, description)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (bond_id, constellation_id, source_aspect_id, target_aspect_id, bond_type, description),
+    )
+    conn.commit()
+    conn.close()
+
+    # Re-evaluate awakening stage
+    update_awakening_stage_record(constellation_id=constellation_id)
+
+    return {
+        "id": bond_id,
+        "constellation_id": constellation_id,
+        "source_aspect_id": source_aspect_id,
+        "target_aspect_id": target_aspect_id,
+        "bond_type": bond_type,
+        "description": description,
+    }
+
+
+def update_awakening_stage_record(*, constellation_id: str, target_stage: Optional[str] = None) -> str:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if target_stage:
+        new_stage = target_stage
+    else:
+        cursor.execute("SELECT COUNT(*) as cnt FROM aspects WHERE constellation_id = ?", (constellation_id,))
+        aspect_count = cursor.fetchone()["cnt"]
+
+        cursor.execute("SELECT COUNT(*) as cnt FROM cross_aspect_bonds WHERE constellation_id = ?", (constellation_id,))
+        bond_count = cursor.fetchone()["cnt"]
+
+        if aspect_count <= 1:
+            new_stage = "veiled"
+        elif aspect_count == 2 and bond_count == 0:
+            new_stage = "echoing"
+        elif aspect_count >= 2 and bond_count >= 1 and bond_count < 3:
+            new_stage = "recognizing"
+        elif aspect_count >= 3 or bond_count >= 3:
+            new_stage = "resonant"
+        elif bond_count >= 5:
+            new_stage = "woven"
+        else:
+            new_stage = "echoing"
+
+    cursor.execute(
+        "UPDATE constellations SET awakening_stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_stage, constellation_id),
+    )
+    conn.commit()
+    conn.close()
+    return new_stage
+

@@ -1,4 +1,4 @@
-import type { CanonicalDiceRead, EncounterFrame, IntegrationEvent, LocalThread, NumericDiceRoll, OpenQuestion, ResolvedScene, Seed, SoulResources, SoulprintProfile } from '../types';
+import type { Aspect, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, NumericDiceRoll, OpenQuestion, ResolvedScene, Seed, SoulResources, SoulprintProfile } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
@@ -25,4 +25,8 @@ export const apiClient = {
   resolveQuestion: (payload: { question_id: string; resolution_notes: string; status?: string }) => request<{ success: boolean }>('/api/v1/curiosity/questions/resolve', { method: 'POST', body: JSON.stringify(payload) }),
   listThreads: (soulName = 'Unbound Soul') => request<{ threads: LocalThread[] }>(`/api/v1/curiosity/threads?soul_name=${encodeURIComponent(soulName)}`),
   integrateThread: (payload: { thread_id: string; soul_name: string; choice_made: string; target_relic_id?: string }) => request<IntegrationEvent>('/api/v1/curiosity/integrate', { method: 'POST', body: JSON.stringify(payload) }),
+  getConstellation: () => request<{ constellation: Constellation; stage_info: ConstellationStageInfo }>('/api/v1/constellation'),
+  createAspect: (payload: { constellation_id: string; aspect_name: string; calling: string; origin: string; era_or_world: string }) => request<{ aspect: Aspect }>('/api/v1/constellation/aspects/create', { method: 'POST', body: JSON.stringify(payload) }),
+  createCrossAspectBond: (payload: { constellation_id: string; source_aspect_id: string; target_aspect_id: string; bond_type: string; description: string }) => request<{ bond: CrossAspectBond }>('/api/v1/constellation/bonds/create', { method: 'POST', body: JSON.stringify(payload) }),
+  advanceAwakening: (payload: { constellation_id: string; target_stage?: AwakeningStage }) => request<{ awakening_stage: AwakeningStage }>('/api/v1/constellation/advance', { method: 'POST', body: JSON.stringify(payload) }),
 };

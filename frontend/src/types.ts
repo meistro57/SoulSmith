@@ -54,6 +54,58 @@ export interface OpenQuestion { id: string; seed_id?: string; question_text: str
 export interface LocalThread { id: string; soul_id: string; name: string; thread_type: string; status: 'active' | 'pattern_recognized' | 'integrated' | 'dormant'; evidence_count: number; evidence_summary: string; created_at?: string; }
 export interface IntegrationEvent { id: string; soul_id: string; thread_id: string; choice_made: string; relic_awakened_id?: string; transformation_summary: string; created_at?: string; }
 
+export type AwakeningStage = 'veiled' | 'echoing' | 'recognizing' | 'resonant' | 'woven' | 'lucid';
+
+export interface Aspect {
+  id: string;
+  constellation_id: string;
+  aspect_name: string;
+  calling: string;
+  origin: string;
+  era_or_world: string;
+  sheet?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface Anchor {
+  id: string;
+  constellation_id: string;
+  anchor_name: string;
+  relic_id?: string;
+  connected_aspect_ids: string[];
+  relic_form: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface CrossAspectBond {
+  id: string;
+  constellation_id: string;
+  source_aspect_id: string;
+  target_aspect_id: string;
+  bond_type: string;
+  description: string;
+  created_at?: string;
+}
+
+export interface Constellation {
+  id: string;
+  name: string;
+  unresolved_pattern: string;
+  awakening_stage: AwakeningStage;
+  deep_threads: string[];
+  aspects: Aspect[];
+  anchors: Anchor[];
+  bonds: CrossAspectBond[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ConstellationStageInfo {
+  title: string;
+  description: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;
