@@ -405,6 +405,7 @@ Key Features Built:
 14. **User Authentication & Token System**: Full user registration, password hashing (`bcrypt`), JWT token generation/validation, profile retrieval (`/api/v1/auth/me`), local storage token management, and custom authentication header badge in the frontend UI.
 15. **Relic Recognition Engine & Ledger**: Narrative-driven relic attunement based on Chronicle evidence, full 6-stage lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*), evocative dormant question prompts, overdraw strain/fracture mechanics, narrative fracture repair, and cross-Aspect Constellation Anchors.
 16. **Convergence & Community Mythology Engine**: Multi-player gathering sessions where multiple rolls contribute to evolving phenomena, role rotation (*Focus, Anchor, Witness, Tempest*), world-level community symbols, consent-aware canon merge controls, and explicit private campaign forking.
+17. **Reflection & Accessibility Control Vault**: Optional end-of-session narrative reflection prompts with explicit AI opt-in toggles, secure vault for private notes strictly excluded from AI models, narrative intensity levels (*Gentle, Balanced, Deep Mythic, Unfiltered*), spiritual framing options, reduced motion & high contrast accessibility toggles, and JSON data export sovereignty.
 
 ---
 

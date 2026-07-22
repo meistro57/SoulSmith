@@ -211,6 +211,38 @@ export interface GatheringSession {
   outcome_summary?: string;
 }
 
+export type NarrativeIntensity = 'gentle' | 'balanced' | 'deep_mythic' | 'unfiltered';
+export type SpiritualFraming = 'secular_mythology' | 'opt_in_spiritual';
+
+export interface PlayerPreferences {
+  soul_id: string;
+  narrative_intensity: NarrativeIntensity;
+  spiritual_framing: SpiritualFraming;
+  reduced_motion: boolean;
+  high_contrast: boolean;
+  allow_ai_indexing_default: boolean;
+  updated_at?: string;
+}
+
+export interface ReflectionSession {
+  id: string;
+  soul_id: string;
+  prompt_question: string;
+  player_reflection: string;
+  share_with_ai: boolean;
+  created_at?: string;
+}
+
+export interface PrivateNote {
+  id: string;
+  soul_id: string;
+  title: string;
+  content: string;
+  allow_ai_indexing: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

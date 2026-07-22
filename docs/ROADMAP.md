@@ -475,7 +475,7 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - Conflicting canon can coexist, branch, or reconcile explicitly.
 - Community events remain playable rather than becoming passive generated lore.
 
-### Phase 8: Reflection and Accessibility
+### Phase 8: Reflection and Accessibility (Completed)
 
 - Add optional end-of-session reflection prompts.
 - Support private notes that are never used by AI unless explicitly permitted.

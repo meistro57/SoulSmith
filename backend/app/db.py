@@ -281,6 +281,38 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS player_preferences (
+            soul_id TEXT PRIMARY KEY,
+            narrative_intensity TEXT NOT NULL DEFAULT 'balanced',
+            spiritual_framing TEXT NOT NULL DEFAULT 'secular_mythology',
+            reduced_motion INTEGER DEFAULT 0,
+            high_contrast INTEGER DEFAULT 0,
+            allow_ai_indexing_default INTEGER DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reflection_sessions (
+            id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            prompt_question TEXT NOT NULL,
+            player_reflection TEXT NOT NULL,
+            share_with_ai INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS private_notes (
+            id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            allow_ai_indexing INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -1662,6 +1694,203 @@ def _seed_default_community_symbols(conn: sqlite3.Connection) -> None:
             item,
         )
     conn.commit()
+
+
+# Reflection & Accessibility Database Helpers
+
+
+def get_or_create_preferences_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM player_preferences WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "soul_id": row["soul_id"],
+            "narrative_intensity": row["narrative_intensity"],
+            "spiritual_framing": row["spiritual_framing"],
+            "reduced_motion": bool(row["reduced_motion"]),
+            "high_contrast": bool(row["high_contrast"]),
+            "allow_ai_indexing_default": bool(row["allow_ai_indexing_default"]),
+            "updated_at": row["updated_at"],
+        }
+
+    cursor.execute(
+        """
+        INSERT INTO player_preferences (
+            soul_id, narrative_intensity, spiritual_framing, reduced_motion,
+            high_contrast, allow_ai_indexing_default
+        ) VALUES (?, 'balanced', 'secular_mythology', 0, 0, 0)
+    """,
+        (soul_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "soul_id": soul_id,
+        "narrative_intensity": "balanced",
+        "spiritual_framing": "secular_mythology",
+        "reduced_motion": False,
+        "high_contrast": False,
+        "allow_ai_indexing_default": False,
+    }
+
+
+def update_preferences_record(
+    soul_id: str,
+    *,
+    narrative_intensity: str,
+    spiritual_framing: str,
+    reduced_motion: bool,
+    high_contrast: bool,
+    allow_ai_indexing_default: bool,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO player_preferences (
+            soul_id, narrative_intensity, spiritual_framing, reduced_motion,
+            high_contrast, allow_ai_indexing_default, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(soul_id) DO UPDATE SET
+            narrative_intensity = excluded.narrative_intensity,
+            spiritual_framing = excluded.spiritual_framing,
+            reduced_motion = excluded.reduced_motion,
+            high_contrast = excluded.high_contrast,
+            allow_ai_indexing_default = excluded.allow_ai_indexing_default,
+            updated_at = CURRENT_TIMESTAMP
+    """,
+        (
+            soul_id,
+            narrative_intensity,
+            spiritual_framing,
+            1 if reduced_motion else 0,
+            1 if high_contrast else 0,
+            1 if allow_ai_indexing_default else 0,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "soul_id": soul_id,
+        "narrative_intensity": narrative_intensity,
+        "spiritual_framing": spiritual_framing,
+        "reduced_motion": reduced_motion,
+        "high_contrast": high_contrast,
+        "allow_ai_indexing_default": allow_ai_indexing_default,
+    }
+
+
+def create_reflection_record(
+    *,
+    soul_id: str,
+    prompt_question: str,
+    player_reflection: str,
+    share_with_ai: bool = False,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    ref_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO reflection_sessions (
+            id, soul_id, prompt_question, player_reflection, share_with_ai
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (ref_id, soul_id, prompt_question, player_reflection, 1 if share_with_ai else 0),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": ref_id,
+        "soul_id": soul_id,
+        "prompt_question": prompt_question,
+        "player_reflection": player_reflection,
+        "share_with_ai": share_with_ai,
+    }
+
+
+def get_reflections_records(soul_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM reflection_sessions WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "soul_id": r["soul_id"],
+            "prompt_question": r["prompt_question"],
+            "player_reflection": r["player_reflection"],
+            "share_with_ai": bool(r["share_with_ai"]),
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def create_private_note_record(
+    *,
+    soul_id: str,
+    title: str,
+    content: str,
+    allow_ai_indexing: bool = False,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    note_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO private_notes (
+            id, soul_id, title, content, allow_ai_indexing
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (note_id, soul_id, title, content, 1 if allow_ai_indexing else 0),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": note_id,
+        "soul_id": soul_id,
+        "title": title,
+        "content": content,
+        "allow_ai_indexing": allow_ai_indexing,
+    }
+
+
+def get_private_notes_records(soul_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM private_notes WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "soul_id": r["soul_id"],
+            "title": r["title"],
+            "content": r["content"],
+            "allow_ai_indexing": bool(r["allow_ai_indexing"]),
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+        }
+        for r in rows
+    ]
+
 
 
 

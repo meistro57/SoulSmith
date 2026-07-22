@@ -1,4 +1,4 @@
-import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonStatus, CanonicalDiceRead, CommunitySymbol, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, GatheringContribution, GatheringSession, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
+import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonStatus, CanonicalDiceRead, CommunitySymbol, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, GatheringContribution, GatheringSession, IntegrationEvent, LocalThread, ManifestationType, NarrativeIntensity, NumericDiceRoll, OpenQuestion, PlayerPreferences, PrivateNote, ProbablePath, ProbablePathStatus, ReflectionSession, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, SpiritualFraming, User } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
@@ -87,4 +87,12 @@ export const apiClient = {
   contributeToGathering: (payload: { gathering_id: string; contributor_soul: string; role: 'Focus' | 'Anchor' | 'Witness' | 'Tempest'; resonance_amount: number; notes: string }) => request<{ gathering: GatheringSession; latest_contribution: GatheringContribution }>('/api/v1/convergence/gatherings/contribute', { method: 'POST', body: JSON.stringify(payload) }),
   mergeSharedCanon: (payload: { gathering_id: string; symbol_name: string; description: string; consenting_souls: string[] }) => request<{ success: boolean; canon_merge_summary: string; symbol: CommunitySymbol }>('/api/v1/convergence/canon/merge', { method: 'POST', body: JSON.stringify(payload) }),
   forkPrivateCanon: (payload: { gathering_id: string; forking_soul: string; reason: string }) => request<{ success: boolean; fork_summary: string }>('/api/v1/convergence/canon/fork', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Reflection & Accessibility
+  getPlayerPreferences: (soulId = 'Kaelen the Star-Watcher') => request<{ preferences: PlayerPreferences }>(`/api/v1/reflection/preferences?soul_id=${encodeURIComponent(soulId)}`),
+  updatePlayerPreferences: (payload: { soul_id?: string; narrative_intensity?: NarrativeIntensity; spiritual_framing?: SpiritualFraming; reduced_motion?: boolean; high_contrast?: boolean; allow_ai_indexing_default?: boolean }) => request<{ preferences: PlayerPreferences }>('/api/v1/reflection/preferences', { method: 'POST', body: JSON.stringify(payload) }),
+  listReflectionSessions: (soulId = 'Kaelen the Star-Watcher') => request<{ sessions: ReflectionSession[] }>(`/api/v1/reflection/sessions?soul_id=${encodeURIComponent(soulId)}`),
+  createReflectionSession: (payload: { soul_id?: string; prompt_question: string; player_reflection: string; share_with_ai?: boolean }) => request<{ session: ReflectionSession }>('/api/v1/reflection/sessions/create', { method: 'POST', body: JSON.stringify(payload) }),
+  listPrivateNotes: (soulId = 'Kaelen the Star-Watcher') => request<{ notes: PrivateNote[] }>(`/api/v1/reflection/notes?soul_id=${encodeURIComponent(soulId)}`),
+  createPrivateNote: (payload: { soul_id?: string; title: string; content: string; allow_ai_indexing?: boolean }) => request<{ note: PrivateNote }>('/api/v1/reflection/notes/create', { method: 'POST', body: JSON.stringify(payload) }),
 };

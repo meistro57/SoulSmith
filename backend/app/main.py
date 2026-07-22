@@ -36,18 +36,23 @@ from app.db import (
     create_aspect_record,
     create_cross_aspect_bond_record,
     create_user_record,
-    execute_integration_event,
     add_gathering_contribution,
     create_community_symbol_record,
+    create_private_note_record,
+    create_reflection_record,
+    execute_integration_event,
     get_all_canonical_events,
     get_all_local_threads,
     get_all_open_questions,
     get_all_seeds,
     get_community_symbols_records,
     get_or_create_gathering_session,
+    get_or_create_preferences_record,
     get_or_create_primary_constellation,
     get_or_create_relics_records,
+    get_private_notes_records,
     get_probable_paths_records,
+    get_reflections_records,
     get_relic_history_records,
     get_user_by_email,
     get_user_by_username,
@@ -57,8 +62,17 @@ from app.db import (
     plant_or_echo_seed,
     resolve_open_question,
     update_awakening_stage_record,
+    update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
+)
+from app.reflection import (
+    CreatePrivateNoteRequest,
+    CreateReflectionRequest,
+    PlayerPreferencesModel,
+    PrivateNoteModel,
+    ReflectionSessionModel,
+    UpdatePreferencesRequest,
 )
 from app.convergence import (
     CanonForkRequest,
@@ -671,6 +685,62 @@ def fork_private_canon(req: CanonForkRequest):
         "success": True,
         "fork_summary": f"Soul '{req.forking_soul}' forked shared gathering '{req.gathering_id}' into a private timeline branch. Reason: {req.reason}.",
     }
+
+
+# Phase 8: Reflection & Accessibility Endpoints
+
+
+@app.get("/api/v1/reflection/preferences")
+def get_player_preferences(soul_id: str = "Kaelen the Star-Watcher"):
+    record = get_or_create_preferences_record(soul_id=soul_id)
+    return {"preferences": PlayerPreferencesModel(**record)}
+
+
+@app.post("/api/v1/reflection/preferences")
+def update_player_preferences(req: UpdatePreferencesRequest):
+    record = update_preferences_record(
+        req.soul_id,
+        narrative_intensity=req.narrative_intensity,
+        spiritual_framing=req.spiritual_framing,
+        reduced_motion=req.reduced_motion,
+        high_contrast=req.high_contrast,
+        allow_ai_indexing_default=req.allow_ai_indexing_default,
+    )
+    return {"preferences": PlayerPreferencesModel(**record)}
+
+
+@app.get("/api/v1/reflection/sessions")
+def list_reflection_sessions(soul_id: str = "Kaelen the Star-Watcher"):
+    records = get_reflections_records(soul_id=soul_id)
+    return {"sessions": [ReflectionSessionModel(**r) for r in records]}
+
+
+@app.post("/api/v1/reflection/sessions/create")
+def create_reflection_session(req: CreateReflectionRequest):
+    record = create_reflection_record(
+        soul_id=req.soul_id,
+        prompt_question=req.prompt_question,
+        player_reflection=req.player_reflection,
+        share_with_ai=req.share_with_ai,
+    )
+    return {"session": ReflectionSessionModel(**record)}
+
+
+@app.get("/api/v1/reflection/notes")
+def list_private_notes(soul_id: str = "Kaelen the Star-Watcher"):
+    records = get_private_notes_records(soul_id=soul_id)
+    return {"notes": [PrivateNoteModel(**r) for r in records]}
+
+
+@app.post("/api/v1/reflection/notes/create")
+def create_private_note(req: CreatePrivateNoteRequest):
+    record = create_private_note_record(
+        soul_id=req.soul_id,
+        title=req.title,
+        content=req.content,
+        allow_ai_indexing=req.allow_ai_indexing,
+    )
+    return {"note": PrivateNoteModel(**record)}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")
