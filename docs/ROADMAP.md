@@ -200,6 +200,119 @@ The player may feel that they unlocked the relic. The fiction should allow the m
 
 ---
 
+## SoulSmith Visual Memory System
+
+> **Core Philosophy:** Games save progress. SoulSmith preserves memories.
+
+The visual system exists to reinforce that philosophy. Not every moment deserves an illustration—only moments that become part of a player's mythology.
+
+### 1. Living Avatar
+
+The player's portrait is a living record that evolves naturally through experience:
+
+- **Permanent Identity:** Face, hair, body, species, eyes, voice (rarely change).
+- **Equipment Layer:** Armor, clothing, weapons, relics, jewelry, backpacks, cloaks (updates when gear changes).
+- **Story Layer:** Things earned through history that never disappear unless the story removes them (e.g., scar over eye, burn mark, broken horn, prosthetic arm, blessed tattoos, gray hair, wrinkles, missing finger, ancient curse).
+- **Reputation Layer:** NPC perception changes appearance (e.g., *Keeper of Ash* → ash-colored cloak embroidery; *Hero of Winter* → snowflake brooch gifted by villagers; *Friend of Ravens* → small raven companion appears).
+
+### 2. Emotional Portraits
+
+Portraits aren't static. The Soulkeeper selects subtle emotional states based on recent events:
+- *Hopeful, Curious, Exhausted, Peaceful, Grieving, Determined, Inspired, Afraid*.
+
+### 3. Chronicle Paintings
+
+The Chronicle occasionally creates illustrated memories—not screenshots, but paintings.
+
+Each includes:
+- Title
+- Painting
+- Summary
+- Participants (e.g., 🏷 Rowan, 🏷 Mira, 🏷 Elira)
+- Location, Season, Weather
+- Deep Threads & Relics
+- Lasting Consequences (e.g., *Village celebrates Lantern Night every winter*)
+
+### 4. Character Tags & Living Biography
+
+Every player is tagged like historical records. Clicking a character opens a living biography:
+- Portrait Timeline
+- Titles & Relationships
+- Chronicle Entries
+- Relics & Major Choices
+- Deep Threads & Constellation
+
+### 5. Portrait Timeline
+
+Instead of replacing portraits, SoulSmith preserves them across time:
+```text
+Year 1: Young Adventurer
+   ↓
+Year 3: Scar Added
+   ↓
+Year 5: Relic Awakened
+   ↓
+Year 8: Gray Hair Begins
+   ↓
+Year 12: Keeper of Ash
+```
+
+### 6. Memory Importance Scoring
+
+Not every event becomes art. The Chronicle scores moments across three tiers:
+- **Personal:** First friend, first betrayal, relic awakening, recognition event.
+- **Community:** Festivals, elections, building projects, weddings.
+- **World:** Eclipse, volcano, great flood, kingdom collapse.
+
+Only high significance events trigger painting generation.
+
+### 7. Chronicle AI & Structured Memory Objects
+
+Instead of prompting an image model directly, SoulSmith builds a **Memory Object** first:
+```json
+{
+  "event": {
+    "title": "The Last Warm Fire",
+    "location": "Pine Ridge",
+    "season": "Late Autumn",
+    "weather": "Light Snow",
+    "participants": ["Rowan", "Mira", "Thorn"],
+    "lighting": "Campfire",
+    "emotion": "Hope after hardship",
+    "important_objects": ["Wooden flute", "Iron kettle", "Blue lantern"],
+    "lasting_effect": "Village begins Winter Feast tradition"
+  }
+}
+```
+Feeding this structured Memory Object to the image model ensures consistency and future-proof prompt engineering.
+
+### 8. Artistic Style
+
+Not photorealistic. Storybook, painterly, illuminated manuscript, watercolor, fantasy illustration, timeless—as if painted by the Chronicle itself.
+
+### 9. Group Memories & Shared Albums
+
+When history happens during group gatherings, everyone receives the same Chronicle page. Clicking a player's journal opens shared memories like an old family photo album.
+
+### 10. World Gallery & Environmental Memory
+
+Entire kingdoms develop visual history. Libraries contain paintings, castles display portraits, and villages celebrate old events so new players literally walk through the world's memories.
+
+### 11. Legendary Figures
+
+Centuries later, past players and Aspects appear as paintings, portraits, legends, books, and statues. The world remembers them.
+
+### 12. The Art Director AI Role
+
+An **Art Director AI** acts as a distinct specialist alongside the Soulkeeper and Chronicler:
+- It decides *how* history is visually remembered.
+- Autumn palettes for bittersweet memories, wide landscapes for discovery, intimate close-ups for reconciliation, soft lighting for nostalgia, dramatic compositions for sacrifice.
+- Ensures generated images have a recognizable, unified artistic voice.
+
+> **Design Rule:** Every visual asset should answer one question: *"What story does this tell that words alone cannot?"* If it's only decorative, it doesn't belong. If it makes someone stop and say *"I remember that day..."*, then it's exactly what SoulSmith should create.
+
+---
+
 ## Campaign Shape
 
 ### Act I: One Life
@@ -375,6 +488,21 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - Reflection is always optional.
 - Players control what the system remembers and interprets.
 - The experience remains useful without spiritual framing or personal disclosure.
+
+### Phase 9: Visual Memory System & Art Director AI
+
+- Implement Living Avatars with permanent identity, equipment, story, and reputation layers.
+- Build Emotional Portrait states driven by recent event dynamics.
+- Build Memory Object compiler and Art Director AI prompt orchestration layer.
+- Add Chronicle Paintings, Memory Importance Scoring, and Group Memory Albums.
+- Build Character Tags & Living Biography timeline view.
+- Support World Galleries, castle portraits, and legendary historical figures.
+
+**Exit criteria**
+
+- Visual assets are generated only for high significance events based on structured Memory Objects.
+- Portraits preserve scars, age progression, and mythic titles across the character timeline.
+- Art Director AI maintains a coherent, storybook/painterly aesthetic voice across all Chronicle paintings.
 
 ---
 
