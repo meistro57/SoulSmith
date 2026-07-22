@@ -198,6 +198,21 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS probable_paths (
+            id TEXT PRIMARY KEY,
+            event_id TEXT,
+            soul_id TEXT NOT NULL,
+            path_title TEXT NOT NULL,
+            chosen_path TEXT NOT NULL,
+            unchosen_approach TEXT NOT NULL,
+            potential_outcome_class TEXT NOT NULL,
+            manifestation_type TEXT NOT NULL DEFAULT 'dream',
+            status TEXT NOT NULL DEFAULT 'dormant',
+            provenance_summary TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -828,4 +843,188 @@ def update_awakening_stage_record(*, constellation_id: str, target_stage: Option
     conn.commit()
     conn.close()
     return new_stage
+
+
+# Probable Paths Database Helpers
+
+
+def log_probable_path_record(
+    *,
+    soul_id: str,
+    path_title: str,
+    chosen_path: str,
+    unchosen_approach: str,
+    potential_outcome_class: str,
+    event_id: Optional[str] = None,
+    manifestation_type: str = "dream",
+    provenance_summary: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    path_id = str(uuid.uuid4())
+    prov = provenance_summary or (
+        f"Forked from choice '{chosen_path}'. Unchosen approach '{unchosen_approach}' "
+        f"remains narratively potent as a {manifestation_type}."
+    )
+
+    cursor.execute(
+        """
+        INSERT INTO probable_paths (
+            id, event_id, soul_id, path_title, chosen_path, unchosen_approach,
+            potential_outcome_class, manifestation_type, status, provenance_summary
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            path_id,
+            event_id,
+            soul_id,
+            path_title,
+            chosen_path,
+            unchosen_approach,
+            potential_outcome_class,
+            manifestation_type,
+            "dormant",
+            prov,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": path_id,
+        "event_id": event_id,
+        "soul_id": soul_id,
+        "path_title": path_title,
+        "chosen_path": chosen_path,
+        "unchosen_approach": unchosen_approach,
+        "potential_outcome_class": potential_outcome_class,
+        "manifestation_type": manifestation_type,
+        "status": "dormant",
+        "provenance_summary": prov,
+    }
+
+
+def get_probable_paths_records(soul_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Seed defaults if empty
+    cursor.execute("SELECT COUNT(*) as cnt FROM probable_paths")
+    if cursor.fetchone()["cnt"] == 0:
+        _seed_default_probable_paths(conn, soul_id or "Kaelen the Star-Watcher")
+
+    if soul_id:
+        cursor.execute(
+            "SELECT * FROM probable_paths WHERE soul_id = ? OR soul_id = 'Unbound Soul' ORDER BY created_at DESC",
+            (soul_id,),
+        )
+    else:
+        cursor.execute("SELECT * FROM probable_paths ORDER BY created_at DESC")
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "event_id": r["event_id"],
+            "soul_id": r["soul_id"],
+            "path_title": r["path_title"],
+            "chosen_path": r["chosen_path"],
+            "unchosen_approach": r["unchosen_approach"],
+            "potential_outcome_class": r["potential_outcome_class"],
+            "manifestation_type": r["manifestation_type"],
+            "status": r["status"],
+            "provenance_summary": r["provenance_summary"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def update_probable_path_manifestation(
+    *, path_id: str, manifestation_type: str, status: str = "echoing"
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE probable_paths SET manifestation_type = ?, status = ? WHERE id = ?",
+        (manifestation_type, status, path_id),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM probable_paths WHERE id = ?", (path_id,))
+    r = cursor.fetchone()
+    conn.close()
+
+    if not r:
+        raise ValueError("Probable path not found")
+
+    return {
+        "id": r["id"],
+        "event_id": r["event_id"],
+        "soul_id": r["soul_id"],
+        "path_title": r["path_title"],
+        "chosen_path": r["chosen_path"],
+        "unchosen_approach": r["unchosen_approach"],
+        "potential_outcome_class": r["potential_outcome_class"],
+        "manifestation_type": r["manifestation_type"],
+        "status": r["status"],
+        "provenance_summary": r["provenance_summary"],
+        "created_at": r["created_at"],
+    }
+
+
+def _seed_default_probable_paths(conn: sqlite3.Connection, soul_id: str) -> None:
+    cursor = conn.cursor()
+    seeds = [
+        (
+            str(uuid.uuid4()),
+            None,
+            soul_id,
+            "The Silent Archive Confrontation",
+            "Resolved via Guile & Negotiation",
+            "Direct Confrontation with Ember Dragon",
+            "ascendancy",
+            "dream",
+            "echoing",
+            "Dream of the flames that would have burned the salt bell if sword met scale.",
+        ),
+        (
+            str(uuid.uuid4()),
+            None,
+            soul_id,
+            "The Weeping Door Threshold",
+            "Entered with Token of Light",
+            "Releasing the Secret Key into the Abyss",
+            "revelatory_failure",
+            "rumor",
+            "dormant",
+            "Rumors among salt miners of a key floating unbroken in the lower abyss.",
+        ),
+        (
+            str(uuid.uuid4()),
+            None,
+            soul_id,
+            "The Starforge Memory Key",
+            "Claimed for the Present Aspect",
+            "Surrendered to Archivist Vael",
+            "marked_success",
+            "alternate_scene",
+            "manifested",
+            "An alternate scene branch where the Starforge memory belonged to the Ancient Spire.",
+        ),
+    ]
+
+    for item in seeds:
+        cursor.execute(
+            """
+            INSERT INTO probable_paths (
+                id, event_id, soul_id, path_title, chosen_path, unchosen_approach,
+                potential_outcome_class, manifestation_type, status, provenance_summary
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            item,
+        )
+    conn.commit()
+
 

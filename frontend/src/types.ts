@@ -106,6 +106,33 @@ export interface ConstellationStageInfo {
   description: string;
 }
 
+export type ManifestationType = 'dream' | 'rumor' | 'alternate_scene' | 'echo_aspect';
+export type ProbablePathStatus = 'dormant' | 'echoing' | 'manifested' | 'reconciled';
+
+export interface ProbablePath {
+  id: string;
+  event_id?: string;
+  soul_id: string;
+  path_title: string;
+  chosen_path: string;
+  unchosen_approach: string;
+  potential_outcome_class: string;
+  manifestation_type: ManifestationType;
+  status: ProbablePathStatus;
+  provenance_summary: string;
+  created_at?: string;
+}
+
+export interface AlternateSceneResult {
+  path_id: string;
+  path_title: string;
+  unchosen_approach: string;
+  alternate_prose: string;
+  divergence_notes: string;
+  canonical_integrity_preserved: boolean;
+  suggested_insights: string[];
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

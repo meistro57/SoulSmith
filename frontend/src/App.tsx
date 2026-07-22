@@ -13,11 +13,12 @@ import { PhenomenaView } from './components/PhenomenaView';
 import { CuriosityView } from './components/CuriosityView';
 import { MythicGalleryView } from './components/MythicGalleryView';
 import { ConstellationView } from './components/ConstellationView';
+import { ProbablePathsView } from './components/ProbablePathsView';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles } from 'lucide-react';
+import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'curiosity' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -210,6 +211,7 @@ export function App() {
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'constellation', label: 'Constellation', icon: Sparkles },
               { id: 'curiosity', label: 'Curiosity Engine', icon: Compass },
+              { id: 'paths', label: 'Probable Paths', icon: GitBranch },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
               { id: 'convergence', label: 'Convergence', icon: Radio },
@@ -422,6 +424,8 @@ export function App() {
         )}
 
         {activeTab === 'curiosity' && <CuriosityView soulName={soulSheet.name} />}
+
+        {activeTab === 'paths' && <ProbablePathsView soulName={soulSheet.name} />}
 
         {activeTab === 'phenomena' && <PhenomenaView />}
 

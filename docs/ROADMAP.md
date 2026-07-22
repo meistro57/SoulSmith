@@ -319,6 +319,8 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 
 ### Phase 5: Probable Paths
 
+**Status: completed**
+
 - Persist meaningful unchosen alternatives.
 - Let probable paths return as dreams, rumors, alternate scenes, or playable Aspects.
 - Add probability-branch provenance and convergence rules.

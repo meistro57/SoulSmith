@@ -1,4 +1,4 @@
-import type { Aspect, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, NumericDiceRoll, OpenQuestion, ResolvedScene, Seed, SoulResources, SoulprintProfile } from '../types';
+import type { AlternateSceneResult, Aspect, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, ResolvedScene, Seed, SoulResources, SoulprintProfile } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
@@ -29,4 +29,8 @@ export const apiClient = {
   createAspect: (payload: { constellation_id: string; aspect_name: string; calling: string; origin: string; era_or_world: string }) => request<{ aspect: Aspect }>('/api/v1/constellation/aspects/create', { method: 'POST', body: JSON.stringify(payload) }),
   createCrossAspectBond: (payload: { constellation_id: string; source_aspect_id: string; target_aspect_id: string; bond_type: string; description: string }) => request<{ bond: CrossAspectBond }>('/api/v1/constellation/bonds/create', { method: 'POST', body: JSON.stringify(payload) }),
   advanceAwakening: (payload: { constellation_id: string; target_stage?: AwakeningStage }) => request<{ awakening_stage: AwakeningStage }>('/api/v1/constellation/advance', { method: 'POST', body: JSON.stringify(payload) }),
+  listProbablePaths: (soulName = 'Kaelen the Star-Watcher') => request<{ probable_paths: ProbablePath[] }>(`/api/v1/probable-paths?soul_id=${encodeURIComponent(soulName)}`),
+  logProbablePath: (payload: { soul_id: string; path_title: string; chosen_path: string; unchosen_approach: string; potential_outcome_class?: string; manifestation_type?: ManifestationType; provenance_summary?: string }) => request<{ probable_path: ProbablePath }>('/api/v1/probable-paths/log', { method: 'POST', body: JSON.stringify(payload) }),
+  manifestProbablePath: (payload: { path_id: string; manifestation_type: ManifestationType; status?: ProbablePathStatus }) => request<{ probable_path: ProbablePath }>('/api/v1/probable-paths/manifest', { method: 'POST', body: JSON.stringify(payload) }),
+  exploreProbablePath: (payload: { path_id: string; soul_name: string }) => request<{ alternate_scene: AlternateSceneResult }>('/api/v1/probable-paths/explore', { method: 'POST', body: JSON.stringify(payload) }),
 };

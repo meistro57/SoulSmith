@@ -31,11 +31,21 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_or_create_primary_constellation,
+    get_probable_paths_records,
     init_database,
     log_canonical_event,
+    log_probable_path_record,
     plant_or_echo_seed,
     resolve_open_question,
     update_awakening_stage_record,
+    update_probable_path_manifestation,
+)
+from app.probable_paths import (
+    CreateProbablePathRequest,
+    ExploreAlternateSceneRequest,
+    ManifestPathRequest,
+    ProbablePathModel,
+    simulate_alternate_scene_exploration,
 )
 from app.encounters import (
     EncounterFrame,
@@ -183,12 +193,30 @@ def resolve_encounter_scene(req: ResolveSceneRequest):
             initial_question=question_text,
         )
 
+    # Probable Paths Engine: Auto-log unchosen approach branch
+    all_approaches = ["Guile", "Confrontation", "Release", "Integration"]
+    unchosen = [a for a in all_approaches if a.lower() != req.chosen_approach.lower()]
+    alternate_approach = unchosen[0] if unchosen else "Direct Resistance"
+
+    path_title = f"The {req.dice_read.interpretation.domain} Fork: {req.chosen_approach} vs {alternate_approach}"
+    probable_path = log_probable_path_record(
+        event_id=event_id,
+        soul_id=req.soul_name,
+        path_title=path_title,
+        chosen_path=f"Resolved via {req.chosen_approach}",
+        unchosen_approach=alternate_approach,
+        potential_outcome_class=outcome.outcome_class,
+        manifestation_type="dream",
+        provenance_summary=f"Event #{event_id[:6]}: Chosen path '{req.chosen_approach}' persisted. '{alternate_approach}' preserved as dormant probability branch.",
+    )
+
     return {
         "outcome": outcome,
         "narration": narration,
         "event_id": event_id,
         "dice_read": req.dice_read,
         "seed": seed_result,
+        "probable_path": probable_path,
     }
 
 
@@ -309,6 +337,49 @@ def advance_awakening_stage(req: AdvanceAwakeningRequest):
         target_stage=req.target_stage,
     )
     return {"awakening_stage": new_stage}
+
+
+@app.get("/api/v1/probable-paths")
+def list_probable_paths(soul_id: str = "Kaelen the Star-Watcher"):
+    paths = get_probable_paths_records(soul_id=soul_id)
+    return {"probable_paths": paths}
+
+
+@app.post("/api/v1/probable-paths/log")
+def log_probable_path(req: CreateProbablePathRequest):
+    path = log_probable_path_record(
+        soul_id=req.soul_id,
+        path_title=req.path_title,
+        chosen_path=req.chosen_path,
+        unchosen_approach=req.unchosen_approach,
+        potential_outcome_class=req.potential_outcome_class,
+        event_id=req.event_id,
+        manifestation_type=req.manifestation_type,
+        provenance_summary=req.provenance_summary,
+    )
+    return {"probable_path": path}
+
+
+@app.post("/api/v1/probable-paths/manifest")
+def manifest_probable_path(req: ManifestPathRequest):
+    path = update_probable_path_manifestation(
+        path_id=req.path_id,
+        manifestation_type=req.manifestation_type,
+        status=req.status,
+    )
+    return {"probable_path": path}
+
+
+@app.post("/api/v1/probable-paths/explore")
+def explore_probable_path(req: ExploreAlternateSceneRequest):
+    paths = get_probable_paths_records(soul_id=req.soul_name)
+    matched = next((p for p in paths if p["id"] == req.path_id), None)
+    if not matched:
+        raise ValueError("Probable path not found")
+
+    path_model = ProbablePathModel(**matched)
+    result = simulate_alternate_scene_exploration(path_model, req.soul_name)
+    return {"alternate_scene": result}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")
