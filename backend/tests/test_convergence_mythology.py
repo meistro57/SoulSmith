@@ -16,7 +16,9 @@ def test_convergence_community_mythology_flow():
     assert len(symbols) >= 3
 
     # 2. Get or create active gathering session
-    g_res = client.get(f"/api/v1/convergence/gatherings/{room_id}?phenomenon_name=Awakening%20of%20the%20Salt%20Spire")
+    g_res = client.get(
+        f"/api/v1/convergence/gatherings/{room_id}?phenomenon_name=Awakening%20of%20the%20Salt%20Spire"
+    )
     assert g_res.status_code == 200
     gathering = g_res.json()["gathering"]
     assert gathering["room_id"] == room_id

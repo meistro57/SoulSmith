@@ -492,17 +492,22 @@ Rather than flat "Completed" flags, every phase is evaluated against a 5-tier pr
 
 ### Phase 8: Reflection and Accessibility `[Status: Integrated]`
 
-### Phase 9: Visual Identity Foundation `[Status: Integrated - Vertical Slice]`
+### Phase 9: Visual Identity Foundation `[Status: Integrated]`
 
 Build the character as structured data before generating art.
 
-This phase defines:
+- **Designed:** complete
+- **Prototype implemented:** complete
+- **Integrated:** complete
+- **Validated with players:** not started
+- **Production ready:** not started
+
+Data models:
 - `AvatarIdentity`: Permanent identity (Face, Hair, Body, Species, Eyes).
 - `AppearanceState`: Current physical state.
 - `StoryMark`: Provenance-backed marks (Scars, Burns, Tattoos, Broken Horns, Wrinkles) linked to canonical event IDs.
 - `EquipmentAppearance`: Armor, clothing, relics, weapons layer.
 - `PortraitVersion`: Immutable snapshot of appearance at a point in time.
-- `ConsentSettings`: Explicit privacy and visual permission controls.
 
 *Critical Rule:* The portrait image is disposable. The structured history beneath it is canonical.
 
@@ -512,19 +517,30 @@ This phase defines:
 - Old portrait versions remain accessible in an immutable timeline.
 - Regenerating an image cannot erase canonical scars, age, relics, or story marks.
 
-### Phase 10: Portrait Generation and Continuity `[Status: Designed]`
+### Phase 10: Portrait Generation and Continuity `[Status: Integrated]`
 
-Connect the structured identity data to an image generation pipeline with character consistency across revisions.
+Connect the structured identity data to a local/provider-abstracted image generation pipeline with character consistency across revisions.
 
-- Prompt templates & provider abstraction layer.
-- Deterministic seeds or provider metadata.
-- Image moderation and retry/failure handling.
-- Manual review, approval, and rejection workflow.
+- **Designed:** complete
+- **Prototype implemented:** complete
+- **Integrated:** complete (Vertical Slice)
+- **Validated with players:** not started
+- **Production ready:** not started
+
+**Purpose & Deliverables:**
+- Separate `PortraitGenerationCandidate` model decoupling candidate imagery from canonical history.
+- Deterministic prompt compiler (`app/portrait_compiler.py`) enforcing explicit facial, species, mark, equipment, and age continuity rules.
+- Image Provider Abstraction (`app/portrait_provider.py`) with `MockPortraitImageProvider` (dev/test default) and `ExternalPortraitImageProvider` (graceful fallback).
+- Candidate review workflow (`pending` -> `generated` -> `approved` / `rejected` / `failed`).
+- Transactional, idempotent candidate approval promoting candidate snapshots into canonical `PortraitVersion`s.
+- Refactored modular React components under `frontend/src/components/visual-memory/`.
+- Isolated temporary SQLite test fixture (`conftest.py`) preventing test mutation of committed databases.
 
 **Exit criteria**
 - Character remains recognizably consistent after scars, haircut, aging steps, or equipment updates.
 - Players can approve or reject visual updates before they enter canon.
-- Failed generations never mutate character canon.
+- Failed or rejected candidate generations never mutate character canon.
+- Original portrait versions remain unchanged when new versions are approved.
 
 ### Phase 11: Chronicle Memory Objects `[Status: Designed]`
 

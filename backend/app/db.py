@@ -388,6 +388,30 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS portrait_generation_candidates (
+            candidate_id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            source_portrait_version_id TEXT,
+            generation_type TEXT NOT NULL DEFAULT 'initial',
+            compiled_prompt TEXT NOT NULL,
+            negative_prompt TEXT,
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT NOT NULL DEFAULT 'soulsmith-mock-v1',
+            provider_request_id TEXT,
+            generation_seed INTEGER,
+            reference_image_url TEXT,
+            generated_image_url TEXT,
+            canonical_identity_snapshot_json TEXT NOT NULL,
+            story_marks_snapshot_json TEXT NOT NULL DEFAULT '[]',
+            equipment_snapshot_json TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            failure_reason TEXT,
+            resulting_portrait_version_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -771,10 +795,9 @@ def get_or_create_primary_constellation() -> Dict[str, Any]:
                 "Constellation of the Weeping Star",
                 "The mystery of why the Starforge erased its own name across eras.",
                 "echoing",
-                json.dumps([
-                    "Memory of the Erased Sun",
-                    "The Unbroken Promise of Cinder"
-                ]),
+                json.dumps(
+                    ["Memory of the Erased Sun", "The Unbroken Promise of Cinder"]
+                ),
             ),
         )
 
@@ -852,7 +875,9 @@ def get_or_create_primary_constellation() -> Dict[str, Any]:
     constellation_id = row["id"]
 
     # Fetch aspects
-    cursor.execute("SELECT * FROM aspects WHERE constellation_id = ?", (constellation_id,))
+    cursor.execute(
+        "SELECT * FROM aspects WHERE constellation_id = ?", (constellation_id,)
+    )
     aspect_rows = cursor.fetchall()
     aspects = [
         {
@@ -869,7 +894,10 @@ def get_or_create_primary_constellation() -> Dict[str, Any]:
     ]
 
     # Fetch anchors
-    cursor.execute("SELECT * FROM constellation_anchors WHERE constellation_id = ?", (constellation_id,))
+    cursor.execute(
+        "SELECT * FROM constellation_anchors WHERE constellation_id = ?",
+        (constellation_id,),
+    )
     anchor_rows = cursor.fetchall()
     anchors = [
         {
@@ -886,7 +914,10 @@ def get_or_create_primary_constellation() -> Dict[str, Any]:
     ]
 
     # Fetch bonds
-    cursor.execute("SELECT * FROM cross_aspect_bonds WHERE constellation_id = ?", (constellation_id,))
+    cursor.execute(
+        "SELECT * FROM cross_aspect_bonds WHERE constellation_id = ?",
+        (constellation_id,),
+    )
     bond_rows = cursor.fetchall()
     bonds = [
         {
@@ -967,7 +998,14 @@ def create_cross_aspect_bond_record(
         INSERT INTO cross_aspect_bonds (id, constellation_id, source_aspect_id, target_aspect_id, bond_type, description)
         VALUES (?, ?, ?, ?, ?, ?)
     """,
-        (bond_id, constellation_id, source_aspect_id, target_aspect_id, bond_type, description),
+        (
+            bond_id,
+            constellation_id,
+            source_aspect_id,
+            target_aspect_id,
+            bond_type,
+            description,
+        ),
     )
     conn.commit()
     conn.close()
@@ -985,17 +1023,25 @@ def create_cross_aspect_bond_record(
     }
 
 
-def update_awakening_stage_record(*, constellation_id: str, target_stage: Optional[str] = None) -> str:
+def update_awakening_stage_record(
+    *, constellation_id: str, target_stage: Optional[str] = None
+) -> str:
     conn = get_db_connection()
     cursor = conn.cursor()
 
     if target_stage:
         new_stage = target_stage
     else:
-        cursor.execute("SELECT COUNT(*) as cnt FROM aspects WHERE constellation_id = ?", (constellation_id,))
+        cursor.execute(
+            "SELECT COUNT(*) as cnt FROM aspects WHERE constellation_id = ?",
+            (constellation_id,),
+        )
         aspect_count = cursor.fetchone()["cnt"]
 
-        cursor.execute("SELECT COUNT(*) as cnt FROM cross_aspect_bonds WHERE constellation_id = ?", (constellation_id,))
+        cursor.execute(
+            "SELECT COUNT(*) as cnt FROM cross_aspect_bonds WHERE constellation_id = ?",
+            (constellation_id,),
+        )
         bond_count = cursor.fetchone()["cnt"]
 
         if aspect_count <= 1:
@@ -1217,7 +1263,13 @@ def create_user_record(
         INSERT INTO users (id, email, username, password_hash, display_name)
         VALUES (?, ?, ?, ?, ?)
     """,
-        (user_id, email.lower().strip(), username.lower().strip(), password_hash, display_name.strip()),
+        (
+            user_id,
+            email.lower().strip(),
+            username.lower().strip(),
+            password_hash,
+            display_name.strip(),
+        ),
     )
     conn.commit()
     conn.close()
@@ -1250,7 +1302,9 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ?", (username.lower().strip(),))
+    cursor.execute(
+        "SELECT * FROM users WHERE username = ?", (username.lower().strip(),)
+    )
     row = cursor.fetchone()
     conn.close()
     if not row:
@@ -1286,11 +1340,16 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 # Relic Recognition Database Helpers
 
 
-def get_or_create_relics_records(soul_id: str = "Kaelen the Star-Watcher") -> List[Dict[str, Any]]:
+def get_or_create_relics_records(
+    soul_id: str = "Kaelen the Star-Watcher",
+) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) as cnt FROM relics WHERE soul_id = ? OR soul_id = 'Unbound Soul'", (soul_id,))
+    cursor.execute(
+        "SELECT COUNT(*) as cnt FROM relics WHERE soul_id = ? OR soul_id = 'Unbound Soul'",
+        (soul_id,),
+    )
     if cursor.fetchone()["cnt"] == 0:
         _seed_default_relics(conn, soul_id)
 
@@ -1324,7 +1383,10 @@ def get_or_create_relics_records(soul_id: str = "Kaelen the Star-Watcher") -> Li
 def get_relic_history_records(relic_id: str) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM relic_events WHERE relic_id = ? ORDER BY created_at DESC", (relic_id,))
+    cursor.execute(
+        "SELECT * FROM relic_events WHERE relic_id = ? ORDER BY created_at DESC",
+        (relic_id,),
+    )
     rows = cursor.fetchall()
     conn.close()
 
@@ -1420,7 +1482,8 @@ def update_relic_stage_record(
             "overdraw_consequence": updated_row["overdraw_consequence"],
             "evocative_question": updated_row["evocative_question"],
             "required_thread_type": updated_row["required_thread_type"],
-            "cross_aspect_forms": _json_or_none(updated_row["cross_aspect_forms_json"]) or {},
+            "cross_aspect_forms": _json_or_none(updated_row["cross_aspect_forms_json"])
+            or {},
             "is_anchor": bool(updated_row["is_anchor"]),
             "created_at": updated_row["created_at"],
             "updated_at": updated_row["updated_at"],
@@ -1452,7 +1515,9 @@ def _seed_default_relics(conn: sqlite3.Connection, soul_id: str) -> None:
             "Reveals an unwanted secret to the Foe.",
             "What question must be asked before the Weeping Door will yield?",
             "Memory",
-            json.dumps({"Ancient Era": "Astro-Chronometer", "Future Era": "Resonance Dial"}),
+            json.dumps(
+                {"Ancient Era": "Astro-Chronometer", "Future Era": "Resonance Dial"}
+            ),
             1,
         ),
         (
@@ -1527,7 +1592,9 @@ def get_community_symbols_records() -> List[Dict[str, Any]]:
     if cursor.fetchone()["cnt"] == 0:
         _seed_default_community_symbols(conn)
 
-    cursor.execute("SELECT * FROM community_symbols ORDER BY significance_score DESC, created_at DESC")
+    cursor.execute(
+        "SELECT * FROM community_symbols ORDER BY significance_score DESC, created_at DESC"
+    )
     rows = cursor.fetchall()
     conn.close()
 
@@ -1735,7 +1802,9 @@ def _seed_default_community_symbols(conn: sqlite3.Connection) -> None:
             "world_starforge_01",
             "A celestial anvil bound by five starlight chains, symbolizing shared convergence.",
             5,
-            json.dumps(["Kaelen the Star-Watcher", "Archivist Vael", "Mira the Seeker"]),
+            json.dumps(
+                ["Kaelen the Star-Watcher", "Archivist Vael", "Mira the Seeker"]
+            ),
             "public_canon",
         ),
         (
@@ -1774,7 +1843,9 @@ def _seed_default_community_symbols(conn: sqlite3.Connection) -> None:
 # Reflection & Accessibility Database Helpers
 
 
-def get_or_create_preferences_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+def get_or_create_preferences_record(
+    soul_id: str = "Kaelen the Star-Watcher",
+) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM player_preferences WHERE soul_id = ?", (soul_id,))
@@ -1876,7 +1947,13 @@ def create_reflection_record(
             id, soul_id, prompt_question, player_reflection, share_with_ai
         ) VALUES (?, ?, ?, ?, ?)
     """,
-        (ref_id, soul_id, prompt_question, player_reflection, 1 if share_with_ai else 0),
+        (
+            ref_id,
+            soul_id,
+            prompt_question,
+            player_reflection,
+            1 if share_with_ai else 0,
+        ),
     )
     conn.commit()
     conn.close()
@@ -2032,7 +2109,16 @@ def add_story_mark_record(
             id, soul_id, mark_type, location, origin_event_id, acquired_at, visibility, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """,
-        (mark_id, soul_id, mark_type, location, origin_event_id, acquired_at, visibility, status),
+        (
+            mark_id,
+            soul_id,
+            mark_type,
+            location,
+            origin_event_id,
+            acquired_at,
+            visibility,
+            status,
+        ),
     )
     conn.commit()
     conn.close()
@@ -2053,7 +2139,8 @@ def get_story_marks_records(soul_id: str) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC", (soul_id,)
+        "SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC",
+        (soul_id,),
     )
     rows = cursor.fetchall()
     conn.close()
@@ -2073,7 +2160,9 @@ def get_story_marks_records(soul_id: str) -> List[Dict[str, Any]]:
     ]
 
 
-def get_or_create_equipment_appearance_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+def get_or_create_equipment_appearance_record(
+    soul_id: str = "Kaelen the Star-Watcher",
+) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM equipment_appearances WHERE soul_id = ?", (soul_id,))
@@ -2128,7 +2217,10 @@ def create_portrait_version_record(
     cursor = conn.cursor()
 
     # Get current story marks and equipment
-    cursor.execute("SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC", (soul_id,))
+    cursor.execute(
+        "SELECT * FROM story_marks WHERE soul_id = ? ORDER BY created_at ASC",
+        (soul_id,),
+    )
     marks_rows = cursor.fetchall()
     marks_snapshot = [
         {
@@ -2157,7 +2249,9 @@ def create_portrait_version_record(
             "backpacks_cloaks": eq_row["backpacks_cloaks"],
         }
 
-    cursor.execute("SELECT COUNT(*) as count FROM portrait_versions WHERE soul_id = ?", (soul_id,))
+    cursor.execute(
+        "SELECT COUNT(*) as count FROM portrait_versions WHERE soul_id = ?", (soul_id,)
+    )
     version_num = (cursor.fetchone()["count"] or 0) + 1
     version_id = f"pv_{version_num}_{str(uuid.uuid4())[:8]}"
 
@@ -2226,10 +2320,14 @@ def get_portrait_versions_records(soul_id: str) -> List[Dict[str, Any]]:
     ]
 
 
-def get_or_create_visual_consent_record(soul_id: str = "Kaelen the Star-Watcher") -> Dict[str, Any]:
+def get_or_create_visual_consent_record(
+    soul_id: str = "Kaelen the Star-Watcher",
+) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM visual_consent_settings WHERE soul_id = ?", (soul_id,))
+    cursor.execute(
+        "SELECT * FROM visual_consent_settings WHERE soul_id = ?", (soul_id,)
+    )
     row = cursor.fetchone()
     if row:
         conn.close()
@@ -2347,8 +2445,364 @@ def get_memory_objects_records() -> List[Dict[str, Any]]:
     ]
 
 
+# Phase 10: Candidate & Continuity DB Helpers
 
 
+def _map_candidate_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "candidate_id": row["candidate_id"],
+        "soul_id": row["soul_id"],
+        "source_portrait_version_id": row["source_portrait_version_id"],
+        "generation_type": row["generation_type"],
+        "compiled_prompt": row["compiled_prompt"],
+        "negative_prompt": row["negative_prompt"],
+        "provider": row["provider"],
+        "provider_model": row["provider_model"],
+        "provider_request_id": row["provider_request_id"],
+        "generation_seed": row["generation_seed"],
+        "reference_image_url": row["reference_image_url"],
+        "generated_image_url": row["generated_image_url"],
+        "canonical_identity_snapshot": _json_or_none(
+            row["canonical_identity_snapshot_json"]
+        )
+        or {},
+        "story_marks_snapshot": _json_or_none(row["story_marks_snapshot_json"]) or [],
+        "equipment_snapshot": _json_or_none(row["equipment_snapshot_json"]),
+        "status": row["status"],
+        "failure_reason": row["failure_reason"],
+        "resulting_portrait_version_id": row["resulting_portrait_version_id"],
+        "created_at": row["created_at"],
+        "reviewed_at": row["reviewed_at"],
+    }
 
 
+def create_portrait_candidate_record(
+    *,
+    soul_id: str,
+    generation_type: str,
+    compiled_prompt: str,
+    canonical_identity_snapshot: Dict[str, Any],
+    story_marks_snapshot: List[Dict[str, Any]],
+    equipment_snapshot: Optional[Dict[str, Any]] = None,
+    source_portrait_version_id: Optional[str] = None,
+    reference_image_url: Optional[str] = None,
+    negative_prompt: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
+    cand_id = f"cand_{str(uuid.uuid4())[:8]}"
+
+    cursor.execute(
+        """
+        INSERT INTO portrait_generation_candidates (
+            candidate_id, soul_id, source_portrait_version_id, generation_type,
+            compiled_prompt, negative_prompt, reference_image_url,
+            canonical_identity_snapshot_json, story_marks_snapshot_json, equipment_snapshot_json,
+            status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    """,
+        (
+            cand_id,
+            soul_id,
+            source_portrait_version_id,
+            generation_type,
+            compiled_prompt,
+            negative_prompt,
+            reference_image_url,
+            json.dumps(canonical_identity_snapshot),
+            json.dumps(story_marks_snapshot),
+            json.dumps(equipment_snapshot) if equipment_snapshot else None,
+        ),
+    )
+    conn.commit()
+
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+        (cand_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    return _map_candidate_row(row)
+
+
+def update_candidate_generation_result(
+    candidate_id: str,
+    *,
+    status: str,
+    generated_image_url: Optional[str] = None,
+    provider: str = "mock",
+    provider_model: str = "soulsmith-mock-v1",
+    provider_request_id: Optional[str] = None,
+    generation_seed: Optional[int] = None,
+    failure_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE portrait_generation_candidates
+        SET status = ?,
+            generated_image_url = ?,
+            provider = ?,
+            provider_model = ?,
+            provider_request_id = ?,
+            generation_seed = ?,
+            failure_reason = ?
+        WHERE candidate_id = ?
+    """,
+        (
+            status,
+            generated_image_url,
+            provider,
+            provider_model,
+            provider_request_id,
+            generation_seed,
+            failure_reason,
+            candidate_id,
+        ),
+    )
+    conn.commit()
+
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise ValueError(f"Candidate {candidate_id} not found")
+
+    return _map_candidate_row(row)
+
+
+def approve_portrait_candidate_transaction(
+    candidate_id: str,
+    soul_id: str,
+    custom_label: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Transactionally approves a generated candidate into a permanent PortraitVersion.
+    Uses the exact identity, marks, and equipment snapshots stored on the candidate.
+    Is idempotent.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Candidate '{candidate_id}' not found")
+
+        if row["soul_id"] != soul_id:
+            conn.close()
+            raise ValueError(
+                f"Candidate '{candidate_id}' does not belong to soul '{soul_id}'"
+            )
+
+        # Idempotency check: if already approved, return existing portrait version
+        if row["status"] == "approved" and row["resulting_portrait_version_id"]:
+            res_pv_id = row["resulting_portrait_version_id"]
+            cursor.execute(
+                "SELECT * FROM portrait_versions WHERE version_id = ?", (res_pv_id,)
+            )
+            pv_row = cursor.fetchone()
+            conn.close()
+            if pv_row:
+                return {
+                    "version_id": pv_row["version_id"],
+                    "soul_id": pv_row["soul_id"],
+                    "version_number": pv_row["version_number"],
+                    "label": pv_row["label"],
+                    "image_url": pv_row["image_url"],
+                    "story_marks_snapshot": _json_or_none(
+                        pv_row["story_marks_snapshot_json"]
+                    )
+                    or [],
+                    "equipment_snapshot": _json_or_none(
+                        pv_row["equipment_snapshot_json"]
+                    ),
+                    "created_at": pv_row["created_at"],
+                }
+
+        if row["status"] != "generated":
+            conn.close()
+            raise ValueError(
+                f"Cannot approve candidate '{candidate_id}' in status '{row['status']}'. Must be in 'generated' state."
+            )
+
+        if not row["generated_image_url"]:
+            conn.close()
+            raise ValueError(f"Candidate '{candidate_id}' has no generated_image_url.")
+
+        # Determine version number
+        cursor.execute(
+            "SELECT COUNT(*) as count FROM portrait_versions WHERE soul_id = ?",
+            (soul_id,),
+        )
+        version_num = (cursor.fetchone()["count"] or 0) + 1
+        version_id = f"pv_{version_num}_{str(uuid.uuid4())[:8]}"
+
+        gen_type = row["generation_type"]
+        label = (
+            custom_label
+            or f"Portrait v{version_num} ({gen_type.replace('_', ' ').title()})"
+        )
+
+        # Insert exact snapshots stored on candidate
+        cursor.execute(
+            """
+            INSERT INTO portrait_versions (
+                version_id, soul_id, version_number, label, image_url,
+                story_marks_snapshot_json, equipment_snapshot_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                version_id,
+                soul_id,
+                version_num,
+                label,
+                row["generated_image_url"],
+                row["story_marks_snapshot_json"],
+                row["equipment_snapshot_json"],
+            ),
+        )
+
+        # Update candidate status to approved
+        cursor.execute(
+            """
+            UPDATE portrait_generation_candidates
+            SET status = 'approved',
+                resulting_portrait_version_id = ?,
+                reviewed_at = CURRENT_TIMESTAMP
+            WHERE candidate_id = ?
+        """,
+            (version_id, candidate_id),
+        )
+
+        conn.commit()
+
+        # Fetch created portrait version
+        cursor.execute(
+            "SELECT * FROM portrait_versions WHERE version_id = ?", (version_id,)
+        )
+        pv_row = cursor.fetchone()
+        conn.close()
+
+        return {
+            "version_id": pv_row["version_id"],
+            "soul_id": pv_row["soul_id"],
+            "version_number": pv_row["version_number"],
+            "label": pv_row["label"],
+            "image_url": pv_row["image_url"],
+            "story_marks_snapshot": _json_or_none(pv_row["story_marks_snapshot_json"])
+            or [],
+            "equipment_snapshot": _json_or_none(pv_row["equipment_snapshot_json"]),
+            "created_at": pv_row["created_at"],
+        }
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+
+def reject_portrait_candidate_record(candidate_id: str, soul_id: str) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Candidate '{candidate_id}' not found")
+
+    if row["soul_id"] != soul_id:
+        conn.close()
+        raise ValueError(
+            f"Candidate '{candidate_id}' does not belong to soul '{soul_id}'"
+        )
+
+    if row["status"] == "approved":
+        conn.close()
+        raise ValueError(
+            f"Candidate '{candidate_id}' has already been approved and cannot be rejected."
+        )
+
+    cursor.execute(
+        """
+        UPDATE portrait_generation_candidates
+        SET status = 'rejected',
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE candidate_id = ?
+    """,
+        (candidate_id,),
+    )
+    conn.commit()
+
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    )
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    return _map_candidate_row(updated_row)
+
+
+def get_portrait_candidate_record(candidate_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE candidate_id = ?",
+        (candidate_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return _map_candidate_row(row)
+
+
+def get_portrait_candidates_records(soul_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM portrait_generation_candidates WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_candidate_row(r) for r in rows]
+
+
+def get_portrait_version_record(version_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM portrait_versions WHERE version_id = ?", (version_id,)
+    )
+    r = cursor.fetchone()
+    conn.close()
+    if not r:
+        return None
+    return {
+        "version_id": r["version_id"],
+        "soul_id": r["soul_id"],
+        "version_number": r["version_number"],
+        "label": r["label"],
+        "image_url": r["image_url"],
+        "story_marks_snapshot": _json_or_none(r["story_marks_snapshot_json"]) or [],
+        "equipment_snapshot": _json_or_none(r["equipment_snapshot_json"]),
+        "created_at": r["created_at"],
+    }

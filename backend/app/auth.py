@@ -16,7 +16,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.db import get_user_by_id
 
-SECRET_KEY = os.environ.get("SOULSMITH_JWT_SECRET", "soulsmith_mythic_secret_key_change_in_prod_2026")
+SECRET_KEY = os.environ.get(
+    "SOULSMITH_JWT_SECRET", "soulsmith_mythic_secret_key_change_in_prod_2026"
+)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
 

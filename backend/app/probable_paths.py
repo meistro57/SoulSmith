@@ -80,7 +80,7 @@ def simulate_alternate_scene_exploration(
 
     insights = [
         f"How would {soul_name}'s relationship with the Foe change if '{path.unchosen_approach}' were canon?",
-        f"What relic would have awakened if this branch were integrated into a Deep Thread?",
+        "What relic would have awakened if this branch were integrated into a Deep Thread?",
         "Notice that both choices sprang from the same core desire.",
     ]
 

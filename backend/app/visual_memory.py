@@ -27,7 +27,7 @@ class StoryMarkModel(BaseModel):
     id: str
     soul_id: str
     mark_type: str  # scar, burn_mark, broken_horn, blessed_tattoo, gray_hair, missing_finger, etc.
-    location: str   # left_cheek, right_forearm, forehead, chest, etc.
+    location: str  # left_cheek, right_forearm, forehead, chest, etc.
     origin_event_id: str
     acquired_at: str
     visibility: VisibilityLevel = "prominent"
@@ -38,7 +38,9 @@ class EquipmentAppearanceModel(BaseModel):
     soul_id: str
     armor: str = "Weathered iron pauldrons and salt-crusted leather doublet"
     clothing: str = "Ash-colored travel cloak with silver thread embroidery"
-    weapons: List[str] = Field(default_factory=lambda: ["Seer's Starlight Blade", "Etched Runic Dagger"])
+    weapons: List[str] = Field(
+        default_factory=lambda: ["Seer's Starlight Blade", "Etched Runic Dagger"]
+    )
     relics: List[str] = Field(default_factory=lambda: ["Dormant Salt Bell"])
     backpacks_cloaks: str = "Heavy wool cloak with raven brooch"
 
@@ -123,3 +125,69 @@ class CompileMemoryObjectRequest(BaseModel):
     action_composition: str
     lasting_consequence: str
     privacy_consent_scope: str = "public_canon"
+
+
+# Phase 10: Candidate & Continuity Models
+
+CandidateStatus = Literal["pending", "generated", "approved", "rejected", "failed"]
+GenerationType = Literal[
+    "initial",
+    "story_mark_update",
+    "equipment_update",
+    "age_update",
+    "manual_regeneration",
+]
+
+
+class PortraitGenerationCandidateModel(BaseModel):
+    candidate_id: str
+    soul_id: str
+    source_portrait_version_id: Optional[str] = None
+    generation_type: GenerationType = "initial"
+    compiled_prompt: str
+    negative_prompt: Optional[str] = None
+    provider: str = "mock"
+    provider_model: str = "soulsmith-mock-v1"
+    provider_request_id: Optional[str] = None
+    generation_seed: Optional[int] = None
+    reference_image_url: Optional[str] = None
+    generated_image_url: Optional[str] = None
+    canonical_identity_snapshot: AvatarIdentityModel
+    story_marks_snapshot: List[StoryMarkModel] = Field(default_factory=list)
+    equipment_snapshot: Optional[EquipmentAppearanceModel] = None
+    status: CandidateStatus = "pending"
+    failure_reason: Optional[str] = None
+    resulting_portrait_version_id: Optional[str] = None
+    created_at: Optional[str] = None
+    reviewed_at: Optional[str] = None
+
+
+class CompilePortraitPromptRequest(BaseModel):
+    soul_id: str = "Kaelen the Star-Watcher"
+    source_portrait_version_id: Optional[str] = None
+    generation_type: GenerationType = "initial"
+    emotional_state: str = "focused"
+    style_preset: str = "storybook_painterly"
+
+
+class CreatePortraitCandidateRequest(BaseModel):
+    soul_id: str = "Kaelen the Star-Watcher"
+    source_portrait_version_id: Optional[str] = None
+    generation_type: GenerationType = "initial"
+    emotional_state: str = "focused"
+    style_preset: str = "storybook_painterly"
+
+
+class GenerateCandidateRequest(BaseModel):
+    provider_type: Optional[str] = None  # mock or external
+    seed: Optional[int] = None
+
+
+class ApproveCandidateRequest(BaseModel):
+    soul_id: str = "Kaelen the Star-Watcher"
+    label: Optional[str] = None
+
+
+class RejectCandidateRequest(BaseModel):
+    soul_id: str = "Kaelen the Star-Watcher"
+    reason: Optional[str] = None

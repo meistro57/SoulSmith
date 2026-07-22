@@ -16,7 +16,7 @@ import { ConstellationView } from './components/ConstellationView';
 import { ProbablePathsView } from './components/ProbablePathsView';
 import { RelicLedgerView } from './components/RelicLedgerView';
 import { ReflectionAccessibilityView } from './components/ReflectionAccessibilityView';
-import { VisualMemoryView } from './components/VisualMemoryView';
+import { VisualMemoryView } from './components/visual-memory/VisualMemoryView';
 import { AuthModal } from './components/AuthModal';
 
 import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers } from 'lucide-react';

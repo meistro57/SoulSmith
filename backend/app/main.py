@@ -8,7 +8,14 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    FastAPI,
+    Header,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import (
@@ -38,8 +45,10 @@ from app.db import (
     create_user_record,
     add_gathering_contribution,
     add_story_mark_record,
+    approve_portrait_candidate_transaction,
     compile_memory_object_record,
     create_community_symbol_record,
+    create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
     create_reflection_record,
@@ -57,6 +66,9 @@ from app.db import (
     get_or_create_primary_constellation,
     get_or_create_relics_records,
     get_or_create_visual_consent_record,
+    get_portrait_candidate_record,
+    get_portrait_candidates_records,
+    get_portrait_version_record,
     get_portrait_versions_records,
     get_private_notes_records,
     get_probable_paths_records,
@@ -69,24 +81,34 @@ from app.db import (
     log_canonical_event,
     log_probable_path_record,
     plant_or_echo_seed,
+    reject_portrait_candidate_record,
     resolve_open_question,
     update_awakening_stage_record,
+    update_candidate_generation_result,
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
 )
 from app.visual_memory import (
     AddStoryMarkRequest,
+    ApproveCandidateRequest,
     AvatarIdentityModel,
     CompileMemoryObjectRequest,
+    CompilePortraitPromptRequest,
     ConsentSettingsModel,
     CreateAvatarIdentityRequest,
+    CreatePortraitCandidateRequest,
     CreatePortraitVersionRequest,
     EquipmentAppearanceModel,
+    GenerateCandidateRequest,
     MemoryObjectModel,
+    PortraitGenerationCandidateModel,
     PortraitVersionModel,
+    RejectCandidateRequest,
     StoryMarkModel,
 )
+from app.portrait_compiler import compile_portrait_prompt, PromptCompilationResult
+from app.portrait_provider import get_portrait_provider, ProviderGenerationRequest
 from app.reflection import (
     CreatePrivateNoteRequest,
     CreateReflectionRequest,
@@ -225,8 +247,12 @@ def signup(req: UserSignupRequest):
 
 @app.post("/api/v1/auth/login", response_model=AuthResponse)
 def login(req: UserLoginRequest):
-    user_record = get_user_by_email(req.username_or_email) or get_user_by_username(req.username_or_email)
-    if not user_record or not verify_password(req.password, user_record["password_hash"]):
+    user_record = get_user_by_email(req.username_or_email) or get_user_by_username(
+        req.username_or_email
+    )
+    if not user_record or not verify_password(
+        req.password, user_record["password_hash"]
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username/email or password",
@@ -422,10 +448,13 @@ def create_soulprint(req: SoulprintRequest) -> SoulprintProfile:
 @app.get("/api/v1/constellation")
 def get_constellation():
     constellation = get_or_create_primary_constellation()
-    stage_info = AWAKENING_STAGE_DESCRIPTIONS.get(constellation["awakening_stage"], {
-        "title": constellation["awakening_stage"].capitalize(),
-        "description": "The Constellation patterns unfold across Aspects.",
-    })
+    stage_info = AWAKENING_STAGE_DESCRIPTIONS.get(
+        constellation["awakening_stage"],
+        {
+            "title": constellation["awakening_stage"].capitalize(),
+            "description": "The Constellation patterns unfold across Aspects.",
+        },
+    )
     return {
         "constellation": constellation,
         "stage_info": stage_info,
@@ -528,7 +557,9 @@ def attune_relic_narrative(req: RelicNarrativeAttuneRequest):
     relics = get_or_create_relics_records(soul_id=req.soul_id)
     target = next((r for r in relics if r["id"] == req.relic_id), None)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found"
+        )
 
     current_stage = target["stage"]
     if current_stage == "Dormant":
@@ -557,7 +588,9 @@ def overdraw_relic(req: RelicOverdrawRequest):
     relics = get_or_create_relics_records(soul_id=req.soul_id)
     target = next((r for r in relics if r["id"] == req.relic_id), None)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found"
+        )
 
     current_stage = target["stage"]
     if current_stage == "Overdrawn":
@@ -593,7 +626,9 @@ def repair_relic(req: RelicRepairRequest):
     relics = get_or_create_relics_records(soul_id=req.soul_id)
     target = next((r for r in relics if r["id"] == req.relic_id), None)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found"
+        )
 
     if target["stage"] != "Fractured":
         raise HTTPException(
@@ -622,7 +657,9 @@ def transfigure_relic(req: RelicTransfigureRequest):
     relics = get_or_create_relics_records(soul_id=req.soul_id)
     target = next((r for r in relics if r["id"] == req.relic_id), None)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found"
+        )
 
     transfigured_effect = f"TRANSFIGURED ANCHOR ({req.transfigured_form}): Permanently bridges Constellation Aspects and alters world canon."
     result = update_relic_stage_record(
@@ -662,8 +699,12 @@ def create_community_symbol(req: CreateCommunitySymbolRequest):
 
 
 @app.get("/api/v1/convergence/gatherings/{room_id}")
-def get_gathering_session(room_id: str, phenomenon_name: str = "Awakening of the Salt Spire"):
-    record = get_or_create_gathering_session(room_id=room_id, phenomenon_name=phenomenon_name)
+def get_gathering_session(
+    room_id: str, phenomenon_name: str = "Awakening of the Salt Spire"
+):
+    record = get_or_create_gathering_session(
+        room_id=room_id, phenomenon_name=phenomenon_name
+    )
     return {"gathering": GatheringSessionModel(**record)}
 
 
@@ -840,6 +881,240 @@ def compile_memory_object(req: CompileMemoryObjectRequest):
 def list_memory_objects():
     records = get_memory_objects_records()
     return {"memory_objects": [MemoryObjectModel(**r) for r in records]}
+
+
+# Phase 10: Portrait Generation & Continuity Endpoints
+
+
+@app.post(
+    "/api/v1/visual-memory/portraits/compile",
+    response_model=PromptCompilationResult,
+)
+def compile_portrait_prompt_endpoint(req: CompilePortraitPromptRequest):
+    identity_dict = get_or_create_avatar_identity_record(soul_id=req.soul_id)
+    story_marks_list = get_story_marks_records(soul_id=req.soul_id)
+    equipment_dict = get_or_create_equipment_appearance_record(soul_id=req.soul_id)
+
+    identity = AvatarIdentityModel(**identity_dict)
+    story_marks = [StoryMarkModel(**m) for m in story_marks_list]
+    equipment = EquipmentAppearanceModel(**equipment_dict)
+
+    ref_url = None
+    if req.source_portrait_version_id:
+        source_pv = get_portrait_version_record(req.source_portrait_version_id)
+        if source_pv:
+            ref_url = source_pv["image_url"]
+
+    result = compile_portrait_prompt(
+        identity=identity,
+        equipment=equipment,
+        story_marks=story_marks,
+        reference_image_url=ref_url,
+        generation_type=req.generation_type,
+        emotional_state=req.emotional_state,
+        style_preset=req.style_preset,
+    )
+    return result
+
+
+@app.post("/api/v1/visual-memory/portraits/candidates")
+def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
+    identity_dict = get_or_create_avatar_identity_record(soul_id=req.soul_id)
+    story_marks_list = get_story_marks_records(soul_id=req.soul_id)
+    equipment_dict = get_or_create_equipment_appearance_record(soul_id=req.soul_id)
+
+    identity = AvatarIdentityModel(**identity_dict)
+    story_marks = [StoryMarkModel(**m) for m in story_marks_list]
+    equipment = EquipmentAppearanceModel(**equipment_dict)
+
+    ref_url = None
+    if req.source_portrait_version_id:
+        source_pv = get_portrait_version_record(req.source_portrait_version_id)
+        if source_pv:
+            ref_url = source_pv["image_url"]
+
+    compiled = compile_portrait_prompt(
+        identity=identity,
+        equipment=equipment,
+        story_marks=story_marks,
+        reference_image_url=ref_url,
+        generation_type=req.generation_type,
+        emotional_state=req.emotional_state,
+        style_preset=req.style_preset,
+    )
+
+    candidate = create_portrait_candidate_record(
+        soul_id=req.soul_id,
+        generation_type=req.generation_type,
+        compiled_prompt=compiled.compiled_prompt,
+        canonical_identity_snapshot=identity.model_dump(),
+        story_marks_snapshot=[m.model_dump() for m in story_marks],
+        equipment_snapshot=equipment.model_dump(),
+        source_portrait_version_id=req.source_portrait_version_id,
+        reference_image_url=ref_url,
+        negative_prompt=", ".join(compiled.negative_constraints),
+    )
+    return {"candidate": PortraitGenerationCandidateModel(**candidate)}
+
+
+@app.post("/api/v1/visual-memory/portraits/candidates/{candidate_id}/generate")
+def generate_portrait_candidate_endpoint(
+    candidate_id: str, req: Optional[GenerateCandidateRequest] = None
+):
+    candidate = get_portrait_candidate_record(candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate '{candidate_id}' not found",
+        )
+
+    provider_type = (req and req.provider_type) or None
+    seed = (req and req.seed) or None
+
+    provider = get_portrait_provider(provider_type)
+    gen_req = ProviderGenerationRequest(
+        candidate_id=candidate["candidate_id"],
+        soul_id=candidate["soul_id"],
+        compiled_prompt=candidate["compiled_prompt"],
+        generation_type=candidate["generation_type"],
+        reference_image_url=candidate.get("reference_image_url"),
+        seed=seed,
+    )
+
+    result = provider.generate(gen_req)
+
+    if result.success:
+        updated = update_candidate_generation_result(
+            candidate_id=candidate_id,
+            status="generated",
+            generated_image_url=result.generated_image_url,
+            provider=result.provider,
+            provider_model=result.provider_model,
+            provider_request_id=result.provider_request_id,
+            generation_seed=result.generation_seed,
+        )
+    else:
+        updated = update_candidate_generation_result(
+            candidate_id=candidate_id,
+            status="failed",
+            provider=result.provider,
+            provider_model=result.provider_model,
+            failure_reason=result.failure_reason,
+        )
+
+    return {"candidate": PortraitGenerationCandidateModel(**updated)}
+
+
+@app.post("/api/v1/visual-memory/portraits/candidates/{candidate_id}/approve")
+def approve_portrait_candidate_endpoint(
+    candidate_id: str, req: ApproveCandidateRequest
+):
+    candidate = get_portrait_candidate_record(candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate '{candidate_id}' not found",
+        )
+
+    if candidate["soul_id"] != req.soul_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Candidate '{candidate_id}' does not belong to soul '{req.soul_id}'",
+        )
+
+    if candidate["status"] == "approved":
+        pv = get_portrait_version_record(candidate["resulting_portrait_version_id"])
+        return {
+            "portrait_version": PortraitVersionModel(**pv),
+            "candidate": PortraitGenerationCandidateModel(**candidate),
+            "message": "Candidate was already approved (idempotent response).",
+        }
+
+    if candidate["status"] != "generated":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot approve candidate in state '{candidate['status']}'. Must be in 'generated' state.",
+        )
+
+    try:
+        pv_dict = approve_portrait_candidate_transaction(
+            candidate_id, soul_id=req.soul_id, custom_label=req.label
+        )
+        updated_cand = get_portrait_candidate_record(candidate_id)
+        return {
+            "portrait_version": PortraitVersionModel(**pv_dict),
+            "candidate": PortraitGenerationCandidateModel(**updated_cand),
+            "message": "Candidate approved and promoted to canonical PortraitVersion.",
+        }
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+
+@app.post("/api/v1/visual-memory/portraits/candidates/{candidate_id}/reject")
+def reject_portrait_candidate_endpoint(candidate_id: str, req: RejectCandidateRequest):
+    candidate = get_portrait_candidate_record(candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate '{candidate_id}' not found",
+        )
+
+    if candidate["soul_id"] != req.soul_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Candidate '{candidate_id}' does not belong to soul '{req.soul_id}'",
+        )
+
+    if candidate["status"] == "approved":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot reject a candidate that has already been approved into canon.",
+        )
+
+    try:
+        updated = reject_portrait_candidate_record(candidate_id, soul_id=req.soul_id)
+        return {
+            "candidate": PortraitGenerationCandidateModel(**updated),
+            "message": "Candidate rejected. Saved in audit log without mutating canon.",
+        }
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+
+@app.get("/api/v1/visual-memory/portraits/candidates")
+def list_portrait_candidates_endpoint(
+    soul_id: str = "Kaelen the Star-Watcher",
+):
+    records = get_portrait_candidates_records(soul_id=soul_id)
+    return {"candidates": [PortraitGenerationCandidateModel(**r) for r in records]}
+
+
+@app.get("/api/v1/visual-memory/portraits/candidates/{candidate_id}")
+def get_portrait_candidate_endpoint(candidate_id: str):
+    record = get_portrait_candidate_record(candidate_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate '{candidate_id}' not found",
+        )
+    return {"candidate": PortraitGenerationCandidateModel(**record)}
+
+
+@app.get("/api/v1/visual-memory/portraits/versions")
+def list_portrait_versions_endpoint(soul_id: str = "Kaelen the Star-Watcher"):
+    records = get_portrait_versions_records(soul_id=soul_id)
+    return {"portrait_versions": [PortraitVersionModel(**r) for r in records]}
+
+
+@app.get("/api/v1/visual-memory/portraits/versions/{version_id}")
+def get_portrait_version_endpoint(version_id: str):
+    record = get_portrait_version_record(version_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Portrait version '{version_id}' not found",
+        )
+    return {"portrait_version": PortraitVersionModel(**record)}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

@@ -324,6 +324,45 @@ export interface VisualAvatarProfile {
   consent: ConsentSettings;
 }
 
+export type CandidateStatus = 'pending' | 'generated' | 'approved' | 'rejected' | 'failed';
+export type GenerationType = 'initial' | 'story_mark_update' | 'equipment_update' | 'age_update' | 'manual_regeneration';
+
+export interface PortraitGenerationCandidate {
+  candidate_id: string;
+  soul_id: string;
+  source_portrait_version_id?: string;
+  generation_type: GenerationType;
+  compiled_prompt: string;
+  negative_prompt?: string;
+  provider: string;
+  provider_model: string;
+  provider_request_id?: string;
+  generation_seed?: number;
+  reference_image_url?: string;
+  generated_image_url?: string;
+  canonical_identity_snapshot: AvatarIdentity;
+  story_marks_snapshot: StoryMark[];
+  equipment_snapshot?: EquipmentAppearance;
+  status: CandidateStatus;
+  failure_reason?: string;
+  resulting_portrait_version_id?: string;
+  created_at?: string;
+  reviewed_at?: string;
+}
+
+export interface PromptCompilationResult {
+  subject_identity: string;
+  continuity_requirements: string[];
+  story_marks: string[];
+  equipment: Record<string, any>;
+  expression: string;
+  composition: string;
+  lighting: string;
+  style: string;
+  negative_constraints: string[];
+  compiled_prompt: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;
