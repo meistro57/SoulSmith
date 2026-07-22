@@ -58,6 +58,7 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_community_symbols_records,
+    get_memory_object_record,
     get_memory_objects_records,
     get_or_create_avatar_identity_record,
     get_or_create_equipment_appearance_record,
@@ -863,24 +864,41 @@ def create_portrait_snapshot(req: CreatePortraitVersionRequest):
 
 @app.post("/api/v1/visual/memory-objects/compile")
 def compile_memory_object(req: CompileMemoryObjectRequest):
-    record = compile_memory_object_record(
-        event_id=req.event_id,
-        event_title=req.event_title,
-        participants=[p.model_dump() for p in req.participants],
-        location_environment=req.location_environment,
-        relics_involved=req.relics_involved,
-        emotional_tone=req.emotional_tone,
-        action_composition=req.action_composition,
-        lasting_consequence=req.lasting_consequence,
-        privacy_consent_scope=req.privacy_consent_scope,
-    )
-    return {"memory_object": MemoryObjectModel(**record)}
+    try:
+        record = compile_memory_object_record(
+            event_id=req.event_id,
+            event_title=req.event_title,
+            participants=[p.model_dump() for p in req.participants],
+            location_environment=req.location_environment,
+            relics_involved=req.relics_involved,
+            emotional_tone=req.emotional_tone,
+            action_composition=req.action_composition,
+            lasting_consequence=req.lasting_consequence,
+            privacy_consent_scope=req.privacy_consent_scope,
+            importance_tier=req.importance_tier,
+            importance_score=req.importance_score,
+            importance_rationale=req.importance_rationale,
+        )
+        return {"memory_object": MemoryObjectModel(**record)}
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
 
 @app.get("/api/v1/visual/memory-objects")
 def list_memory_objects():
     records = get_memory_objects_records()
     return {"memory_objects": [MemoryObjectModel(**r) for r in records]}
+
+
+@app.get("/api/v1/visual/memory-objects/{memory_object_id}")
+def get_memory_object(memory_object_id: str):
+    record = get_memory_object_record(memory_object_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{memory_object_id}' not found",
+        )
+    return {"memory_object": MemoryObjectModel(**record)}
 
 
 # Phase 10: Portrait Generation & Continuity Endpoints

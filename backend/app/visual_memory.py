@@ -65,12 +65,17 @@ class ConsentSettingsModel(BaseModel):
     real_person_display_name: Optional[str] = None
 
 
+ImportanceTier = Literal["personal", "community", "world"]
+
+
 class ParticipantRefModel(BaseModel):
     soul_id: str
     character_name: str
     portrait_version_id: str
     role_in_event: str
     real_person_tag_opt_in: bool = False
+    historical_story_marks_snapshot: List[StoryMarkModel] = Field(default_factory=list)
+    historical_equipment_snapshot: Optional[EquipmentAppearanceModel] = None
 
 
 class MemoryObjectModel(BaseModel):
@@ -84,6 +89,10 @@ class MemoryObjectModel(BaseModel):
     action_composition: str
     lasting_consequence: str
     privacy_consent_scope: str = "public_canon"
+    importance_tier: ImportanceTier = "personal"
+    importance_score: int = Field(default=5, ge=1, le=10)
+    is_painting_eligible: bool = True
+    importance_rationale: Optional[str] = None
     visual_generation_status: VisualGenStatus = "compiled"
     painting_image_url: Optional[str] = None
     created_at: Optional[str] = None
@@ -125,6 +134,9 @@ class CompileMemoryObjectRequest(BaseModel):
     action_composition: str
     lasting_consequence: str
     privacy_consent_scope: str = "public_canon"
+    importance_tier: ImportanceTier = "personal"
+    importance_score: Optional[int] = None
+    importance_rationale: Optional[str] = None
 
 
 # Phase 10: Candidate & Continuity Models

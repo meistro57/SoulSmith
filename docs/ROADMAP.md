@@ -542,7 +542,7 @@ Connect the structured identity data to a local/provider-abstracted image genera
 - Failed or rejected candidate generations never mutate character canon.
 - Original portrait versions remain unchanged when new versions are approved.
 
-### Phase 11: Chronicle Memory Objects `[Status: Designed]`
+### Phase 11: Chronicle Memory Objects `[Status: Integrated]`
 
 Formalize the `MemoryObject` schema as the first-class bridge between Chronicle events and visual generation.
 

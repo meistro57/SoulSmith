@@ -383,11 +383,19 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             action_composition TEXT NOT NULL,
             lasting_consequence TEXT NOT NULL,
             privacy_consent_scope TEXT NOT NULL DEFAULT 'public_canon',
+            importance_tier TEXT NOT NULL DEFAULT 'personal',
+            importance_score INTEGER NOT NULL DEFAULT 5,
+            is_painting_eligible INTEGER NOT NULL DEFAULT 1,
+            importance_rationale TEXT,
             visual_generation_status TEXT NOT NULL DEFAULT 'compiled',
             painting_image_url TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _add_column_if_missing(cursor, "memory_objects", "importance_tier", "importance_tier TEXT NOT NULL DEFAULT 'personal'")
+    _add_column_if_missing(cursor, "memory_objects", "importance_score", "importance_score INTEGER NOT NULL DEFAULT 5")
+    _add_column_if_missing(cursor, "memory_objects", "is_painting_eligible", "is_painting_eligible INTEGER NOT NULL DEFAULT 1")
+    _add_column_if_missing(cursor, "memory_objects", "importance_rationale", "importance_rationale TEXT")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS portrait_generation_candidates (
             candidate_id TEXT PRIMARY KEY,
@@ -2372,30 +2380,110 @@ def compile_memory_object_record(
     action_composition: str,
     lasting_consequence: str,
     privacy_consent_scope: str = "public_canon",
+    importance_tier: str = "personal",
+    importance_score: Optional[int] = None,
+    importance_rationale: Optional[str] = None,
 ) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     mem_id = f"mem_{str(uuid.uuid4())[:8]}"
+
+    normalized_scope = privacy_consent_scope.strip().lower()
+    redacted_real_person_tags: List[str] = []
+
+    # Importance score logic
+    if importance_score is None:
+        if importance_tier == "world":
+            score = 9
+        elif importance_tier == "community":
+            score = 7
+        else:
+            score = 5
+    else:
+        score = max(1, min(10, importance_score))
+
+    is_eligible = 1 if score >= 4 else 0
+    rationale = (
+        importance_rationale
+        or f"Compiled as {importance_tier} significance event with score {score}/10."
+    )
+
+    # Enrich participant historical appearance snapshots if available
+    enriched_participants = []
+    for p in participants:
+        p_copy = dict(p)
+        participant_soul_id = p_copy.get("soul_id")
+
+        cursor.execute(
+            "SELECT * FROM visual_consent_settings WHERE soul_id = ?",
+            (participant_soul_id,),
+        )
+        consent_row = cursor.fetchone()
+        allow_shared_gallery = bool(consent_row["allow_shared_gallery"]) if consent_row else True
+        allow_real_person_tagging = (
+            bool(consent_row["allow_real_person_tagging"]) if consent_row else False
+        )
+
+        if normalized_scope == "public_canon" and not allow_shared_gallery:
+            conn.close()
+            raise ValueError(
+                f"Soul '{participant_soul_id}' has not consented to shared gallery publication."
+            )
+
+        if p_copy.get("real_person_tag_opt_in") and not allow_real_person_tagging:
+            p_copy["real_person_tag_opt_in"] = False
+            redacted_real_person_tags.append(participant_soul_id)
+
+        pv_id = p.get("portrait_version_id")
+        if pv_id and (
+            "historical_story_marks_snapshot" not in p_copy
+            or not p_copy["historical_story_marks_snapshot"]
+        ):
+            cursor.execute(
+                "SELECT * FROM portrait_versions WHERE version_id = ?",
+                (pv_id,),
+            )
+            pv_row = cursor.fetchone()
+            if pv_row:
+                p_copy["historical_story_marks_snapshot"] = (
+                    _json_or_none(pv_row["story_marks_snapshot_json"]) or []
+                )
+                p_copy["historical_equipment_snapshot"] = _json_or_none(
+                    pv_row["equipment_snapshot_json"]
+                )
+        enriched_participants.append(p_copy)
+
+    if redacted_real_person_tags:
+        redacted_list = ", ".join(redacted_real_person_tags)
+        rationale = (
+            f"{rationale} Real-person tagging removed for: {redacted_list} "
+            "due to missing consent."
+        )
 
     cursor.execute(
         """
         INSERT INTO memory_objects (
             id, event_id, event_title, participants_json, location_environment,
             relics_involved_json, emotional_tone, action_composition, lasting_consequence,
-            privacy_consent_scope, visual_generation_status, painting_image_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'compiled', ?)
+            privacy_consent_scope, importance_tier, importance_score, is_painting_eligible,
+            importance_rationale, visual_generation_status, painting_image_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'compiled', ?)
     """,
         (
             mem_id,
             event_id,
             event_title,
-            json.dumps(participants),
+            json.dumps(enriched_participants),
             location_environment,
             json.dumps(relics_involved),
             emotional_tone,
             action_composition,
             lasting_consequence,
             privacy_consent_scope,
+            importance_tier,
+            score,
+            is_eligible,
+            rationale,
             f"/assets/paintings/{event_id}_painting.png",
         ),
     )
@@ -2406,13 +2494,17 @@ def compile_memory_object_record(
         "id": mem_id,
         "event_id": event_id,
         "event_title": event_title,
-        "participants": participants,
+        "participants": enriched_participants,
         "location_environment": location_environment,
         "relics_involved": relics_involved,
         "emotional_tone": emotional_tone,
         "action_composition": action_composition,
         "lasting_consequence": lasting_consequence,
         "privacy_consent_scope": privacy_consent_scope,
+        "importance_tier": importance_tier,
+        "importance_score": score,
+        "is_painting_eligible": bool(is_eligible),
+        "importance_rationale": rationale,
         "visual_generation_status": "compiled",
         "painting_image_url": f"/assets/paintings/{event_id}_painting.png",
     }
@@ -2437,12 +2529,61 @@ def get_memory_objects_records() -> List[Dict[str, Any]]:
             "action_composition": r["action_composition"],
             "lasting_consequence": r["lasting_consequence"],
             "privacy_consent_scope": r["privacy_consent_scope"],
+            "importance_tier": r["importance_tier"]
+            if "importance_tier" in r.keys()
+            else "personal",
+            "importance_score": r["importance_score"]
+            if "importance_score" in r.keys()
+            else 5,
+            "is_painting_eligible": bool(r["is_painting_eligible"])
+            if "is_painting_eligible" in r.keys()
+            else True,
+            "importance_rationale": r["importance_rationale"]
+            if "importance_rationale" in r.keys()
+            else None,
             "visual_generation_status": r["visual_generation_status"],
             "painting_image_url": r["painting_image_url"],
             "created_at": r["created_at"],
         }
         for r in rows
     ]
+
+
+def get_memory_object_record(mem_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM memory_objects WHERE id = ?", (mem_id,))
+    r = cursor.fetchone()
+    conn.close()
+    if not r:
+        return None
+    return {
+        "id": r["id"],
+        "event_id": r["event_id"],
+        "event_title": r["event_title"],
+        "participants": _json_or_none(r["participants_json"]) or [],
+        "location_environment": r["location_environment"],
+        "relics_involved": _json_or_none(r["relics_involved_json"]) or [],
+        "emotional_tone": r["emotional_tone"],
+        "action_composition": r["action_composition"],
+        "lasting_consequence": r["lasting_consequence"],
+        "privacy_consent_scope": r["privacy_consent_scope"],
+        "importance_tier": r["importance_tier"]
+        if "importance_tier" in r.keys()
+        else "personal",
+        "importance_score": r["importance_score"]
+        if "importance_score" in r.keys()
+        else 5,
+        "is_painting_eligible": bool(r["is_painting_eligible"])
+        if "is_painting_eligible" in r.keys()
+        else True,
+        "importance_rationale": r["importance_rationale"]
+        if "importance_rationale" in r.keys()
+        else None,
+        "visual_generation_status": r["visual_generation_status"],
+        "painting_image_url": r["painting_image_url"],
+        "created_at": r["created_at"],
+    }
 
 
 # Phase 10: Candidate & Continuity DB Helpers

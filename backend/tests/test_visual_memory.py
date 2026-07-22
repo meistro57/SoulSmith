@@ -1,6 +1,7 @@
 # backend/tests/test_visual_memory.py
 import uuid
 from fastapi.testclient import TestClient
+import app.db as db
 from app.main import app
 
 client = TestClient(app)
@@ -88,12 +89,117 @@ def test_visual_identity_and_memory_object_flow():
     assert mem_obj["event_id"] == "evt_salt_spire_01"
     assert mem_obj["visual_generation_status"] == "compiled"
     assert mem_obj["participants"][0]["portrait_version_id"] == v1_portrait_id
+    assert mem_obj["participants"][0]["historical_story_marks_snapshot"] == []
+    assert mem_obj["importance_tier"] == "personal"
+    assert mem_obj["importance_score"] == 5
+    assert mem_obj["is_painting_eligible"] is True
 
-    # 5. List compiled memory objects
+    # 5. Fetch compiled memory object by id
+    get_mem_res = client.get(f"/api/v1/visual/memory-objects/{mem_obj['id']}")
+    assert get_mem_res.status_code == 200
+    assert get_mem_res.json()["memory_object"]["id"] == mem_obj["id"]
+
+    # 6. List compiled memory objects
     list_mem_res = client.get("/api/v1/visual/memory-objects")
     assert list_mem_res.status_code == 200
     mem_objects = list_mem_res.json()["memory_objects"]
     assert len(mem_objects) >= 1
+
+
+def test_phase_11_memory_object_enforces_consent_and_redacts_real_person_tags():
+    soul_id = f"Phase11_Soul_{str(uuid.uuid4())[:6]}"
+
+    client.post(
+        "/api/v1/visual/avatar/create",
+        json={
+            "soul_id": soul_id,
+            "face": "Calm angular features",
+            "hair": "Silver braids",
+            "body": "Lean traveler build",
+            "species": "Human Aspect",
+            "eyes": "Gray-blue eyes",
+        },
+    )
+
+    portrait = client.post(
+        "/api/v1/visual/portraits/snapshot",
+        json={
+            "soul_id": soul_id,
+            "label": "Phase 11 Baseline",
+            "image_url": "/assets/portraits/phase11_baseline.png",
+        },
+    ).json()["portrait"]
+
+    client.get(f"/api/v1/visual/avatar/{soul_id}")
+
+    conn = db.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE visual_consent_settings SET allow_shared_gallery = 0 WHERE soul_id = ?",
+        (soul_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    blocked_res = client.post(
+        "/api/v1/visual/memory-objects/compile",
+        json={
+            "event_id": "evt_phase11_blocked_01",
+            "event_title": "Blocked Consent Event",
+            "participants": [
+                {
+                    "soul_id": soul_id,
+                    "character_name": "Consent Warden",
+                    "portrait_version_id": portrait["version_id"],
+                    "role_in_event": "Focus",
+                    "real_person_tag_opt_in": False,
+                }
+            ],
+            "location_environment": "Hidden observatory",
+            "relics_involved": ["Veiled Dial"],
+            "emotional_tone": "Guarded",
+            "action_composition": "The warden turns away from the scribe.",
+            "lasting_consequence": "The event remains private.",
+            "privacy_consent_scope": "public_canon",
+        },
+    )
+    assert blocked_res.status_code == 400
+
+    conn = db.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE visual_consent_settings SET allow_shared_gallery = 1, allow_real_person_tagging = 0 WHERE soul_id = ?",
+        (soul_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    redacted_res = client.post(
+        "/api/v1/visual/memory-objects/compile",
+        json={
+            "event_id": "evt_phase11_redaction_01",
+            "event_title": "Redacted Tag Event",
+            "participants": [
+                {
+                    "soul_id": soul_id,
+                    "character_name": "Consent Warden",
+                    "portrait_version_id": portrait["version_id"],
+                    "role_in_event": "Focus",
+                    "real_person_tag_opt_in": True,
+                }
+            ],
+            "location_environment": "Salt archive atrium",
+            "relics_involved": ["Veiled Dial"],
+            "emotional_tone": "Measured",
+            "action_composition": "The warden seals a memory vault.",
+            "lasting_consequence": "Real-person tag data remains hidden.",
+            "privacy_consent_scope": "public_canon",
+        },
+    )
+    assert redacted_res.status_code == 200
+    memory_object = redacted_res.json()["memory_object"]
+    assert memory_object["participants"][0]["real_person_tag_opt_in"] is False
+    assert "missing consent" in memory_object["importance_rationale"].lower()
 
 
 def test_phase_10_portrait_candidate_generation_and_continuity_workflow():
