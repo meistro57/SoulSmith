@@ -403,6 +403,7 @@ Key Features Built:
 12. **Soul Constellation Engine**: Multi-Aspect identity management across eras, shared Deep Threads, Constellation Anchors, Cross-Aspect Bonds (scars, promises, memory echoes), and interactive Awakening Stage progression (*Veiled → Echoing → Recognizing → Resonant → Woven → Lucid*).
 13. **Probable Paths Engine**: Automatic persistence of unchosen approaches, probability branch tracking, manifestation state transitions (*Dreams, Rumors, Alternate Scenes, Echo Aspects*), and interactive "What-If" scene simulations while preserving canonical event integrity.
 14. **User Authentication & Token System**: Full user registration, password hashing (`bcrypt`), JWT token generation/validation, profile retrieval (`/api/v1/auth/me`), local storage token management, and custom authentication header badge in the frontend UI.
+15. **Relic Recognition Engine & Ledger**: Narrative-driven relic attunement based on Chronicle evidence, full 6-stage lifecycle management (*Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured*), evocative dormant question prompts, overdraw strain/fracture mechanics, narrative fracture repair, and cross-Aspect Constellation Anchors.
 
 ---
 

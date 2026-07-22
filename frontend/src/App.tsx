@@ -14,12 +14,13 @@ import { CuriosityView } from './components/CuriosityView';
 import { MythicGalleryView } from './components/MythicGalleryView';
 import { ConstellationView } from './components/ConstellationView';
 import { ProbablePathsView } from './components/ProbablePathsView';
+import { RelicLedgerView } from './components/RelicLedgerView';
 import { AuthModal } from './components/AuthModal';
 
 import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -51,11 +52,15 @@ export function App() {
     },
     relics: [
       {
-        id: '1',
+        id: 'relic_compass_01',
+        soul_id: 'Kaelen the Star-Watcher',
         name: 'Compass of Better Questions',
         stage: 'Awakened',
         effect: 'Allows shifting one Domain face to Omen once per session.',
-        overdraw_consequence: 'Reveals an unwanted secret to the Foe.'
+        overdraw_consequence: 'Reveals an unwanted secret to the Foe.',
+        evocative_question: 'What question must be asked before the Weeping Door will yield?',
+        cross_aspect_forms: { 'Ancient Era': 'Astro-Chronometer' },
+        is_anchor: true,
       }
     ],
     bonds: ['Friend of the Silent Archivist', 'Bound to the Salt Bell'],
@@ -228,6 +233,7 @@ export function App() {
               { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'constellation', label: 'Constellation', icon: Sparkles },
+              { id: 'relics', label: 'Relics', icon: Shield },
               { id: 'curiosity', label: 'Curiosity Engine', icon: Compass },
               { id: 'paths', label: 'Probable Paths', icon: GitBranch },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
@@ -464,6 +470,8 @@ export function App() {
             onSelectAspect={(name) => setSoulSheet((s) => ({ ...s, name }))}
           />
         )}
+
+        {activeTab === 'relics' && <RelicLedgerView soulName={soulSheet.name} />}
 
         {activeTab === 'curiosity' && <CuriosityView soulName={soulSheet.name} />}
 

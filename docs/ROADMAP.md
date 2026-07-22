@@ -446,7 +446,7 @@ The campaign must support alternate pacing. These acts are a narrative scaffold,
 - Branches remain legible and reversible.
 - Probability mechanics deepen agency instead of trivializing consequence.
 
-### Phase 6: Relic Recognition
+### Phase 6: Relic Recognition (Completed)
 
 - Convert relic progression to narrative conditions and Chronicle evidence.
 - Add Constellation Anchor behavior.

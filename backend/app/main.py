@@ -42,7 +42,9 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_or_create_primary_constellation,
+    get_or_create_relics_records,
     get_probable_paths_records,
+    get_relic_history_records,
     get_user_by_email,
     get_user_by_username,
     init_database,
@@ -52,6 +54,15 @@ from app.db import (
     resolve_open_question,
     update_awakening_stage_record,
     update_probable_path_manifestation,
+    update_relic_stage_record,
+)
+from app.relics import (
+    RelicEventModel,
+    RelicModel,
+    RelicNarrativeAttuneRequest,
+    RelicOverdrawRequest,
+    RelicRepairRequest,
+    RelicTransfigureRequest,
 )
 from app.probable_paths import (
     CreateProbablePathRequest,
@@ -448,6 +459,139 @@ def explore_probable_path(req: ExploreAlternateSceneRequest):
     path_model = ProbablePathModel(**matched)
     result = simulate_alternate_scene_exploration(path_model, req.soul_name)
     return {"alternate_scene": result}
+
+
+# Relic Recognition API Endpoints
+
+
+@app.get("/api/v1/relics")
+def list_relics(soul_id: str = "Kaelen the Star-Watcher"):
+    records = get_or_create_relics_records(soul_id=soul_id)
+    return {"relics": [RelicModel(**r) for r in records]}
+
+
+@app.get("/api/v1/relics/{relic_id}/history")
+def get_relic_history(relic_id: str):
+    records = get_relic_history_records(relic_id=relic_id)
+    return {"history": [RelicEventModel(**r) for r in records]}
+
+
+@app.post("/api/v1/relics/attune-narrative")
+def attune_relic_narrative(req: RelicNarrativeAttuneRequest):
+    relics = get_or_create_relics_records(soul_id=req.soul_id)
+    target = next((r for r in relics if r["id"] == req.relic_id), None)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+
+    current_stage = target["stage"]
+    if current_stage == "Dormant":
+        next_stage = "Remembered"
+    elif current_stage == "Remembered":
+        next_stage = "Awakened"
+    else:
+        next_stage = "Awakened"
+
+    result = update_relic_stage_record(
+        relic_id=req.relic_id,
+        soul_id=req.soul_id,
+        action="attune",
+        new_stage=next_stage,
+        narrative_condition_met=req.narrative_condition_met,
+        chronicle_evidence_summary=req.chronicle_evidence_summary,
+    )
+    return {
+        "relic": RelicModel(**result["relic"]),
+        "relic_event": RelicEventModel(**result["relic_event"]),
+    }
+
+
+@app.post("/api/v1/relics/overdraw")
+def overdraw_relic(req: RelicOverdrawRequest):
+    relics = get_or_create_relics_records(soul_id=req.soul_id)
+    target = next((r for r in relics if r["id"] == req.relic_id), None)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+
+    current_stage = target["stage"]
+    if current_stage == "Overdrawn":
+        new_stage = "Fractured"
+        action = "fracture"
+        cond = "Overdrawn power pushed past structural resonance limit."
+        evidence = "The relic's vessel shattered into splintered glints."
+        effect = "FRACTURED: Relic capability disabled until narrative repair condition is met."
+    else:
+        new_stage = "Overdrawn"
+        action = "overdraw"
+        cond = f"Channeled overdrawn power: {req.intensity_boost}."
+        evidence = "Soulkeeper accepts +1 Glitch Strain to force acute ascendancy."
+        effect = f"OVERDRAWN: {req.intensity_boost}. Channelling adds +1 Strain per encounter."
+
+    result = update_relic_stage_record(
+        relic_id=req.relic_id,
+        soul_id=req.soul_id,
+        action=action,
+        new_stage=new_stage,
+        narrative_condition_met=cond,
+        chronicle_evidence_summary=evidence,
+        new_effect=effect,
+    )
+    return {
+        "relic": RelicModel(**result["relic"]),
+        "relic_event": RelicEventModel(**result["relic_event"]),
+    }
+
+
+@app.post("/api/v1/relics/repair")
+def repair_relic(req: RelicRepairRequest):
+    relics = get_or_create_relics_records(soul_id=req.soul_id)
+    target = next((r for r in relics if r["id"] == req.relic_id), None)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+
+    if target["stage"] != "Fractured":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Relic is not in Fractured state",
+        )
+
+    restored_effect = "Repaired and cleansed of glitch strain. Fully Awakened."
+    result = update_relic_stage_record(
+        relic_id=req.relic_id,
+        soul_id=req.soul_id,
+        action="repair",
+        new_stage="Awakened",
+        narrative_condition_met="Narrative repair condition fulfilled via Chronicle evidence.",
+        chronicle_evidence_summary=req.repair_evidence_summary,
+        new_effect=restored_effect,
+    )
+    return {
+        "relic": RelicModel(**result["relic"]),
+        "relic_event": RelicEventModel(**result["relic_event"]),
+    }
+
+
+@app.post("/api/v1/relics/transfigure")
+def transfigure_relic(req: RelicTransfigureRequest):
+    relics = get_or_create_relics_records(soul_id=req.soul_id)
+    target = next((r for r in relics if r["id"] == req.relic_id), None)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relic not found")
+
+    transfigured_effect = f"TRANSFIGURED ANCHOR ({req.transfigured_form}): Permanently bridges Constellation Aspects and alters world canon."
+    result = update_relic_stage_record(
+        relic_id=req.relic_id,
+        soul_id=req.soul_id,
+        action="transfigure",
+        new_stage="Transfigured",
+        narrative_condition_met=f"Transfigured as Constellation Anchor: '{req.anchor_name}'.",
+        chronicle_evidence_summary=f"Transfigured into mythic form '{req.transfigured_form}' across eras.",
+        new_effect=transfigured_effect,
+        is_anchor=True,
+    )
+    return {
+        "relic": RelicModel(**result["relic"]),
+        "relic_event": RelicEventModel(**result["relic_event"]),
+    }
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

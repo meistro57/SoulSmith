@@ -1,10 +1,62 @@
+# backend/app/relics.py
 """
-SoulSmith Relic Attunement & Evolution Engine
+SoulSmith Phase 6: Relic Recognition Engine
+Relic progression driven by narrative conditions and Chronicle evidence.
 """
 
-from pydantic import BaseModel
+from __future__ import annotations
+
+from typing import Dict, List, Literal, Optional
+from pydantic import BaseModel, Field
+
+RelicStage = Literal[
+    "Dormant",
+    "Remembered",
+    "Awakened",
+    "Overdrawn",
+    "Fractured",
+    "Transfigured",
+]
+
+RELIC_STAGES_ORDER: List[RelicStage] = [
+    "Dormant",
+    "Remembered",
+    "Awakened",
+    "Overdrawn",
+    "Fractured",
+    "Transfigured",
+]
 
 
+class RelicModel(BaseModel):
+    id: str
+    soul_id: str
+    constellation_id: Optional[str] = None
+    name: str
+    stage: RelicStage = "Dormant"
+    effect: str
+    overdraw_consequence: str
+    evocative_question: str
+    required_thread_type: Optional[str] = None
+    cross_aspect_forms: Dict[str, str] = Field(default_factory=dict)
+    is_anchor: bool = False
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class RelicEventModel(BaseModel):
+    id: str
+    relic_id: str
+    soul_id: str
+    action: str  # attune | overdraw | fracture | repair | transfigure
+    previous_stage: str
+    new_stage: str
+    narrative_condition_met: str
+    chronicle_evidence_summary: str
+    created_at: Optional[str] = None
+
+
+# Deprecated simple request format maintained for backward compatibility
 class RelicAttuneRequest(BaseModel):
     relic_id: str
     relic_name: str
@@ -20,27 +72,47 @@ class RelicAttuneResponse(BaseModel):
     canon_note: str
 
 
-RELIC_STAGES = [
-    "Dormant",
-    "Remembered",
-    "Awakened",
-    "Overdrawn",
-    "Fractured",
-    "Transfigured",
-]
+# Phase 6 Narrative-Driven Relic Request Schemas
 
 
+class RelicNarrativeAttuneRequest(BaseModel):
+    relic_id: str
+    soul_id: str = "Kaelen the Star-Watcher"
+    narrative_condition_met: str
+    chronicle_evidence_summary: str
+
+
+class RelicOverdrawRequest(BaseModel):
+    relic_id: str
+    soul_id: str = "Kaelen the Star-Watcher"
+    intensity_boost: str = "Ascendancy Score +1"
+
+
+class RelicRepairRequest(BaseModel):
+    relic_id: str
+    soul_id: str = "Kaelen the Star-Watcher"
+    repair_evidence_summary: str
+
+
+class RelicTransfigureRequest(BaseModel):
+    relic_id: str
+    soul_id: str = "Kaelen the Star-Watcher"
+    anchor_name: str
+    transfigured_form: str
+
+
+# Legacy processor
 def process_relic_attunement(req: RelicAttuneRequest) -> RelicAttuneResponse:
     curr_idx = (
-        RELIC_STAGES.index(req.current_stage)
-        if req.current_stage in RELIC_STAGES
+        RELIC_STAGES_ORDER.index(req.current_stage)
+        if req.current_stage in RELIC_STAGES_ORDER
         else 0
     )
 
     strain_penalty = 0
     if req.action == "attune":
-        new_idx = min(len(RELIC_STAGES) - 1, curr_idx + 1)
-        new_stage = RELIC_STAGES[new_idx]
+        new_idx = min(len(RELIC_STAGES_ORDER) - 1, curr_idx + 1)
+        new_stage = RELIC_STAGES_ORDER[new_idx]
         effect = f"Gains active move: Can substitute one [{new_stage}] Domain face per session."
         note = f"Relic [{req.relic_name}] attuned to stage [{new_stage}]."
     elif req.action == "overdraw":

@@ -54,10 +54,14 @@ export const SoulSheetView: React.FC<SoulSheetViewProps> = ({ sheet, onUpdateShe
   const handleEquipPresetRelic = (preset: typeof PRESET_RELICS[0]) => {
     const created: Relic = {
       id: Date.now().toString(),
+      soul_id: sheet.name,
       name: preset.name,
       stage: 'Awakened',
       effect: preset.effect,
-      overdraw_consequence: 'Adds +1 automatic Strain upon overdraw.'
+      overdraw_consequence: 'Adds +1 automatic Strain upon overdraw.',
+      evocative_question: 'What secret does this relic remember?',
+      cross_aspect_forms: {},
+      is_anchor: false,
     };
     onUpdateSheet({
       ...sheet,
@@ -69,10 +73,14 @@ export const SoulSheetView: React.FC<SoulSheetViewProps> = ({ sheet, onUpdateShe
     if (!newRelicName.trim()) return;
     const created: Relic = {
       id: Date.now().toString(),
+      soul_id: sheet.name,
       name: newRelicName.trim(),
       stage: 'Dormant',
       effect: 'Grants passive story alignment reroll on favored Domains.',
-      overdraw_consequence: 'Adds +1 automatic Strain upon overdraw.'
+      overdraw_consequence: 'Adds +1 automatic Strain upon overdraw.',
+      evocative_question: 'What secret does this relic remember?',
+      cross_aspect_forms: {},
+      is_anchor: false,
     };
     onUpdateSheet({
       ...sheet,

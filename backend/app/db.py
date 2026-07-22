@@ -224,6 +224,36 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relics (
+            id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            constellation_id TEXT,
+            name TEXT NOT NULL,
+            stage TEXT NOT NULL DEFAULT 'Dormant',
+            effect TEXT NOT NULL,
+            overdraw_consequence TEXT NOT NULL,
+            evocative_question TEXT NOT NULL,
+            required_thread_type TEXT,
+            cross_aspect_forms_json TEXT NOT NULL DEFAULT '{}',
+            is_anchor INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relic_events (
+            id TEXT PRIMARY KEY,
+            relic_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            previous_stage TEXT NOT NULL,
+            new_stage TEXT NOT NULL,
+            narrative_condition_met TEXT NOT NULL,
+            chronicle_evidence_summary TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -1117,6 +1147,241 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         "display_name": row["display_name"],
         "created_at": row["created_at"],
     }
+
+
+# Relic Recognition Database Helpers
+
+
+def get_or_create_relics_records(soul_id: str = "Kaelen the Star-Watcher") -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) as cnt FROM relics WHERE soul_id = ? OR soul_id = 'Unbound Soul'", (soul_id,))
+    if cursor.fetchone()["cnt"] == 0:
+        _seed_default_relics(conn, soul_id)
+
+    cursor.execute(
+        "SELECT * FROM relics WHERE soul_id = ? OR soul_id = 'Unbound Soul' ORDER BY created_at ASC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "soul_id": r["soul_id"],
+            "constellation_id": r["constellation_id"],
+            "name": r["name"],
+            "stage": r["stage"],
+            "effect": r["effect"],
+            "overdraw_consequence": r["overdraw_consequence"],
+            "evocative_question": r["evocative_question"],
+            "required_thread_type": r["required_thread_type"],
+            "cross_aspect_forms": _json_or_none(r["cross_aspect_forms_json"]) or {},
+            "is_anchor": bool(r["is_anchor"]),
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+        }
+        for r in rows
+    ]
+
+
+def get_relic_history_records(relic_id: str) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM relic_events WHERE relic_id = ? ORDER BY created_at DESC", (relic_id,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r["id"],
+            "relic_id": r["relic_id"],
+            "soul_id": r["soul_id"],
+            "action": r["action"],
+            "previous_stage": r["previous_stage"],
+            "new_stage": r["new_stage"],
+            "narrative_condition_met": r["narrative_condition_met"],
+            "chronicle_evidence_summary": r["chronicle_evidence_summary"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def update_relic_stage_record(
+    *,
+    relic_id: str,
+    soul_id: str,
+    action: str,
+    new_stage: str,
+    narrative_condition_met: str,
+    chronicle_evidence_summary: str,
+    new_effect: Optional[str] = None,
+    is_anchor: Optional[bool] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM relics WHERE id = ?", (relic_id,))
+    relic_row = cursor.fetchone()
+    if not relic_row:
+        conn.close()
+        raise ValueError("Relic not found")
+
+    previous_stage = relic_row["stage"]
+
+    if new_effect:
+        cursor.execute(
+            "UPDATE relics SET stage = ?, effect = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_stage, new_effect, relic_id),
+        )
+    else:
+        cursor.execute(
+            "UPDATE relics SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_stage, relic_id),
+        )
+
+    if is_anchor is not None:
+        cursor.execute(
+            "UPDATE relics SET is_anchor = ? WHERE id = ?",
+            (1 if is_anchor else 0, relic_id),
+        )
+
+    event_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO relic_events (
+            id, relic_id, soul_id, action, previous_stage, new_stage,
+            narrative_condition_met, chronicle_evidence_summary
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            event_id,
+            relic_id,
+            soul_id,
+            action,
+            previous_stage,
+            new_stage,
+            narrative_condition_met,
+            chronicle_evidence_summary,
+        ),
+    )
+
+    conn.commit()
+
+    cursor.execute("SELECT * FROM relics WHERE id = ?", (relic_id,))
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    return {
+        "relic": {
+            "id": updated_row["id"],
+            "soul_id": updated_row["soul_id"],
+            "constellation_id": updated_row["constellation_id"],
+            "name": updated_row["name"],
+            "stage": updated_row["stage"],
+            "effect": updated_row["effect"],
+            "overdraw_consequence": updated_row["overdraw_consequence"],
+            "evocative_question": updated_row["evocative_question"],
+            "required_thread_type": updated_row["required_thread_type"],
+            "cross_aspect_forms": _json_or_none(updated_row["cross_aspect_forms_json"]) or {},
+            "is_anchor": bool(updated_row["is_anchor"]),
+            "created_at": updated_row["created_at"],
+            "updated_at": updated_row["updated_at"],
+        },
+        "relic_event": {
+            "id": event_id,
+            "relic_id": relic_id,
+            "soul_id": soul_id,
+            "action": action,
+            "previous_stage": previous_stage,
+            "new_stage": new_stage,
+            "narrative_condition_met": narrative_condition_met,
+            "chronicle_evidence_summary": chronicle_evidence_summary,
+        },
+    }
+
+
+def _seed_default_relics(conn: sqlite3.Connection, soul_id: str) -> None:
+    cursor = conn.cursor()
+    soul_slug = soul_id.lower().replace(" ", "_").replace("-", "_")
+    seeds = [
+        (
+            f"relic_compass_{soul_slug}",
+            soul_id,
+            "const_01",
+            "Compass of Better Questions",
+            "Awakened",
+            "Allows shifting one Domain face to Omen once per session.",
+            "Reveals an unwanted secret to the Foe.",
+            "What question must be asked before the Weeping Door will yield?",
+            "Memory",
+            json.dumps({"Ancient Era": "Astro-Chronometer", "Future Era": "Resonance Dial"}),
+            1,
+        ),
+        (
+            f"relic_bell_{soul_slug}",
+            soul_id,
+            "const_01",
+            "Salt Bell of Cinder",
+            "Remembered",
+            "Resonates when an Echo Thread is within three steps.",
+            "Summons the memory of the Flooded Archives.",
+            "Who tolled the bell backwards when the Starforge fell?",
+            "Bond",
+            json.dumps({"Ancient Era": "Sun-Chime", "Future Era": "Frequency Anchor"}),
+            0,
+        ),
+        (
+            f"relic_lantern_{soul_slug}",
+            soul_id,
+            None,
+            "Lantern of Forgotten Suns",
+            "Dormant",
+            "Illuminates hidden Veils and reveals unseen motives.",
+            "Blinds the bearer's vision to physical surroundings for one beat.",
+            "What light burned when the King Without a Reflection crossed the threshold?",
+            "Mark",
+            json.dumps({"Ancient Era": "Sol Prism", "Future Era": "Starlight Beacon"}),
+            0,
+        ),
+    ]
+
+    for item in seeds:
+        cursor.execute(
+            """
+            INSERT INTO relics (
+                id, soul_id, constellation_id, name, stage, effect,
+                overdraw_consequence, evocative_question, required_thread_type,
+                cross_aspect_forms_json, is_anchor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            item,
+        )
+        # Add initial event
+        cursor.execute(
+            """
+            INSERT INTO relic_events (
+                id, relic_id, soul_id, action, previous_stage, new_stage,
+                narrative_condition_met, chronicle_evidence_summary
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                str(uuid.uuid4()),
+                item[0],
+                soul_id,
+                "attune",
+                "Dormant",
+                item[4],
+                "Initial mythic discovery in the chronicle.",
+                f"Relic '{item[3]}' discovered during expedition.",
+            ),
+        )
+
+    conn.commit()
+
 
 
 

@@ -137,6 +137,36 @@ export interface AuthResponse {
   user: User;
 }
 
+export type RelicStage = 'Dormant' | 'Remembered' | 'Awakened' | 'Overdrawn' | 'Fractured' | 'Transfigured';
+
+export interface Relic {
+  id: string;
+  soul_id: string;
+  constellation_id?: string;
+  name: string;
+  stage: RelicStage;
+  effect: string;
+  overdraw_consequence: string;
+  evocative_question: string;
+  required_thread_type?: string;
+  cross_aspect_forms: Record<string, string>;
+  is_anchor: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RelicEvent {
+  id: string;
+  relic_id: string;
+  soul_id: string;
+  action: string;
+  previous_stage: RelicStage;
+  new_stage: RelicStage;
+  narrative_condition_met: string;
+  chronicle_evidence_summary: string;
+  created_at?: string;
+}
+
 export interface AlternateSceneResult {
   path_id: string;
   path_title: string;

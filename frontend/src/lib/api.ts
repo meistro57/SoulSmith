@@ -1,4 +1,4 @@
-import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
+import type { AlternateSceneResult, Aspect, AuthResponse, AwakeningStage, CanonicalDiceRead, Constellation, ConstellationStageInfo, CrossAspectBond, EncounterFrame, IntegrationEvent, LocalThread, ManifestationType, NumericDiceRoll, OpenQuestion, ProbablePath, ProbablePathStatus, Relic, RelicEvent, ResolvedScene, Seed, SoulResources, SoulprintProfile, User } from '../types';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
@@ -71,4 +71,12 @@ export const apiClient = {
   logProbablePath: (payload: { soul_id: string; path_title: string; chosen_path: string; unchosen_approach: string; potential_outcome_class?: string; manifestation_type?: ManifestationType; provenance_summary?: string }) => request<{ probable_path: ProbablePath }>('/api/v1/probable-paths/log', { method: 'POST', body: JSON.stringify(payload) }),
   manifestProbablePath: (payload: { path_id: string; manifestation_type: ManifestationType; status?: ProbablePathStatus }) => request<{ probable_path: ProbablePath }>('/api/v1/probable-paths/manifest', { method: 'POST', body: JSON.stringify(payload) }),
   exploreProbablePath: (payload: { path_id: string; soul_name: string }) => request<{ alternate_scene: AlternateSceneResult }>('/api/v1/probable-paths/explore', { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Relic Recognition
+  listRelics: (soulId = 'Kaelen the Star-Watcher') => request<{ relics: Relic[] }>(`/api/v1/relics?soul_id=${encodeURIComponent(soulId)}`),
+  getRelicHistory: (relicId: string) => request<{ history: RelicEvent[] }>(`/api/v1/relics/${relicId}/history`),
+  attuneRelicNarrative: (payload: { relic_id: string; soul_id?: string; narrative_condition_met: string; chronicle_evidence_summary: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/attune-narrative', { method: 'POST', body: JSON.stringify(payload) }),
+  overdrawRelic: (payload: { relic_id: string; soul_id?: string; intensity_boost?: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/overdraw', { method: 'POST', body: JSON.stringify(payload) }),
+  repairRelic: (payload: { relic_id: string; soul_id?: string; repair_evidence_summary: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/repair', { method: 'POST', body: JSON.stringify(payload) }),
+  transfigureRelic: (payload: { relic_id: string; soul_id?: string; anchor_name: string; transfigured_form: string }) => request<{ relic: Relic; relic_event: RelicEvent }>('/api/v1/relics/transfigure', { method: 'POST', body: JSON.stringify(payload) }),
 };
