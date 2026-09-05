@@ -191,7 +191,7 @@ class CreatePortraitCandidateRequest(BaseModel):
 
 
 class GenerateCandidateRequest(BaseModel):
-    provider_type: Optional[str] = None  # mock or external
+    provider_type: Optional[str] = None  # mock, external, or comfyui
     seed: Optional[int] = None
 
 

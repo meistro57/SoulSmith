@@ -1,0 +1,181 @@
+# AGENTS.md — SoulSmith
+
+SoulSmith is a collaborative storytelling RPG built around a **seven-dice grammar**: seven numeric dice faces form the immutable roll record, a versioned grammar derives symbolic meaning, and the Soulkeeper AI (currently a deterministic stub) weaves encounters, persistent canon, relics, and multiplayer convergence into a "living mythology."
+
+The repo is a monorepo with a **FastAPI backend**, a **React/Vite/Three.js frontend**, SQLite persistence, and no build orchestration beyond per-package commands (no Makefile, no Docker).
+
+---
+
+## Repo layout
+
+- `backend/` — FastAPI (Python 3.12) + Pydantic v2 + SQLite (stdlib `sqlite3`). All logic lives here.
+  - `backend/app/` — application code (one module per engine subsystem, all routes in `main.py`).
+  - `backend/tests/` — pytest suite.
+- `frontend/` — React 19 + Vite + TypeScript + Tailwind 4 + Three.js (`@react-three/fiber`/`drei`) + `oxlint`.
+  - `frontend/src/lib/api.ts` — single typed API client.
+  - `frontend/src/types.ts` — single source of frontend type definitions.
+  - `frontend/src/components/` — one component per feature view.
+  - `frontend/src/three/` — the 3D dice renderer modules.
+- `docs/` — design docs. `ROLL_CONTRACT.md`, `DICE_RENDERING_SYSTEM.md`, `IMPLEMENTATION_AUDIT.md`, and `ROADMAP.md` are the important ones.
+- `art/` — STL dice files and source image assets (not served by the app; static assets are duplicated under `frontend/public/art/`).
+- `.agent/skills/` and `.gemini/skills/` — **agent skill definitions** (Three.js procedural techniques, etc.). These are context for AI agents, *not* runtime app code. Do not confuse them with app source.
+- `soulsmith.md` — a long AI-generated architecture/design brief. Useful background, but the authoritative contract is `docs/ROLL_CONTRACT.md`.
+
+---
+
+## Commands
+
+### Backend (run from `backend/`)
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+uvicorn app.main:app --reload          # http://localhost:8000
+```
+
+```bash
+python -m pytest                        # run tests
+ruff check .                            # lint
+ruff format --check .                   # format check (no auto-format step)
+```
+
+### Frontend (run from `frontend/`)
+
+```bash
+npm ci
+npm run dev                             # http://localhost:5173
+```
+
+```bash
+npm run lint        # oxlint
+npm run typecheck   # tsc -b --noEmit
+npm run test        # NOT a real test runner — see "Testing" below
+npm run build       # tsc -b && vite build
+```
+
+### CI parity
+
+`.github/workflows/` pins these versions: **Python 3.12** (backend) and **Node 22** (frontend). Backend CI runs `ruff check`, `ruff format --check`, then `pytest --cov`. Frontend CI runs `lint`, `typecheck`, `test`, `build` in that order. `security.yml` runs `pip-audit` (severity high) and `npm audit`.
+
+---
+
+## Architecture and data flow
+
+### Backend module map (`backend/app/`)
+
+| Module | Responsibility |
+|---|---|
+| `main.py` | The FastAPI app. **Every route is defined here.** Also holds `RoomManager` for the WebSocket convergence endpoint. |
+| `db.py` | SQLite storage abstraction. All persistence functions live here; returns plain dicts (via `sqlite3.Row`). Schema is created on first connection. |
+| `grammar.py` | Canonical numeric roll contract + versioned grammar registry (`CURRENT_GRAMMAR_VERSION = "1.0.0"`). |
+| `rules.py` | Deterministic scene outcome engine (4 outcome classes). |
+| `encounters.py` | Encounter framing (`POST /api/v1/encounters/frame`). |
+| `soulkeeper.py` | Soulkeeper narration + 5-Gate Canon Guardian audit. **Simulated/template prose** (no LLM call). |
+| `soulprint.py` | Astrological soulprint generation (simulated). |
+| `phenomena.py` | Phenomena codex (Echoes, Knots, Veils, Wells, Awakenings, etc.). |
+| `relics.py` | Relic lifecycle: Dormant → Remembered → Awakened → Overdrawn → Fractured → Transfigured. |
+| `curiosity.py` | Seeds, open questions, local threads, integration events. |
+| `constellation.py` | Multi-Aspect identity, bonds, anchors, awakening stages. |
+| `probable_paths.py` | Unchosen-path persistence and "what-if" scene simulation. |
+| `convergence.py` | Multiplayer gatherings, community symbols, canon merge/fork. |
+| `reflection.py` | Reflection sessions, private notes, player preferences/accessibility. |
+| `visual_memory.py` | Avatar identity, story marks, memory objects, portrait models. |
+| `portrait_compiler.py` | Deterministic portrait prompt compilation (sectioned into identity / changes / preserve / must-not-invent / framing). |
+| `portrait_provider.py` | Image provider abstraction (`mock`, `external` scaffold, `comfyui`). |
+| `portrait_reference.py` | Resolves `source_portrait_version_id` → a canonical `PortraitVersion`, enforcing soul ownership and existence. |
+| `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
+| `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
+| `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
+
+### Core game loop
+
+```
+Roll (digital /dice/roll, manual /dice/interpret, camera /dice/photo-ingest)
+  → numeric faces (validated by Pydantic)
+  → versioned grammar → symbolic interpretation
+  → encounter frame (/encounters/frame)
+  → player intent + approach + Resonance/Strain spend
+  → /scenes/resolve → deterministic outcome + narration
+  → Chronicle event logged (scene_events)
+     + auto-plants a Curiosity seed + auto-logs a Probable Path
+```
+
+All REST endpoints are under `/api/v1/`. The one WebSocket endpoint is `/ws/v1/convergence/{room_id}`.
+
+### Persistence
+
+SQLite only, via stdlib `sqlite3`. DB file defaults to `backend/soulsmith_canonical.db`, overridable with the `SOULSMITH_DB_FILE` env var. `db.py` runs `CREATE TABLE IF NOT EXISTS` plus an `_add_column_if_missing` helper — **new columns are appended via this helper, there is no migration framework**. The README and `soulsmith.md` describe Postgres/Qdrant/OpenRouter as the production plan; none of that is wired in (no DB driver in `requirements.txt`).
+
+---
+
+## The canonical roll contract (critical)
+
+This is the single most important rule in the codebase:
+
+- **Numeric dice faces are immutable source of truth.** Symbolic meaning is *derived* through a named grammar version.
+- The seven dice are `d20`, `d12`, `d10`, `percentile`, `d8`, `d6`, `d4`. Validation is in `NumericDiceRoll` (`grammar.py`).
+- Never let frontend, narration, or any downstream code overwrite the raw numeric values.
+- The `VersionedGrammar` model validates that every die face (1..N) is covered by exactly one mapping — adding a grammar must cover all faces or model validation fails.
+- The d4 `Thread` vocabulary is intentionally exactly four faces: **Bond, Memory, Mark, Prophecy**. `Portal` and `Debt` are reserved for future Chronicle consequences, not primary d4 faces.
+- Full schema/lifecycle is documented in `docs/ROLL_CONTRACT.md`.
+
+---
+
+## Key patterns and conventions
+
+- **Pydantic v2 everywhere.** Use `model_dump()` (never `.dict()`). Request/response models are defined in the domain modules and imported into `main.py`.
+- **Adding an endpoint** means touching three places: the route in `main.py`, the model/function in the relevant domain module, and the persistence function in `db.py`.
+- **Python files** start with `from __future__ import annotations`. Docstrings at the top of each module.
+- **DB functions return dicts** (via `sqlite3.Row`), and are rehydrated into Pydantic models with `Model(**record)` at the route layer.
+- **Frontend types** (`src/types.ts`) are a hand-maintained mirror of the backend Pydantic models. When you change a backend model, update `types.ts` and the matching `apiClient` method in `src/lib/api.ts`.
+- **`apiClient`** in `src/lib/api.ts` is the only place HTTP calls are made. It attaches the Bearer token from `localStorage` and normalizes the base URL.
+- **3D renderer** (`DiceRoller3D.tsx` + `src/three/*`) rebuilds the scene when material/quality settings change and **must dispose all WebGL resources** via `disposeSceneResources.ts` on teardown. See `docs/DICE_RENDERING_SYSTEM.md` for the full renderer contract.
+
+---
+
+## Gotchas (non-obvious, save yourself the trial-and-error)
+
+1. **`npm run test` is not a unit test runner.** It executes `node scripts/run-tests.mjs`, which regex-asserts against the *source text* of `types.ts`, `api.ts`, `diceQualityProfiles.ts`, `resonanceEffects.ts`, `diceMotion.ts`, and `prepareDiceGeometry.ts`. Renaming a symbol or rewording a string can break "tests" with no real coverage. If you change those files, update the assertions in `run-tests.mjs`.
+
+2. **The "AI" is stubbed, except portrait rendering.** `soulkeeper.py` narration is deterministic template prose; `vision.py` dice recognition returns random simulated reads. Portrait generation has a real integration: `SOULSMITH_IMAGE_PROVIDER=comfyui` routes through `backend/app/comfyui/` to a local ComfyUI instance; the `mock` provider is the default and the `external` provider is an unconfigured scaffold. Don't assume the text/vision modules reach a network.
+
+3. **Most game endpoints are not authenticated.** Only `/api/v1/auth/*` and `/api/v1/auth/me` enforce JWT auth. The rest accept `soul_id`/`soul_name` as a query or body param, with hard-coded demo defaults like `"Kaelen the Star-Watcher"` and `"Unbound Soul"`. This is demo-state; do not assume JWT identity propagates into game state.
+
+4. **Backend test isolation is via monkeypatch, not a test DB config.** `tests/conftest.py` has an autouse fixture that sets `SOULSMITH_DB_FILE` to a temp path and clears `app.db._initialized_files`. When you add DB-backed tests, rely on this fixture; don't point at the real DB.
+
+5. **No migration framework.** Schema changes go in `db.py` `_run_init_schema` / `_add_column_if_missing`. Historical columns are appended lazily (e.g. `scene_events.raw_roll_json`, `grammar_version`, `player_intent`, `chosen_approach`, etc.).
+
+6. **Environment variables** (backend): `SOULSMITH_DB_FILE`, `SOULSMITH_JWT_SECRET` (default is a hardcoded dev value — override in production), `SOULSMITH_IMAGE_PROVIDER` (`mock`/`external`/`comfyui`), `SOULSMITH_IMAGE_PROVIDER_API_KEY`, plus the ComfyUI set — `COMFYUI_SERVER_URL`, `COMFYUI_PORTRAIT_INITIAL_WORKFLOW` (text-to-image), `COMFYUI_PORTRAIT_REFERENCE_WORKFLOW` (img2img continuity), `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` (0..1, maps to `denoise = 1 - strength`), `COMFYUI_TIMEOUT_SECONDS`, `COMFYUI_POLL_INTERVAL_SECONDS`, `SOULSMITH_ASSET_ROOT`. Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`).
+
+7. **CORS is wide open** (`allow_origins=["*"]` in `main.py`). This is intentional for local dev but relevant if you touch deployment.
+
+8. **`requirements.txt` has trailing blank lines** and deliberately contains only runtime deps (no DB driver, no AI SDK). Dev/test tooling lives in `requirements-dev.txt` (which includes `-r requirements.txt`).
+
+9. **Do not invent die semantics.** The grammar is fixed in `grammar.py`. The LLM/narration layer must receive the structured interpretation, not improvise its own meaning (this is called out explicitly in `soulsmith.md` and `docs/ROADMAP.md`).
+
+10. **Generated images are SoulSmith-owned.** `main.py` mounts `StaticFiles` at `/assets` (serving `SOULSMITH_ASSET_ROOT`, default `backend/assets/`). The ComfyUI provider copies PNGs into `backend/assets/portraits/candidates/` and stores `/assets/...` URLs, never ComfyUI `/view` URLs. The frontend resolves those relative paths against `API_BASE_URL` via `resolveAssetUrl` in `src/lib/api.ts`. The `mock`/`external` providers return `/assets/...` paths without writing files (pre-existing).
+
+11. **Workflow roles decide initial vs reference.** `comfyui/workflow_roles.py` maps generation types to roles: `initial` → `portrait_initial`; `story_mark_update`/`equipment_update`/`age_update`/`manual_regeneration` → `portrait_reference`. Continuity types *require* a source portrait and fail cleanly (they never silently fall back to text-to-image, which could change the character's identity). The `provider_model` field encodes the role (`soulsmith-comfyui-portrait-initial-v1` vs `...-reference-v1`) so you can tell which workflow produced a candidate.
+
+12. **Continuity is source-portrait-locked.** `portrait_reference.resolve_source_portrait` enforces that a `source_portrait_version_id` is a real, soul-owned, imaged `PortraitVersion`; it never substitutes a newer portrait for the one requested. Approving a candidate creates a *new* `PortraitVersion` and never mutates the referenced one, so historical versions and events referencing them stay intact. The reference-image technique is dependency-free img2img (`LoadImage` + `VAEEncode` + `KSampler` denoise); IPAdapter/FaceID are documented as an optional upgrade, not assumed to exist.
+
+13. **ComfyUI diagnostics** live at `GET /api/v1/visual-memory/providers/comfyui/status` (reachability, initial/reference workflow availability, output-storage writability).
+
+---
+
+## Testing approach
+
+- **Backend:** pytest. Tests import app modules directly and hit route functions (not necessarily via HTTP). One test file per engine subsystem. Use `Model(**record)` rehydration patterns in assertions. Run with `python -m pytest` from `backend/`.
+- **Frontend:** no real test framework. `npm run test` is the regex source-assertion script described above. Manual visual QA for the renderer is documented at the bottom of `docs/DICE_RENDERING_SYSTEM.md`.
+
+---
+
+## Where to look first
+
+- Canonical roll / grammar rules → `backend/app/grammar.py`, `docs/ROLL_CONTRACT.md`
+- Scene resolution rules → `backend/app/rules.py`
+- All API routes → `backend/app/main.py`
+- Persistence schema → `backend/app/db.py`
+- Frontend API surface → `frontend/src/lib/api.ts`, `frontend/src/types.ts`
+- 3D dice renderer → `frontend/src/three/`, `docs/DICE_RENDERING_SYSTEM.md`
+- Current design intent and roadmap → `docs/ROADMAP.md`

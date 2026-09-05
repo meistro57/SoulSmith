@@ -463,6 +463,82 @@ npm run test
 npm run build
 ```
 
+## Running with ComfyUI
+
+SoulSmith renders portrait candidates through a pluggable image provider. By default it uses the deterministic `mock` provider (no external service). To generate real images locally, point it at a running [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instance:
+
+```bash
+# 1. Start ComfyUI separately on port 8188 (outside this repo).
+
+# 2. Point SoulSmith at it.
+export SOULSMITH_IMAGE_PROVIDER=comfyui
+export COMFYUI_SERVER_URL=http://127.0.0.1:8188
+export COMFYUI_PORTRAIT_INITIAL_WORKFLOW=portrait_initial_v1_api.json
+export COMFYUI_PORTRAIT_REFERENCE_WORKFLOW=portrait_reference_v1_api.json
+export COMFYUI_PORTRAIT_REFERENCE_STRENGTH=0.75
+
+# 3. Start the backend.
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The Visual Memory "Synthesize Imagery" action then submits the compiled prompt to ComfyUI, polls for completion, copies the generated PNG into SoulSmith-owned storage, and returns a candidate `generated_image_url` for the existing Approve/Reject flow.
+
+### ComfyUI details
+
+- **Workflow files** live at `backend/app/comfyui/workflows/`. They must be ComfyUI **API-format** JSON (a top-level map of `node_id -> {class_type, inputs}`), not the default UI export (which carries `nodes`/`links` arrays). Two roles are bundled:
+  - `portrait_initial_v1_api.json` — plain text-to-image (no reference).
+  - `portrait_reference_v1_api.json` — reference image-to-image continuity (`LoadImage` → `VAEEncode` → `KSampler` with a `denoise` derived from reference strength → `VAEDecode` → `SaveImage`).
+- **Workflow roles** are selected centrally in `backend/app/comfyui/workflow_roles.py`: `initial` → `portrait_initial`; `story_mark_update` / `equipment_update` / `age_update` / `manual_regeneration` → `portrait_reference`. Continuity types *require* a source portrait and fail cleanly (never silently fall back to text-to-image).
+- **Node bindings** map SoulSmith concepts to workflow inputs and are declared in `backend/app/comfyui/workflow_binder.py`:
+  - Base `DEFAULT_PORTRAIT_BINDINGS`:
+    - `positive_prompt` -> node `6` `CLIPTextEncode.text`
+    - `negative_prompt` -> node `7` `CLIPTextEncode.text`
+    - `seed` -> node `10` `KSampler.seed`
+    - `filename_prefix` -> node `24` `SaveImage.filename_prefix`
+  - `REFERENCE_PORTRAIT_BINDINGS` add:
+    - `reference_image` -> node `11` `LoadImage.image` (uploaded reference filename)
+    - `denoise` -> node `10` `KSampler.denoise` (derived from `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` as `denoise = 1 - strength`)
+- **Reference-image continuity**: when a continuity candidate carries a `reference_image_url` (resolved from its `source_portrait_version_id` at creation), the provider uploads the approved historical portrait to ComfyUI (`/upload/image`) and binds it into the reference workflow. Files are resolved from `SOULSMITH_ASSET_ROOT` with path-traversal protection.
+- **Reference strength** (`COMFYUI_PORTRAIT_REFERENCE_STRENGTH`, `0..1`, default `0.75`) controls how strongly the reference is preserved; higher = closer to the source portrait. It maps to `KSampler.denoise = 1 - strength`.
+- **Diagnostics** are exposed at `GET /api/v1/visual-memory/providers/comfyui/status` (reachability, workflow availability, output-storage writability).
+- **Generated images** are saved to `backend/assets/portraits/candidates/` (configurable via `SOULSMITH_ASSET_ROOT`) and served by the backend at `/assets/...`. ComfyUI `/view` URLs are never stored as canonical image URLs.
+- **Switch back to mock mode** with `unset SOULSMITH_IMAGE_PROVIDER` (or set it to `mock`).
+
+### ComfyUI environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SOULSMITH_IMAGE_PROVIDER` | `mock` | Selects the provider (`mock`, `external`, or `comfyui`). |
+| `COMFYUI_SERVER_URL` | `http://127.0.0.1:8188` | ComfyUI server base URL. |
+| `COMFYUI_PORTRAIT_INITIAL_WORKFLOW` | `portrait_initial_v1_api.json` | Text-to-image workflow (resolved under `workflows/`) or absolute path. |
+| `COMFYUI_PORTRAIT_REFERENCE_WORKFLOW` | `portrait_reference_v1_api.json` | Reference img2img workflow for continuity generations. |
+| `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` | `0.75` | How strongly the reference is preserved (0..1); maps to `denoise = 1 - strength`. |
+| `COMFYUI_TIMEOUT_SECONDS` | `180` | Maximum time to wait for a generation. |
+| `COMFYUI_POLL_INTERVAL_SECONDS` | `1` | Delay between completion polls. |
+| `SOULSMITH_ASSET_ROOT` | `backend/assets` | SoulSmith-owned directory for generated images. |
+
+### Reference-image technique
+
+The bundled reference workflow uses a dependency-free **img2img** approach (`LoadImage` + `VAEEncode` + `KSampler` with `denoise < 1`), so it works on a stock ComfyUI install with no custom nodes. The checkpoint (`v1-5-pruned-emaonly.safetensors`) must exist in your `models/checkpoints/` directory, or you can export your own workflow and update the node bindings.
+
+For stronger identity preservation you may later swap in an IPAdapter / InstantID / FaceID workflow (which require custom nodes under `ComfyUI/custom_nodes/`). SoulSmith only cares that a generation *has* a reference portrait; the workflow owns the technique. Administrators install those custom nodes explicitly — the application never auto-installs them.
+
+## Character continuity
+
+SoulSmith keeps a character visually recognisable across time:
+
+```text
+Initial Portrait
+    → approve → PortraitVersion v1 (immutable)
+        → later generations reference v1 as visual guidance
+            → new candidate → approve → PortraitVersion v2
+```
+
+- **Continuity generations** (`story_mark_update`, `equipment_update`, `age_update`, `manual_regeneration`) require a `source_portrait_version_id` and render through the reference workflow, preserving facial structure, species, eyes, hair, and existing canonical marks while applying only the requested change.
+- **Historical integrity** is preserved: approving a candidate creates a *new* `PortraitVersion` and never mutates the referenced one, so `v1` remains independently retrievable and events referencing `v1` keep using it.
+- The compiled prompt is sectioned into `CANONICAL IDENTITY`, `CANONICAL CHANGES`, `MUST PRESERVE`, `MUST NOT INVENT`, and `ARTISTIC FRAMING`, with reinforced continuity instructions and negative constraints for reference generations.
+
 ## Canonical Roll Contract
 
 SoulSmith now treats the seven numeric dice faces as the immutable roll record. Symbolic values are derived through a versioned grammar and persisted alongside the raw values in the Chronicle. See [`docs/ROLL_CONTRACT.md`](docs/ROLL_CONTRACT.md) for schemas, workflows, compatibility policy, and the initial `1.0.0` vocabulary.

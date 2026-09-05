@@ -1,6 +1,7 @@
 // frontend/src/components/visual-memory/PortraitVersionCard.tsx
 import React from 'react';
 import type { PortraitVersion } from '../../types';
+import { resolveAssetUrl } from '../../lib/api';
 import { Camera } from 'lucide-react';
 
 interface PortraitVersionCardProps {
@@ -35,7 +36,7 @@ export const PortraitVersionCard: React.FC<PortraitVersionCardProps> = ({
 
       <div className="relative rounded-xl overflow-hidden border border-purple-500/30 bg-slate-950 aspect-square">
         <img
-          src={version.image_url}
+          src={resolveAssetUrl(version.image_url)}
           alt={version.label}
           className="w-full h-full object-cover"
           onError={(e) => {

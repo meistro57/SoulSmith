@@ -3,6 +3,19 @@ import type { AlternateSceneResult, Aspect, AuthResponse, AvatarIdentity, Awaken
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 const AUTH_TOKEN_KEY = 'soulsmith_auth_token';
 
+/**
+ * Resolve a SoulSmith-owned asset path (e.g. "/assets/portraits/candidates/x.png")
+ * against the backend origin so generated images load regardless of which origin
+ * serves the frontend. Absolute and data URLs are passed through unchanged.
+ */
+export function resolveAssetUrl(path: string | null | undefined): string {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) {
+    return path;
+  }
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 export function getStoredAuthToken(): string | null {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 }

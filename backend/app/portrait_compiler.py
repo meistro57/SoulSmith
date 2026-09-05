@@ -28,6 +28,31 @@ class PromptCompilationResult(BaseModel):
     compiled_prompt: str
 
 
+def _build_changes_text(
+    generation_type: str,
+    marks: List[StoryMarkModel],
+    equipment: EquipmentAppearanceModel,
+) -> str:
+    if generation_type == "story_mark_update":
+        if marks:
+            latest = marks[-1]
+            return (
+                f"Add the new canonical story mark: {latest.mark_type.replace('_', ' ')} "
+                f"on {latest.location.replace('_', ' ')}."
+            )
+        return "Add the newly canonical story mark without inventing additional marks."
+    if generation_type == "equipment_update":
+        return (
+            "Update equipment, clothing, and relic appearance to the canonical "
+            f"equipment state (armor: {equipment.armor}; clothing: {equipment.clothing})."
+        )
+    if generation_type == "age_update":
+        return "Age this same character forward while preserving facial identity."
+    if generation_type == "manual_regeneration":
+        return "Re-render the same canonical character state without altering identity or marks."
+    return "None. This is an initial portrait with no prior canonical changes."
+
+
 def compile_portrait_prompt(
     *,
     identity: AvatarIdentityModel,
@@ -40,7 +65,8 @@ def compile_portrait_prompt(
 ) -> PromptCompilationResult:
     """
     Deterministically compiles a canonical character state into a structured prompt object.
-    Separates canonical facts from artistic framing.
+    Separates canonical facts from artistic framing, and strengthens continuity
+    instructions when a reference portrait is supplied (continuity generations).
     """
     marks = story_marks or []
     equip = equipment or EquipmentAppearanceModel(soul_id=identity.soul_id)
@@ -75,6 +101,16 @@ def compile_portrait_prompt(
         "Do not alter character age unless explicitly requested in generation type",
         "Do not invent unrecorded scars, tattoos, burns, injuries, or uncanonical accessories",
     ]
+
+    is_reference = bool(reference_image_url) or generation_type != "initial"
+    if is_reference:
+        continuity_requirements.extend(
+            [
+                "Same character as the reference portrait: identical facial structure",
+                "Same identifying features (eyes, hair, species, build) as the reference portrait",
+                "Apply only the requested canonical changes; preserve everything else from the reference",
+            ]
+        )
 
     if reference_image_url:
         continuity_requirements.append(
@@ -113,6 +149,16 @@ def compile_portrait_prompt(
         "blurry details",
     ]
 
+    if is_reference:
+        negative_constraints.extend(
+            [
+                "different character than the reference portrait",
+                "altered facial structure",
+                "changed species, eye color, or hair color",
+                "invented marks, scars, or accessories",
+            ]
+        )
+
     # Assemble final compiled prompt deterministically
     marks_text = (
         f" Story Marks: {'; '.join(formatted_marks)}."
@@ -125,9 +171,16 @@ def compile_portrait_prompt(
         f"Relics: {', '.join(equip.relics) if equip.relics else 'None'}."
     )
 
+    changes_text = _build_changes_text(generation_type, marks, equip)
+    preserve_text = "; ".join(continuity_requirements)
+    must_not_text = "; ".join(negative_constraints)
+
     compiled_prompt = (
-        f"{subject_identity}{marks_text}{equip_text} "
-        f"Expression: {expression}. Style: {style}. {composition}. {lighting}."
+        f"CANONICAL IDENTITY: {subject_identity}{marks_text}{equip_text} "
+        f"CANONICAL CHANGES: {changes_text} "
+        f"MUST PRESERVE: {preserve_text} "
+        f"MUST NOT INVENT: {must_not_text} "
+        f"ARTISTIC FRAMING: Expression: {expression}. Style: {style}. {composition}. {lighting}."
     )
 
     return PromptCompilationResult(

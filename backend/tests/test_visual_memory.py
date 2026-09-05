@@ -383,3 +383,37 @@ def test_phase_10_portrait_candidate_generation_and_continuity_workflow():
         client.get("/api/v1/visual-memory/portraits/candidates/unknown_id").status_code
         == 404
     )
+
+
+def test_candidate_retains_source_portrait_and_reference_url():
+    soul_id = f"Continuity_Soul_{str(uuid.uuid4())[:6]}"
+
+    # Auto-initialise v1 portrait.
+    profile = client.get(f"/api/v1/visual/avatar/{soul_id}").json()
+    v1_id = profile["portraits"][0]["version_id"]
+    v1_image_url = profile["portraits"][0]["image_url"]
+
+    # Create a continuity candidate referencing v1.
+    res = client.post(
+        "/api/v1/visual-memory/portraits/candidates",
+        json={
+            "soul_id": soul_id,
+            "generation_type": "story_mark_update",
+            "source_portrait_version_id": v1_id,
+        },
+    )
+    assert res.status_code == 200
+    cand = res.json()["candidate"]
+    assert cand["source_portrait_version_id"] == v1_id
+    assert cand["reference_image_url"] == v1_image_url
+
+    # A source portrait belonging to a different soul must be rejected.
+    bad = client.post(
+        "/api/v1/visual-memory/portraits/candidates",
+        json={
+            "soul_id": "someone_else",
+            "generation_type": "story_mark_update",
+            "source_portrait_version_id": v1_id,
+        },
+    )
+    assert bad.status_code == 400

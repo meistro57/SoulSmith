@@ -1,6 +1,7 @@
 // frontend/src/components/visual-memory/PortraitTimeline.tsx
 import React, { useState } from 'react';
 import type { PortraitVersion } from '../../types';
+import { resolveAssetUrl } from '../../lib/api';
 import { PortraitVersionCard } from './PortraitVersionCard';
 import { History, Camera } from 'lucide-react';
 
@@ -57,7 +58,7 @@ export const PortraitTimeline: React.FC<PortraitTimelineProps> = ({ portraits })
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="relative rounded-2xl overflow-hidden border border-purple-500/40 bg-slate-950 aspect-square">
               <img
-                src={selectedVersion.image_url}
+                src={resolveAssetUrl(selectedVersion.image_url)}
                 alt={selectedVersion.label}
                 className="w-full h-full object-cover"
                 onError={(e) => {

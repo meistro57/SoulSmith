@@ -17,6 +17,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.auth import (
     AuthResponse,
@@ -109,7 +110,12 @@ from app.visual_memory import (
     StoryMarkModel,
 )
 from app.portrait_compiler import compile_portrait_prompt, PromptCompilationResult
-from app.portrait_provider import get_portrait_provider, ProviderGenerationRequest
+from app.portrait_provider import (
+    get_comfyui_status,
+    get_portrait_provider,
+    ProviderGenerationRequest,
+)
+from app.portrait_reference import SourcePortraitError, resolve_source_portrait
 from app.reflection import (
     CreatePrivateNoteRequest,
     CreateReflectionRequest,
@@ -165,6 +171,7 @@ from app.soulprint import (
     generate_astrological_soulprint,
 )
 from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
+from app.comfyui.storage import get_asset_root
 
 
 @asynccontextmanager
@@ -187,6 +194,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve SoulSmith-owned generated assets (e.g. ComfyUI candidate portraits).
+_asset_root = get_asset_root()
+_asset_root.mkdir(parents=True, exist_ok=True)
+app.mount("/assets", StaticFiles(directory=str(_asset_root)), name="assets")
 
 
 class RoomManager:
@@ -904,6 +916,11 @@ def get_memory_object(memory_object_id: str):
 # Phase 10: Portrait Generation & Continuity Endpoints
 
 
+@app.get("/api/v1/visual-memory/providers/comfyui/status")
+def comfyui_provider_status():
+    return get_comfyui_status()
+
+
 @app.post(
     "/api/v1/visual-memory/portraits/compile",
     response_model=PromptCompilationResult,
@@ -945,11 +962,13 @@ def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
     story_marks = [StoryMarkModel(**m) for m in story_marks_list]
     equipment = EquipmentAppearanceModel(**equipment_dict)
 
-    ref_url = None
-    if req.source_portrait_version_id:
-        source_pv = get_portrait_version_record(req.source_portrait_version_id)
-        if source_pv:
-            ref_url = source_pv["image_url"]
+    try:
+        source_version = resolve_source_portrait(
+            req.soul_id, req.source_portrait_version_id
+        )
+    except SourcePortraitError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    ref_url = source_version["image_url"] if source_version else None
 
     compiled = compile_portrait_prompt(
         identity=identity,
@@ -996,6 +1015,7 @@ def generate_portrait_candidate_endpoint(
         compiled_prompt=candidate["compiled_prompt"],
         generation_type=candidate["generation_type"],
         reference_image_url=candidate.get("reference_image_url"),
+        negative_prompt=candidate.get("negative_prompt"),
         seed=seed,
     )
 
