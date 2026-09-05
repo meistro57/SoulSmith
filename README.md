@@ -409,6 +409,9 @@ Key Features Built:
 18. **Visual Identity Foundation & Timeline Canon**: Structured avatar identity persistence (*Face, Hair, Body, Species, Eyes*), provenance-backed Story Marks linked to canonical event IDs, equipment appearance layers, and immutable portrait timeline snapshots that preserve historical states.
 19. **Portrait Generation & Continuity Workflow**: Deterministic portrait prompt compilation, provider-abstracted candidate generation, review states (*pending → generated → approved/rejected/failed*), idempotent approval into canonical versions, and continuity safeguards that keep earlier portraits unchanged.
 20. **Chronicle Memory Object Pipeline**: Auditable `MemoryObject` compilation with participant event-time portrait locking, strict portrait reference validation, significance scoring for painting eligibility, public-canon consent enforcement, and automatic real-person tag redaction when consent is missing.
+21. **ComfyUI Portrait Generation**: Pluggable image provider (`mock`, `external`, `comfyui`) with static API-format workflows, a workflow-role selector (`initial` vs `reference`), deterministic seed handling, and SoulSmith-owned image storage — generated PNGs are archived under `/assets/` rather than left on ComfyUI `/view`.
+22. **Reference-Image Character Continuity**: Approved historical `PortraitVersion`s are resolved, uploaded, and bound into an img2img workflow with a configurable reference strength, so story-mark, equipment, and age updates keep the same recognisable character while only applying the canonical change.
+23. **Visual Worldsmith (World Atlas)**: Persistent visual identities for locations, relics, and phenomena — immutable `VisualEntityVersion`s, deterministic world-entity compilers with visual anchors, a canonical-delta diff, environment/object workflow roles, and a reviewable candidate flow that never rewrites history.
 
 ---
 
