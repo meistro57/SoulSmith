@@ -437,6 +437,46 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             reviewed_at TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visual_entity_versions (
+            version_id TEXT PRIMARY KEY,
+            entity_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            label TEXT NOT NULL,
+            canonical_snapshot_json TEXT NOT NULL DEFAULT '{}',
+            image_url TEXT NOT NULL,
+            source_version_id TEXT,
+            provider TEXT DEFAULT 'comfyui',
+            provider_model TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_visual_candidates (
+            candidate_id TEXT PRIMARY KEY,
+            entity_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            source_visual_version_id TEXT,
+            generation_type TEXT NOT NULL DEFAULT 'initial',
+            canonical_snapshot_json TEXT NOT NULL DEFAULT '{}',
+            canonical_delta_json TEXT NOT NULL DEFAULT '{}',
+            compiled_prompt TEXT NOT NULL,
+            negative_prompt TEXT,
+            reference_image_url TEXT,
+            workflow_role TEXT,
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT,
+            provider_request_id TEXT,
+            generation_seed INTEGER,
+            generated_image_url TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            failure_reason TEXT,
+            resulting_visual_version_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -2976,3 +3016,311 @@ def get_portrait_version_record(version_id: str) -> Optional[Dict[str, Any]]:
         "equipment_snapshot": _json_or_none(r["equipment_snapshot_json"]),
         "created_at": r["created_at"],
     }
+
+
+# Phase 4: Visual Worldsmith DB Helpers
+
+
+def _map_visual_version_row(r: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "version_id": r["version_id"],
+        "entity_id": r["entity_id"],
+        "entity_type": r["entity_type"],
+        "version_number": r["version_number"],
+        "label": r["label"],
+        "canonical_snapshot": _json_or_none(r["canonical_snapshot_json"]) or {},
+        "image_url": r["image_url"],
+        "source_version_id": r["source_version_id"],
+        "provider": r["provider"],
+        "provider_model": r["provider_model"],
+        "created_at": r["created_at"],
+    }
+
+
+def _map_world_candidate_row(r: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "candidate_id": r["candidate_id"],
+        "entity_id": r["entity_id"],
+        "entity_type": r["entity_type"],
+        "source_visual_version_id": r["source_visual_version_id"],
+        "generation_type": r["generation_type"],
+        "canonical_snapshot": _json_or_none(r["canonical_snapshot_json"]) or {},
+        "canonical_delta": _json_or_none(r["canonical_delta_json"]) or {},
+        "compiled_prompt": r["compiled_prompt"],
+        "negative_prompt": r["negative_prompt"],
+        "reference_image_url": r["reference_image_url"],
+        "workflow_role": r["workflow_role"],
+        "provider": r["provider"],
+        "provider_model": r["provider_model"],
+        "provider_request_id": r["provider_request_id"],
+        "generation_seed": r["generation_seed"],
+        "generated_image_url": r["generated_image_url"],
+        "status": r["status"],
+        "failure_reason": r["failure_reason"],
+        "resulting_visual_version_id": r["resulting_visual_version_id"],
+        "created_at": r["created_at"],
+        "reviewed_at": r["reviewed_at"],
+    }
+
+
+def create_world_visual_candidate_record(
+    *,
+    entity_id: str,
+    entity_type: str,
+    generation_type: str,
+    canonical_snapshot: Dict[str, Any],
+    canonical_delta: Dict[str, Any],
+    compiled_prompt: str,
+    workflow_role: str,
+    negative_prompt: Optional[str] = None,
+    source_visual_version_id: Optional[str] = None,
+    reference_image_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cand_id = f"wvc_{str(uuid.uuid4())[:8]}"
+
+    cursor.execute(
+        """
+        INSERT INTO world_visual_candidates (
+            candidate_id, entity_id, entity_type, source_visual_version_id,
+            generation_type, canonical_snapshot_json, canonical_delta_json,
+            compiled_prompt, negative_prompt, reference_image_url, workflow_role,
+            status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    """,
+        (
+            cand_id,
+            entity_id,
+            entity_type,
+            source_visual_version_id,
+            generation_type,
+            json.dumps(canonical_snapshot),
+            json.dumps(canonical_delta),
+            compiled_prompt,
+            negative_prompt,
+            reference_image_url,
+            workflow_role,
+        ),
+    )
+    conn.commit()
+
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE candidate_id = ?", (cand_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_world_candidate_row(row)
+
+
+def update_world_visual_candidate_result(
+    candidate_id: str,
+    *,
+    status: str,
+    generated_image_url: Optional[str] = None,
+    provider: str = "comfyui",
+    provider_model: Optional[str] = None,
+    provider_request_id: Optional[str] = None,
+    generation_seed: Optional[int] = None,
+    failure_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE world_visual_candidates
+        SET status = ?, generated_image_url = ?, provider = ?, provider_model = ?,
+            provider_request_id = ?, generation_seed = ?, failure_reason = ?
+        WHERE candidate_id = ?
+    """,
+        (
+            status,
+            generated_image_url,
+            provider,
+            provider_model,
+            provider_request_id,
+            generation_seed,
+            failure_reason,
+            candidate_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE candidate_id = ?", (candidate_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise ValueError(f"Candidate {candidate_id} not found")
+    return _map_world_candidate_row(row)
+
+
+def approve_world_visual_candidate_transaction(
+    candidate_id: str, label: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Transactionally approve a generated world candidate into an immutable
+    VisualEntityVersion. Idempotent: repeated approval returns the existing version.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT * FROM world_visual_candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Candidate '{candidate_id}' not found")
+
+        if row["status"] == "approved" and row["resulting_visual_version_id"]:
+            version_id = row["resulting_visual_version_id"]
+            cursor.execute(
+                "SELECT * FROM visual_entity_versions WHERE version_id = ?",
+                (version_id,),
+            )
+            version_row = cursor.fetchone()
+            conn.close()
+            if version_row:
+                return _map_visual_version_row(version_row)
+
+        if row["status"] != "generated":
+            conn.close()
+            raise ValueError(
+                f"Cannot approve candidate '{candidate_id}' in status '{row['status']}'. Must be in 'generated' state."
+            )
+        if not row["generated_image_url"]:
+            conn.close()
+            raise ValueError(f"Candidate '{candidate_id}' has no generated_image_url.")
+
+        cursor.execute(
+            "SELECT COUNT(*) as count FROM visual_entity_versions WHERE entity_id = ? AND entity_type = ?",
+            (row["entity_id"], row["entity_type"]),
+        )
+        version_num = (cursor.fetchone()["count"] or 0) + 1
+        version_id = f"wvv_{version_num}_{str(uuid.uuid4())[:8]}"
+        version_label = (
+            label
+            or f"{row['entity_type'].replace('_', ' ').title()} v{version_num} ({row['generation_type'].replace('_', ' ').title()})"
+        )
+
+        cursor.execute(
+            """
+            INSERT INTO visual_entity_versions (
+                version_id, entity_id, entity_type, version_number, label,
+                canonical_snapshot_json, image_url, source_version_id,
+                provider, provider_model
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                version_id,
+                row["entity_id"],
+                row["entity_type"],
+                version_num,
+                version_label,
+                row["canonical_snapshot_json"],
+                row["generated_image_url"],
+                row["source_visual_version_id"],
+                row["provider"],
+                row["provider_model"],
+            ),
+        )
+        cursor.execute(
+            """
+            UPDATE world_visual_candidates
+            SET status = 'approved', resulting_visual_version_id = ?, reviewed_at = CURRENT_TIMESTAMP
+            WHERE candidate_id = ?
+        """,
+            (version_id, candidate_id),
+        )
+        conn.commit()
+
+        cursor.execute(
+            "SELECT * FROM visual_entity_versions WHERE version_id = ?", (version_id,)
+        )
+        version_row = cursor.fetchone()
+        conn.close()
+        return _map_visual_version_row(version_row)
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+
+def reject_world_visual_candidate_record(candidate_id: str) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE candidate_id = ?", (candidate_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Candidate '{candidate_id}' not found")
+    if row["status"] == "approved":
+        conn.close()
+        raise ValueError(
+            f"Candidate '{candidate_id}' has already been approved and cannot be rejected."
+        )
+    cursor.execute(
+        "UPDATE world_visual_candidates SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP WHERE candidate_id = ?",
+        (candidate_id,),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE candidate_id = ?", (candidate_id,)
+    )
+    updated = cursor.fetchone()
+    conn.close()
+    return _map_world_candidate_row(updated)
+
+
+def get_world_visual_candidate_record(candidate_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE candidate_id = ?", (candidate_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_world_candidate_row(row) if row else None
+
+
+def get_world_visual_candidates_records(
+    entity_type: str, entity_id: str
+) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_visual_candidates WHERE entity_type = ? AND entity_id = ? ORDER BY created_at ASC",
+        (entity_type, entity_id),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_world_candidate_row(r) for r in rows]
+
+
+def get_visual_entity_versions_records(
+    entity_type: str, entity_id: str
+) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_entity_versions WHERE entity_type = ? AND entity_id = ? ORDER BY version_number ASC",
+        (entity_type, entity_id),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_visual_version_row(r) for r in rows]
+
+
+def get_visual_entity_version_record(version_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_entity_versions WHERE version_id = ?", (version_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_version_row(row) if row else None

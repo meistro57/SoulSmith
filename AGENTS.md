@@ -83,6 +83,9 @@ npm run build       # tsc -b && vite build
 | `portrait_compiler.py` | Deterministic portrait prompt compilation (sectioned into identity / changes / preserve / must-not-invent / framing). |
 | `portrait_provider.py` | Image provider abstraction (`mock`, `external` scaffold, `comfyui`). |
 | `portrait_reference.py` | Resolves `source_portrait_version_id` → a canonical `PortraitVersion`, enforcing soul ownership and existence. |
+| `visual_world.py` | Phase 4 Worldsmith models (`VisualEntityVersionModel`, `WorldVisualCandidateModel`, request schemas). |
+| `visual_compilers.py` | Deterministic world visual compilers (`location`/`relic`/`phenomenon`) + `compile_canonical_delta`. |
+| `world_visual_provider.py` | Provider abstraction for world-entity generation (mock + ComfyUI environment/object roles). |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -160,6 +163,8 @@ This is the single most important rule in the codebase:
 12. **Continuity is source-portrait-locked.** `portrait_reference.resolve_source_portrait` enforces that a `source_portrait_version_id` is a real, soul-owned, imaged `PortraitVersion`; it never substitutes a newer portrait for the one requested. Approving a candidate creates a *new* `PortraitVersion` and never mutates the referenced one, so historical versions and events referencing them stay intact. The reference-image technique is dependency-free img2img (`LoadImage` + `VAEEncode` + `KSampler` denoise); IPAdapter/FaceID are documented as an optional upgrade, not assumed to exist.
 
 13. **ComfyUI diagnostics** live at `GET /api/v1/visual-memory/providers/comfyui/status` (reachability, initial/reference workflow availability, output-storage writability).
+
+14. **World entities have visual history too.** Phase 4 (`visual_world.py`, `visual_compilers.py`, `world_visual_provider.py`) gives locations, relics, and phenomena immutable `VisualEntityVersion`s and a candidate/review flow mirroring portraits, under `/api/v1/visual-world/*`. Workflow roles come from `comfyui/workflow_roles.py`: locations/phenomena → `environment_{initial,reference}`, relics → `object_{initial,reference}`. Approving a world candidate creates a *new* immutable version (`approve_world_visual_candidate_transaction` is idempotent) and never mutates older ones, so Chronicle scenes can reference the version that actually existed at event time. NPCs reuse the portrait pipeline; `world_event`/Chronicle painting visuals are deferred to a later phase.
 
 ---
 

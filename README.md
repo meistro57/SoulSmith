@@ -539,6 +539,48 @@ Initial Portrait
 - **Historical integrity** is preserved: approving a candidate creates a *new* `PortraitVersion` and never mutates the referenced one, so `v1` remains independently retrievable and events referencing `v1` keep using it.
 - The compiled prompt is sectioned into `CANONICAL IDENTITY`, `CANONICAL CHANGES`, `MUST PRESERVE`, `MUST NOT INVENT`, and `ARTISTIC FRAMING`, with reinforced continuity instructions and negative constraints for reference generations.
 
+## Visual Worldsmith (World Atlas)
+
+Beyond character portraits, SoulSmith gives world entities a persistent visual memory: **locations**, **relics**, and **phenomena** each have immutable visual versions that evolve only through canonical state changes.
+
+```text
+CANON → visual snapshot → candidate → ComfyUI → generated representation
+        → human approval → immutable VisualEntityVersion
+```
+
+- **Entity types**: `location` (environment workflows), `relic` (object workflows), `phenomenon` (environment workflows). NPCs reuse the portrait pipeline.
+- **Visual anchors** (landmarks, persistent details, motifs) are compiled into every prompt so an evolved version stays recognisably the same place/object/phenomenon.
+- **Canonical delta** diffs the previous vs current snapshot into `PRESERVE` / `CHANGE` / `REMOVE` so continuity generations apply only the recorded change.
+- **Historical integrity**: approving a new version creates a new immutable `VisualEntityVersion` and never mutates older versions.
+
+### World API
+
+```text
+POST /api/v1/visual-world/candidates
+POST /api/v1/visual-world/candidates/{candidate_id}/generate
+POST /api/v1/visual-world/candidates/{candidate_id}/approve
+POST /api/v1/visual-world/candidates/{candidate_id}/reject
+GET  /api/v1/visual-world/{entity_type}/{entity_id}/versions
+GET  /api/v1/visual-world/{entity_type}/{entity_id}/candidates
+```
+
+Generated assets are stored under `/assets/world/{entity_type}/candidates/` (SoulSmith-owned, never ComfyUI `/view` URLs).
+
+### World workflow roles & configuration
+
+| Role | Workflow file | Used by |
+|---|---|---|
+| `environment_initial` / `environment_reference` | `environment_*_v1_api.json` | locations, phenomena |
+| `object_initial` / `object_reference` | `object_*_v1_api.json` | relics |
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `COMFYUI_ENVIRONMENT_INITIAL_WORKFLOW` | `environment_initial_v1_api.json` | Landscape environment text-to-image. |
+| `COMFYUI_ENVIRONMENT_REFERENCE_WORKFLOW` | `environment_reference_v1_api.json` | Landscape environment img2img continuity. |
+| `COMFYUI_OBJECT_INITIAL_WORKFLOW` | `object_initial_v1_api.json` | Square object text-to-image. |
+| `COMFYUI_OBJECT_REFERENCE_WORKFLOW` | `object_reference_v1_api.json` | Square object img2img continuity. |
+| `COMFYUI_WORLD_REFERENCE_STRENGTH` | `0.6` | Reference preservation strength (maps to `denoise = 1 - strength`). |
+
 ## Canonical Roll Contract
 
 SoulSmith now treats the seven numeric dice faces as the immutable roll record. Symbolic values are derived through a versioned grammar and persisted alongside the raw values in the Chronicle. See [`docs/ROLL_CONTRACT.md`](docs/ROLL_CONTRACT.md) for schemas, workflows, compatibility policy, and the initial `1.0.0` vocabulary.

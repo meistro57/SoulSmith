@@ -27,10 +27,16 @@ from app.comfyui.workflow_loader import (
     validate_workflow,
 )
 from app.comfyui.workflow_roles import (
+    ENVIRONMENT_INITIAL_ROLE,
+    ENVIRONMENT_REFERENCE_ROLE,
     INITIAL_ROLE,
+    OBJECT_INITIAL_ROLE,
+    OBJECT_REFERENCE_ROLE,
     REFERENCE_ROLE,
     requires_reference,
+    requires_world_reference,
     select_workflow_role,
+    select_world_workflow_role,
 )
 
 __all__ = [
@@ -51,4 +57,10 @@ __all__ = [
     "REFERENCE_ROLE",
     "requires_reference",
     "select_workflow_role",
+    "ENVIRONMENT_INITIAL_ROLE",
+    "ENVIRONMENT_REFERENCE_ROLE",
+    "OBJECT_INITIAL_ROLE",
+    "OBJECT_REFERENCE_ROLE",
+    "requires_world_reference",
+    "select_world_workflow_role",
 ]

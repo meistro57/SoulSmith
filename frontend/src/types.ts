@@ -363,6 +363,48 @@ export interface PromptCompilationResult {
   compiled_prompt: string;
 }
 
+// Phase 4: Visual Worldsmith
+export type WorldEntityType = 'location' | 'relic' | 'phenomenon';
+export type WorldCandidateStatus = 'pending' | 'generated' | 'approved' | 'rejected' | 'failed';
+
+export interface VisualEntityVersion {
+  version_id: string;
+  entity_id: string;
+  entity_type: WorldEntityType;
+  version_number: number;
+  label: string;
+  canonical_snapshot: Record<string, any>;
+  image_url: string;
+  source_version_id?: string;
+  provider: string;
+  provider_model?: string;
+  created_at?: string;
+}
+
+export interface WorldVisualCandidate {
+  candidate_id: string;
+  entity_id: string;
+  entity_type: WorldEntityType;
+  source_visual_version_id?: string;
+  generation_type: string;
+  canonical_snapshot: Record<string, any>;
+  canonical_delta: Record<string, string[]>;
+  compiled_prompt: string;
+  negative_prompt?: string;
+  reference_image_url?: string;
+  workflow_role?: string;
+  provider: string;
+  provider_model?: string;
+  provider_request_id?: string;
+  generation_seed?: number;
+  generated_image_url?: string;
+  status: WorldCandidateStatus;
+  failure_reason?: string;
+  resulting_visual_version_id?: string;
+  created_at?: string;
+  reviewed_at?: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

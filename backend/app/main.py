@@ -90,6 +90,14 @@ from app.db import (
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
+    approve_world_visual_candidate_transaction,
+    create_world_visual_candidate_record,
+    get_visual_entity_version_record,
+    get_visual_entity_versions_records,
+    get_world_visual_candidate_record,
+    get_world_visual_candidates_records,
+    reject_world_visual_candidate_record,
+    update_world_visual_candidate_result,
 )
 from app.visual_memory import (
     AddStoryMarkRequest,
@@ -116,6 +124,18 @@ from app.portrait_provider import (
     ProviderGenerationRequest,
 )
 from app.portrait_reference import SourcePortraitError, resolve_source_portrait
+from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
+from app.visual_world import (
+    CreateWorldVisualCandidateRequest,
+    GenerateWorldVisualCandidateRequest,
+    VisualEntityVersionModel,
+    WorldVisualCandidateModel,
+)
+from app.world_visual_provider import (
+    get_world_visual_provider,
+    WorldVisualGenerationRequest,
+)
+from app.comfyui.workflow_roles import select_world_workflow_role
 from app.reflection import (
     CreatePrivateNoteRequest,
     CreateReflectionRequest,
@@ -1153,6 +1173,139 @@ def get_portrait_version_endpoint(version_id: str):
             detail=f"Portrait version '{version_id}' not found",
         )
     return {"portrait_version": PortraitVersionModel(**record)}
+
+
+# Phase 4: Visual Worldsmith Endpoints
+
+
+@app.post("/api/v1/visual-world/candidates")
+def create_world_visual_candidate_endpoint(req: CreateWorldVisualCandidateRequest):
+    source_version = None
+    if req.source_visual_version_id:
+        source_version = get_visual_entity_version_record(req.source_visual_version_id)
+        if not source_version:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source visual version '{req.source_visual_version_id}' not found",
+            )
+        if (
+            source_version["entity_id"] != req.entity_id
+            or source_version["entity_type"] != req.entity_type
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source visual version does not match the requested entity",
+            )
+
+    previous_snapshot = source_version["canonical_snapshot"] if source_version else None
+    compiled = compile_visual_prompt(
+        entity_type=req.entity_type,
+        name=req.name,
+        canonical_state=req.canonical_state,
+        generation_type=req.generation_type,
+        previous_snapshot=previous_snapshot,
+        style=req.style,
+    )
+    canonical_delta = compile_canonical_delta(previous_snapshot, req.canonical_state)
+    workflow_role = select_world_workflow_role(req.entity_type, req.generation_type)
+
+    candidate = create_world_visual_candidate_record(
+        entity_id=req.entity_id,
+        entity_type=req.entity_type,
+        generation_type=req.generation_type,
+        canonical_snapshot=req.canonical_state,
+        canonical_delta=canonical_delta,
+        compiled_prompt=compiled.compiled_prompt,
+        workflow_role=workflow_role,
+        negative_prompt=", ".join(compiled.negative_constraints),
+        source_visual_version_id=req.source_visual_version_id,
+        reference_image_url=source_version["image_url"] if source_version else None,
+    )
+    return {"candidate": WorldVisualCandidateModel(**candidate)}
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/generate")
+def generate_world_visual_candidate_endpoint(
+    candidate_id: str, req: Optional[GenerateWorldVisualCandidateRequest] = None
+):
+    candidate = get_world_visual_candidate_record(candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World visual candidate '{candidate_id}' not found",
+        )
+
+    provider = get_world_visual_provider((req and req.provider_type) or None)
+    gen_req = WorldVisualGenerationRequest(
+        candidate_id=candidate["candidate_id"],
+        entity_id=candidate["entity_id"],
+        entity_type=candidate["entity_type"],
+        compiled_prompt=candidate["compiled_prompt"],
+        workflow_role=candidate["workflow_role"],
+        generation_type=candidate["generation_type"],
+        negative_prompt=candidate.get("negative_prompt"),
+        reference_image_url=candidate.get("reference_image_url"),
+        seed=(req and req.seed) or None,
+    )
+    result = provider.generate(gen_req)
+
+    if result.success:
+        updated = update_world_visual_candidate_result(
+            candidate_id=candidate_id,
+            status="generated",
+            generated_image_url=result.generated_image_url,
+            provider=result.provider,
+            provider_model=result.provider_model,
+            provider_request_id=result.provider_request_id,
+            generation_seed=result.generation_seed,
+        )
+    else:
+        updated = update_world_visual_candidate_result(
+            candidate_id=candidate_id,
+            status="failed",
+            provider=result.provider,
+            provider_model=result.provider_model,
+            failure_reason=result.failure_reason,
+        )
+    return {"candidate": WorldVisualCandidateModel(**updated)}
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/approve")
+def approve_world_visual_candidate_endpoint(candidate_id: str):
+    try:
+        version = approve_world_visual_candidate_transaction(candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    candidate = get_world_visual_candidate_record(candidate_id)
+    return {
+        "visual_version": VisualEntityVersionModel(**version),
+        "candidate": WorldVisualCandidateModel(**candidate),
+        "message": "Candidate approved and promoted to an immutable VisualEntityVersion.",
+    }
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/reject")
+def reject_world_visual_candidate_endpoint(candidate_id: str):
+    try:
+        updated = reject_world_visual_candidate_record(candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "candidate": WorldVisualCandidateModel(**updated),
+        "message": "Candidate rejected. Canonical world state was untouched.",
+    }
+
+
+@app.get("/api/v1/visual-world/{entity_type}/{entity_id}/versions")
+def list_visual_entity_versions_endpoint(entity_type: str, entity_id: str):
+    records = get_visual_entity_versions_records(entity_type, entity_id)
+    return {"versions": [VisualEntityVersionModel(**r) for r in records]}
+
+
+@app.get("/api/v1/visual-world/{entity_type}/{entity_id}/candidates")
+def list_world_visual_candidates_endpoint(entity_type: str, entity_id: str):
+    records = get_world_visual_candidates_records(entity_type, entity_id)
+    return {"candidates": [WorldVisualCandidateModel(**r) for r in records]}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")
