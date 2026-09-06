@@ -51,8 +51,17 @@ def create_painting_attempt(
     source_painting_id: str | None = None,
     retry_count: int = 0,
     correction_instructions: list | None = None,
+    art_direction_profile_id: str | None = None,
+    art_direction_profile_version_id: str | None = None,
+    resolved_art_direction=None,
 ) -> ChroniclePaintingModel:
     compiled_prompt = compile_painting_prompt(scene_spec)
+    if resolved_art_direction is not None:
+        from app.art_director import apply_art_direction_to_prompt
+
+        compiled_prompt = apply_art_direction_to_prompt(
+            compiled_prompt, resolved_art_direction
+        )
     if correction_instructions:
         compiled_prompt += " [CORRECTION] " + "; ".join(correction_instructions)
     record = create_chronicle_painting_record(
@@ -65,6 +74,8 @@ def create_painting_attempt(
         negative_prompt=", ".join(scene_spec.must_not_invent),
         source_painting_id=source_painting_id,
         retry_count=retry_count,
+        art_direction_profile_id=art_direction_profile_id,
+        art_direction_profile_version_id=art_direction_profile_version_id,
     )
     return ChroniclePaintingModel(**record)
 
@@ -193,5 +204,7 @@ def generate_chronicle_painting(
             negative_prompt=painting.negative_prompt,
             source_painting_id=current_id,
             retry_count=painting.retry_count + 1,
+            art_direction_profile_id=painting.art_direction_profile_id,
+            art_direction_profile_version_id=painting.art_direction_profile_version_id,
         )
         current_id = retry_record["painting_id"]

@@ -415,6 +415,7 @@ Key Features Built:
 24. **Chronicle Paintings & Visual Canon Guardian**: Canonical Memory Objects compiled into generated scene paintings through a `CANON → SCENE → IMAGE → VISUAL CANON GUARDIAN → CANDIDATE` pipeline — historical participant portrait locking, a deterministic composition selector, quarantine-then-promote storage, mandatory vision review with a deterministic mock Guardian (PASS/RETRY/BLOCK), and an approval flow that supersedes prior art without deleting history.
 25. **Group Memories & Tags**: A relational `GroupMemory` linking participant-specific Memory Objects to the same shared event without rewriting them — deterministic exact-event-ID grouping, typed ID-anchored tags, shared anchors locked to historical visual versions, participant-specific consent filtering, and a narrative "everyone remembers the same moment differently" perspective view. See [`docs/GROUP_MEMORIES.md`](docs/GROUP_MEMORIES.md).
 26. **Living Biography**: An evolving, provenance-aware life story derived from the Chronicle (never rewriting it) — a deterministic structured compiler, immutable version/section/provenance model, chronology without invented dates, recurring-thread extraction, fact-vs-perspective classification, a deterministic narrative provider, a Biography Guardian, draft/current/version lifecycle, consent-aware public/private publication, and a reading experience with expandable "From the Chronicle" provenance. See [`docs/LIVING_BIOGRAPHY.md`](docs/LIVING_BIOGRAPHY.md).
+27. **Art Director & World Gallery**: Persistent, versioned Art Direction Profiles that give portraits, world visuals, and Chronicle artwork a coherent visual language *without changing what they depict* — a deterministic style hierarchy and inspectable Art Direction Spec, honest provider-capability degradation, an optional style reviewer that can never override a Visual Canon Guardian BLOCK, and a consent-safe, accessible World Gallery with curated Collections and immutable timelines. See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
 
 ---
 
@@ -586,6 +587,45 @@ Generated assets are stored under `/assets/world/{entity_type}/candidates/` (Sou
 | `COMFYUI_OBJECT_INITIAL_WORKFLOW` | `object_initial_v1_api.json` | Square object text-to-image. |
 | `COMFYUI_OBJECT_REFERENCE_WORKFLOW` | `object_reference_v1_api.json` | Square object img2img continuity. |
 | `COMFYUI_WORLD_REFERENCE_STRENGTH` | `0.6` | Reference preservation strength (maps to `denoise = 1 - strength`). |
+
+## Art Director & World Gallery
+
+Phase 15 unifies the approved visual history (portraits, world visuals, Chronicle
+Paintings, Group Memories, and the Living Biography) into a coherent art-direction
+system and an explorable World Gallery, without letting style rewrite canon.
+
+```text
+CANON + HISTORICAL VISUAL REFERENCES + ART DIRECTION
+    -> GENERATION -> VISUAL CANON GUARDIAN -> APPROVAL -> WORLD GALLERY
+```
+
+- **Art Direction Profiles** are persistent and versioned; updating always creates
+  a new version and older artwork keeps its original instructions. Profiles store
+  only stylistic treatment, never canonical facts.
+- **Style hierarchy** (`World -> artifact-type treatment -> override`) resolves
+  deterministically into an inspectable Art Direction Spec with canonical and
+  stylistic requirements kept separate.
+- **Provider capability awareness** degrades honestly instead of pretending
+  unsupported capabilities exist.
+- **Optional style reviewer** checks profile compliance but can never override a
+  Visual Canon Guardian BLOCK.
+- **World Gallery** curates only approved, consent-safe artifacts across modes
+  (The World, The People, The Chronicle, Shared Moments, A Life, Then & Now), with
+  provenance, curated Collections, immutable timelines, conservative alt text,
+  keyboard navigation, reduced motion, and lazy-loaded images.
+
+```text
+POST  /api/v1/art-direction/profiles
+POST  /api/v1/art-direction/profiles/{profile_id}/versions
+POST  /api/v1/art-direction/resolve
+POST  /api/v1/art-direction/preview
+GET   /api/v1/gallery?mode=world|people|chronicle|shared|life|all
+GET   /api/v1/gallery/timeline?entity_type=...&entity_id=...
+POST  /api/v1/gallery/collections
+POST  /api/v1/gallery/collections/{id}/reorder
+```
+
+See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
 
 ## Canonical Roll Contract
 

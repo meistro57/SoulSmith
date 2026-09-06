@@ -346,6 +346,8 @@ export interface PortraitGenerationCandidate {
   status: CandidateStatus;
   failure_reason?: string;
   resulting_portrait_version_id?: string;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
   created_at?: string;
   reviewed_at?: string;
 }
@@ -401,6 +403,8 @@ export interface WorldVisualCandidate {
   status: WorldCandidateStatus;
   failure_reason?: string;
   resulting_visual_version_id?: string;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
   created_at?: string;
   reviewed_at?: string;
 }
@@ -471,6 +475,8 @@ export interface ChroniclePainting {
   guardian_report?: GuardianReport;
   failure_reason?: string;
   retry_count: number;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
   created_at?: string;
   reviewed_at?: string;
   approved_at?: string;
@@ -604,6 +610,126 @@ export interface Biography {
   guardian_status: BiographyGuardianStatus;
   guardian_report?: BiographyGuardianReport;
   sections: BiographySection[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Phase 15: Art Director & World Gallery
+export type ArtDirectionProfileStatus = 'draft' | 'current' | 'superseded' | 'archived';
+export type ArtifactType = 'portrait' | 'location' | 'relic' | 'phenomenon' | 'chronicle_painting';
+
+export interface ArtDirectionProfile {
+  profile_id: string;
+  name: string;
+  description: string;
+  status: ArtDirectionProfileStatus;
+  current_version_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ArtDirectionProfileVersion {
+  version_id: string;
+  profile_id: string;
+  version_number: number;
+  medium_style: string;
+  palette_guidance: string;
+  lighting_guidance: string;
+  atmosphere: string;
+  texture_material: string;
+  camera_framing: string;
+  composition_guidance: string;
+  portrait_treatment: string;
+  environment_treatment: string;
+  relic_treatment: string;
+  phenomenon_treatment: string;
+  chronicle_treatment: string;
+  negative_guidance: string;
+  provider_hints: Record<string, any>;
+  accessibility_notes: string;
+  created_at?: string;
+}
+
+export interface ResolvedArtDirection {
+  profile_id: string;
+  version_id: string;
+  artifact_type: ArtifactType;
+  medium_style: string;
+  palette_guidance: string;
+  lighting_guidance: string;
+  atmosphere: string;
+  texture_material: string;
+  camera_framing: string;
+  composition_guidance: string;
+  treatment: string;
+  negative_guidance: string;
+  provider_hints: Record<string, any>;
+  accessibility_notes: string;
+  override_applied: Record<string, string>;
+}
+
+export interface ArtDirectionSpec {
+  artifact_type: string;
+  profile_id: string;
+  profile_version_id: string;
+  canonical: Record<string, any>;
+  historical_references: Record<string, any>[];
+  style: ResolvedArtDirection;
+  provider_capabilities: Record<string, any>;
+  composition_intent: string;
+  accessibility: string[];
+  limitations: string[];
+  provider_prompt: string;
+}
+
+export interface StyleReviewResult {
+  status: 'pass' | 'retry';
+  style_confidence: number;
+  style_deviations: string[];
+  correction_instructions: string[];
+}
+
+export type GalleryArtifactType = 'portrait' | 'visual_entity' | 'chronicle_painting' | 'biography_illustration';
+
+export interface GalleryProvenance {
+  source_type: string;
+  source_id: string;
+  label: string;
+}
+
+export interface GalleryArtifact {
+  artifact_id: string;
+  artifact_type: GalleryArtifactType;
+  image_url: string;
+  title: string;
+  caption: string;
+  alt_text: string;
+  provenance: GalleryProvenance[];
+  art_direction?: { profile_id?: string; profile_version_id?: string };
+  guardian_status?: string;
+  chronology_label?: string;
+  entity_id?: string;
+  entity_type?: string;
+  created_at?: string;
+}
+
+export interface GalleryCollectionItem {
+  item_id: string;
+  collection_id: string;
+  artifact_type: GalleryArtifactType;
+  artifact_ref: string;
+  position: number;
+  caption: string;
+  created_at?: string;
+}
+
+export interface GalleryCollection {
+  collection_id: string;
+  title: string;
+  description: string;
+  visibility: 'public_canon' | 'private';
+  curator_soul_id?: string;
+  items: GalleryCollectionItem[];
   created_at?: string;
   updated_at?: string;
 }

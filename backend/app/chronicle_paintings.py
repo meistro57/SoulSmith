@@ -158,6 +158,8 @@ class ChroniclePaintingModel(BaseModel):
     guardian_report: dict[str, Any] | None = None
     failure_reason: str | None = None
     retry_count: int = 0
+    art_direction_profile_id: str | None = None
+    art_direction_profile_version_id: str | None = None
     created_at: str | None = None
     reviewed_at: str | None = None
     approved_at: str | None = None
@@ -172,6 +174,7 @@ class CreateChroniclePaintingRequest(BaseModel):
     source_painting_id: str | None = None
     composition: str | None = None
     style: str | None = None
+    art_direction_profile_version_id: str | None = None
 
 
 class GenerateChroniclePaintingRequest(BaseModel):

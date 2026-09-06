@@ -646,18 +646,38 @@ provenance, uncertainty, privacy, and individual perspective.
 
 See [`docs/LIVING_BIOGRAPHY.md`](LIVING_BIOGRAPHY.md).
 
-### Phase 15: Art Director and World Gallery `[Status: Designed]`
+### Phase 15: Art Director and World Gallery `[Status: Integrated]`
 
 Campaign-level visual voice and world galleries.
 
-- Art Director controlling composition, medium, palette, and recurring motifs.
-- Libraries, settlement galleries, memorial walls, and historical figures.
-- Alternate cultural visual interpretations of the same event.
+> **THE ART DIRECTOR CONTROLS INTERPRETATION. IT DOES NOT CONTROL CANON.**
+
+- Persistent, versioned Art Direction Profiles (medium, palette, lighting,
+  atmosphere, material, framing, composition, per-artifact treatments, negative
+  guidance, provider hints, accessibility) that store no canonical facts.
+- Deterministic style hierarchy: World Art Direction -> artifact-type treatment
+  -> optional scene/collection override.
+- An inspectable Art Direction Spec compiler that keeps canonical and stylistic
+  requirements separate, plus honest provider-capability degradation.
+- Optional Art Direction Reviewer (style compliance) that can never override a
+  Visual Canon Guardian BLOCK.
+- A consent-safe World Gallery curating approved portraits, world visuals,
+  Chronicle Paintings, shared moments, and biography illustrations across modes
+  (The World, The People, The Chronicle, Shared Moments, A Life, Then & Now).
+- Curated Collections/Exhibitions that reference artifacts without mutating
+  canonical records, with captions, provenance, and immutable historical
+  timelines.
+- Privacy-first publication: private participants never leak through images,
+  metadata, captions, tags, provenance, counts, or alt text.
+- Accessible (conservative alt text, keyboard navigation, reduced motion) and
+  performance-aware (lazy loading, immutable asset references).
 
 **Exit criteria**
 - Campaign maintains a coherent visual style.
 - Distinguishes canonical facts from artistic framing.
 - World galleries contain only approved, permission-safe memories.
+
+See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](ART_DIRECTOR_AND_WORLD_GALLERY.md).
 
 ---
 

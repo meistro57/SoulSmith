@@ -171,6 +171,8 @@ class PortraitGenerationCandidateModel(BaseModel):
     status: CandidateStatus = "pending"
     failure_reason: str | None = None
     resulting_portrait_version_id: str | None = None
+    art_direction_profile_id: str | None = None
+    art_direction_profile_version_id: str | None = None
     created_at: str | None = None
     reviewed_at: str | None = None
 
@@ -189,6 +191,7 @@ class CreatePortraitCandidateRequest(BaseModel):
     generation_type: GenerationType = "initial"
     emotional_state: str = "focused"
     style_preset: str = "storybook_painterly"
+    art_direction_profile_version_id: str | None = None
 
 
 class GenerateCandidateRequest(BaseModel):

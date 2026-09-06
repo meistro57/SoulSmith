@@ -615,6 +615,103 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 15: Art Direction Profiles & World Gallery. Profiles store stylistic
+    # treatment only; canonical facts never live inside a style profile.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS art_direction_profiles (
+            profile_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'draft',
+            current_version_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS art_direction_profile_versions (
+            version_id TEXT PRIMARY KEY,
+            profile_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            medium_style TEXT NOT NULL DEFAULT '',
+            palette_guidance TEXT NOT NULL DEFAULT '',
+            lighting_guidance TEXT NOT NULL DEFAULT '',
+            atmosphere TEXT NOT NULL DEFAULT '',
+            texture_material TEXT NOT NULL DEFAULT '',
+            camera_framing TEXT NOT NULL DEFAULT '',
+            composition_guidance TEXT NOT NULL DEFAULT '',
+            portrait_treatment TEXT NOT NULL DEFAULT '',
+            environment_treatment TEXT NOT NULL DEFAULT '',
+            relic_treatment TEXT NOT NULL DEFAULT '',
+            phenomenon_treatment TEXT NOT NULL DEFAULT '',
+            chronicle_treatment TEXT NOT NULL DEFAULT '',
+            negative_guidance TEXT NOT NULL DEFAULT '',
+            provider_hints_json TEXT NOT NULL DEFAULT '{}',
+            accessibility_notes TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gallery_collections (
+            collection_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            curator_soul_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gallery_collection_items (
+            item_id TEXT PRIMARY KEY,
+            collection_id TEXT NOT NULL,
+            artifact_type TEXT NOT NULL,
+            artifact_ref TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            caption TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Track which Art Direction Profile/version produced a generated candidate.
+    _add_column_if_missing(
+        cursor,
+        "portrait_generation_candidates",
+        "art_direction_profile_id",
+        "art_direction_profile_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "portrait_generation_candidates",
+        "art_direction_profile_version_id",
+        "art_direction_profile_version_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "world_visual_candidates",
+        "art_direction_profile_id",
+        "art_direction_profile_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "world_visual_candidates",
+        "art_direction_profile_version_id",
+        "art_direction_profile_version_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "chronicle_paintings",
+        "art_direction_profile_id",
+        "art_direction_profile_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "chronicle_paintings",
+        "art_direction_profile_version_id",
+        "art_direction_profile_version_id TEXT",
+    )
+
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
         cursor.execute(
@@ -2802,6 +2899,8 @@ def _map_candidate_row(row: sqlite3.Row) -> dict[str, Any]:
         "status": row["status"],
         "failure_reason": row["failure_reason"],
         "resulting_portrait_version_id": row["resulting_portrait_version_id"],
+        "art_direction_profile_id": row["art_direction_profile_id"],
+        "art_direction_profile_version_id": row["art_direction_profile_version_id"],
         "created_at": row["created_at"],
         "reviewed_at": row["reviewed_at"],
     }
@@ -2818,6 +2917,8 @@ def create_portrait_candidate_record(
     source_portrait_version_id: str | None = None,
     reference_image_url: str | None = None,
     negative_prompt: str | None = None,
+    art_direction_profile_id: str | None = None,
+    art_direction_profile_version_id: str | None = None,
 ) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -2830,8 +2931,9 @@ def create_portrait_candidate_record(
             candidate_id, soul_id, source_portrait_version_id, generation_type,
             compiled_prompt, negative_prompt, reference_image_url,
             canonical_identity_snapshot_json, story_marks_snapshot_json, equipment_snapshot_json,
+            art_direction_profile_id, art_direction_profile_version_id,
             status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """,
         (
             cand_id,
@@ -2844,6 +2946,8 @@ def create_portrait_candidate_record(
             json.dumps(canonical_identity_snapshot),
             json.dumps(story_marks_snapshot),
             json.dumps(equipment_snapshot) if equipment_snapshot else None,
+            art_direction_profile_id,
+            art_direction_profile_version_id,
         ),
     )
     conn.commit()
@@ -3179,6 +3283,8 @@ def _map_world_candidate_row(r: sqlite3.Row) -> dict[str, Any]:
         "status": r["status"],
         "failure_reason": r["failure_reason"],
         "resulting_visual_version_id": r["resulting_visual_version_id"],
+        "art_direction_profile_id": r["art_direction_profile_id"],
+        "art_direction_profile_version_id": r["art_direction_profile_version_id"],
         "created_at": r["created_at"],
         "reviewed_at": r["reviewed_at"],
     }
@@ -3196,6 +3302,8 @@ def create_world_visual_candidate_record(
     negative_prompt: str | None = None,
     source_visual_version_id: str | None = None,
     reference_image_url: str | None = None,
+    art_direction_profile_id: str | None = None,
+    art_direction_profile_version_id: str | None = None,
 ) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3207,8 +3315,9 @@ def create_world_visual_candidate_record(
             candidate_id, entity_id, entity_type, source_visual_version_id,
             generation_type, canonical_snapshot_json, canonical_delta_json,
             compiled_prompt, negative_prompt, reference_image_url, workflow_role,
+            art_direction_profile_id, art_direction_profile_version_id,
             status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     """,
         (
             cand_id,
@@ -3222,6 +3331,8 @@ def create_world_visual_candidate_record(
             negative_prompt,
             reference_image_url,
             workflow_role,
+            art_direction_profile_id,
+            art_direction_profile_version_id,
         ),
     )
     conn.commit()
@@ -3476,6 +3587,8 @@ def _map_chronicle_painting_row(row: sqlite3.Row) -> dict[str, Any]:
         "guardian_report": _json_or_none(row["guardian_report_json"]),
         "failure_reason": row["failure_reason"],
         "retry_count": row["retry_count"],
+        "art_direction_profile_id": row["art_direction_profile_id"],
+        "art_direction_profile_version_id": row["art_direction_profile_version_id"],
         "created_at": row["created_at"],
         "reviewed_at": row["reviewed_at"],
         "approved_at": row["approved_at"],
@@ -3506,6 +3619,8 @@ def create_chronicle_painting_record(
     negative_prompt: str | None = None,
     source_painting_id: str | None = None,
     retry_count: int = 0,
+    art_direction_profile_id: str | None = None,
+    art_direction_profile_version_id: str | None = None,
 ) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -3517,8 +3632,9 @@ def create_chronicle_painting_record(
             painting_id, memory_object_id, source_painting_id, generation_type,
             status, guardian_status, compiler_version, scene_spec_json, composition,
             historical_participant_refs_json, compiled_prompt, negative_prompt,
+            art_direction_profile_id, art_direction_profile_version_id,
             retry_count
-        ) VALUES (?, ?, ?, ?, 'candidate', 'pending', '1.0.0', ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, 'candidate', 'pending', '1.0.0', ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             painting_id,
@@ -3530,6 +3646,8 @@ def create_chronicle_painting_record(
             json.dumps(historical_participant_refs),
             compiled_prompt,
             negative_prompt,
+            art_direction_profile_id,
+            art_direction_profile_version_id,
             retry_count,
         ),
     )
@@ -4551,3 +4669,499 @@ def get_probable_path_record(path_id: str) -> dict[str, Any] | None:
         "provenance_summary": row["provenance_summary"],
         "created_at": row["created_at"],
     }
+
+
+# Phase 15: Art Direction Profiles & World Gallery DB Helpers
+
+
+def _map_art_direction_profile_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "profile_id": row["profile_id"],
+        "name": row["name"],
+        "description": row["description"],
+        "status": row["status"],
+        "current_version_id": row["current_version_id"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_art_direction_version_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "version_id": row["version_id"],
+        "profile_id": row["profile_id"],
+        "version_number": row["version_number"],
+        "medium_style": row["medium_style"],
+        "palette_guidance": row["palette_guidance"],
+        "lighting_guidance": row["lighting_guidance"],
+        "atmosphere": row["atmosphere"],
+        "texture_material": row["texture_material"],
+        "camera_framing": row["camera_framing"],
+        "composition_guidance": row["composition_guidance"],
+        "portrait_treatment": row["portrait_treatment"],
+        "environment_treatment": row["environment_treatment"],
+        "relic_treatment": row["relic_treatment"],
+        "phenomenon_treatment": row["phenomenon_treatment"],
+        "chronicle_treatment": row["chronicle_treatment"],
+        "negative_guidance": row["negative_guidance"],
+        "provider_hints": _json_or_none(row["provider_hints_json"]) or {},
+        "accessibility_notes": row["accessibility_notes"],
+        "created_at": row["created_at"],
+    }
+
+
+def create_art_direction_profile_record(
+    *,
+    name: str,
+    description: str = "",
+    status: str = "draft",
+    medium_style: str = "",
+    palette_guidance: str = "",
+    lighting_guidance: str = "",
+    atmosphere: str = "",
+    texture_material: str = "",
+    camera_framing: str = "",
+    composition_guidance: str = "",
+    portrait_treatment: str = "",
+    environment_treatment: str = "",
+    relic_treatment: str = "",
+    phenomenon_treatment: str = "",
+    chronicle_treatment: str = "",
+    negative_guidance: str = "",
+    provider_hints: dict[str, Any] | None = None,
+    accessibility_notes: str = "",
+) -> dict[str, Any]:
+    """Create a profile with its first immutable version in one transaction."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    profile_id = f"adp_{str(uuid.uuid4())[:8]}"
+    version_id = f"adpv_1_{str(uuid.uuid4())[:8]}"
+    try:
+        cursor.execute(
+            """
+            INSERT INTO art_direction_profiles (
+                profile_id, name, description, status, current_version_id
+            ) VALUES (?, ?, ?, ?, ?)
+        """,
+            (profile_id, name, description, status, version_id),
+        )
+        cursor.execute(
+            """
+            INSERT INTO art_direction_profile_versions (
+                version_id, profile_id, version_number, medium_style, palette_guidance,
+                lighting_guidance, atmosphere, texture_material, camera_framing,
+                composition_guidance, portrait_treatment, environment_treatment,
+                relic_treatment, phenomenon_treatment, chronicle_treatment,
+                negative_guidance, provider_hints_json, accessibility_notes
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                version_id,
+                profile_id,
+                medium_style,
+                palette_guidance,
+                lighting_guidance,
+                atmosphere,
+                texture_material,
+                camera_framing,
+                composition_guidance,
+                portrait_treatment,
+                environment_treatment,
+                relic_treatment,
+                phenomenon_treatment,
+                chronicle_treatment,
+                negative_guidance,
+                json.dumps(provider_hints or {}),
+                accessibility_notes,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+    profile = get_art_direction_profile_record(profile_id)
+    version = get_art_direction_profile_version_record(version_id)
+    conn.close()
+    return {"profile": profile, "version": version}
+
+
+def create_art_direction_profile_version_record(
+    *,
+    profile_id: str,
+    medium_style: str = "",
+    palette_guidance: str = "",
+    lighting_guidance: str = "",
+    atmosphere: str = "",
+    texture_material: str = "",
+    camera_framing: str = "",
+    composition_guidance: str = "",
+    portrait_treatment: str = "",
+    environment_treatment: str = "",
+    relic_treatment: str = "",
+    phenomenon_treatment: str = "",
+    chronicle_treatment: str = "",
+    negative_guidance: str = "",
+    provider_hints: dict[str, Any] | None = None,
+    accessibility_notes: str = "",
+) -> dict[str, Any]:
+    """Append a new immutable version and point the profile at it."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) as count FROM art_direction_profile_versions WHERE profile_id = ?",
+        (profile_id,),
+    )
+    version_number = (cursor.fetchone()["count"] or 0) + 1
+    version_id = f"adpv_{version_number}_{str(uuid.uuid4())[:8]}"
+    try:
+        cursor.execute(
+            """
+            INSERT INTO art_direction_profile_versions (
+                version_id, profile_id, version_number, medium_style, palette_guidance,
+                lighting_guidance, atmosphere, texture_material, camera_framing,
+                composition_guidance, portrait_treatment, environment_treatment,
+                relic_treatment, phenomenon_treatment, chronicle_treatment,
+                negative_guidance, provider_hints_json, accessibility_notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                version_id,
+                profile_id,
+                version_number,
+                medium_style,
+                palette_guidance,
+                lighting_guidance,
+                atmosphere,
+                texture_material,
+                camera_framing,
+                composition_guidance,
+                portrait_treatment,
+                environment_treatment,
+                relic_treatment,
+                phenomenon_treatment,
+                chronicle_treatment,
+                negative_guidance,
+                json.dumps(provider_hints or {}),
+                accessibility_notes,
+            ),
+        )
+        cursor.execute(
+            """
+            UPDATE art_direction_profiles
+            SET current_version_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE profile_id = ?
+        """,
+            (version_id, profile_id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+    version = get_art_direction_profile_version_record(version_id)
+    conn.close()
+    return version
+
+
+def get_art_direction_profile_record(profile_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_direction_profiles WHERE profile_id = ?", (profile_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_direction_profile_row(row) if row else None
+
+
+def get_art_direction_profile_version_record(version_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_direction_profile_versions WHERE version_id = ?",
+        (version_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_direction_version_row(row) if row else None
+
+
+def list_art_direction_profiles_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM art_direction_profiles ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_art_direction_profile_row(r) for r in rows]
+
+
+def list_art_direction_profile_versions_records(
+    profile_id: str,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_direction_profile_versions WHERE profile_id = ? "
+        "ORDER BY version_number ASC",
+        (profile_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_art_direction_version_row(r) for r in rows]
+
+
+def get_current_art_direction_profile_record() -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_direction_profiles WHERE status = 'current' "
+        "ORDER BY updated_at DESC LIMIT 1"
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_direction_profile_row(row) if row else None
+
+
+def set_art_direction_profile_status_record(
+    profile_id: str, status: str
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Only one profile may be "current" at a time.
+    if status == "current":
+        cursor.execute(
+            "UPDATE art_direction_profiles SET status = 'superseded', "
+            "updated_at = CURRENT_TIMESTAMP WHERE status = 'current'"
+        )
+    cursor.execute(
+        "UPDATE art_direction_profiles SET status = ?, updated_at = CURRENT_TIMESTAMP "
+        "WHERE profile_id = ?",
+        (status, profile_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM art_direction_profiles WHERE profile_id = ?", (profile_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_direction_profile_row(row)
+
+
+def _map_gallery_collection_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "collection_id": row["collection_id"],
+        "title": row["title"],
+        "description": row["description"],
+        "visibility": row["visibility"],
+        "curator_soul_id": row["curator_soul_id"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_gallery_collection_item_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "item_id": row["item_id"],
+        "collection_id": row["collection_id"],
+        "artifact_type": row["artifact_type"],
+        "artifact_ref": row["artifact_ref"],
+        "position": row["position"],
+        "caption": row["caption"],
+        "created_at": row["created_at"],
+    }
+
+
+def create_gallery_collection_record(
+    *,
+    title: str,
+    description: str = "",
+    visibility: str = "public_canon",
+    curator_soul_id: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    collection_id = f"col_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO gallery_collections (
+            collection_id, title, description, visibility, curator_soul_id
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (collection_id, title, description, visibility, curator_soul_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_gallery_collection_record(collection_id)
+
+
+def get_gallery_collection_record(collection_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM gallery_collections WHERE collection_id = ?", (collection_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    collection = _map_gallery_collection_row(row)
+    cursor.execute(
+        "SELECT * FROM gallery_collection_items WHERE collection_id = ? "
+        "ORDER BY position ASC, created_at ASC",
+        (collection_id,),
+    )
+    collection["items"] = [
+        _map_gallery_collection_item_row(r) for r in cursor.fetchall()
+    ]
+    conn.close()
+    return collection
+
+
+def list_gallery_collections_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM gallery_collections ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [get_gallery_collection_record(r["collection_id"]) for r in rows]
+
+
+def update_gallery_collection_record(
+    collection_id: str,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    visibility: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM gallery_collections WHERE collection_id = ?", (collection_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Collection '{collection_id}' not found")
+    new_title = title if title is not None else row["title"]
+    new_desc = description if description is not None else row["description"]
+    new_vis = visibility if visibility is not None else row["visibility"]
+    cursor.execute(
+        """
+        UPDATE gallery_collections
+        SET title = ?, description = ?, visibility = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE collection_id = ?
+    """,
+        (new_title, new_desc, new_vis, collection_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_gallery_collection_record(collection_id)
+
+
+def add_gallery_collection_item_record(
+    *,
+    collection_id: str,
+    artifact_type: str,
+    artifact_ref: str,
+    caption: str = "",
+    position: int | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if position is None:
+        cursor.execute(
+            "SELECT COALESCE(MAX(position), -1) as max_pos FROM gallery_collection_items "
+            "WHERE collection_id = ?",
+            (collection_id,),
+        )
+        position = (cursor.fetchone()["max_pos"] or -1) + 1
+    item_id = f"coli_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO gallery_collection_items (
+            item_id, collection_id, artifact_type, artifact_ref, position, caption
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (item_id, collection_id, artifact_type, artifact_ref, position, caption),
+    )
+    conn.commit()
+    conn.close()
+    return _get_gallery_collection_item_record(item_id)
+
+
+def _get_gallery_collection_item_record(item_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM gallery_collection_items WHERE item_id = ?", (item_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_gallery_collection_item_row(row)
+
+
+def remove_gallery_collection_item_record(collection_id: str, item_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM gallery_collection_items WHERE collection_id = ? AND item_id = ?",
+        (collection_id, item_id),
+    )
+    removed = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return removed
+
+
+def reorder_gallery_collection_items_record(
+    collection_id: str, ordered_item_ids: list[str]
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    for position, item_id in enumerate(ordered_item_ids):
+        cursor.execute(
+            """
+            UPDATE gallery_collection_items SET position = ?
+            WHERE collection_id = ? AND item_id = ?
+        """,
+            (position, collection_id, item_id),
+        )
+    conn.commit()
+    conn.close()
+    return get_gallery_collection_record(collection_id)
+
+
+def list_all_portrait_versions_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM portrait_versions ORDER BY soul_id ASC, version_number ASC"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "version_id": r["version_id"],
+            "soul_id": r["soul_id"],
+            "version_number": r["version_number"],
+            "label": r["label"],
+            "image_url": r["image_url"],
+            "story_marks_snapshot": _json_or_none(r["story_marks_snapshot_json"]) or [],
+            "equipment_snapshot": _json_or_none(r["equipment_snapshot_json"]),
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def list_all_visual_entity_versions_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_entity_versions "
+        "ORDER BY entity_type ASC, entity_id ASC, version_number ASC"
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_visual_version_row(r) for r in rows]

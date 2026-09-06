@@ -55,6 +55,8 @@ class WorldVisualCandidateModel(BaseModel):
     status: WorldCandidateStatus = "pending"
     failure_reason: str | None = None
     resulting_visual_version_id: str | None = None
+    art_direction_profile_id: str | None = None
+    art_direction_profile_version_id: str | None = None
     created_at: str | None = None
     reviewed_at: str | None = None
 
@@ -67,6 +69,7 @@ class CreateWorldVisualCandidateRequest(BaseModel):
     generation_type: str = "initial"
     source_visual_version_id: str | None = None
     style: str = "soulsmith_painterly"
+    art_direction_profile_version_id: str | None = None
 
 
 class GenerateWorldVisualCandidateRequest(BaseModel):

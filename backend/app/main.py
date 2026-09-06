@@ -18,6 +18,18 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.art_director import (
+    ArtDirectionProfileModel,
+    ArtDirectionProfileVersionModel,
+    CompileArtDirectionSpecRequest,
+    CreateArtDirectionProfileRequest,
+    ResolveArtDirectionRequest,
+    ResolvedArtDirectionModel,
+    UpdateArtDirectionProfileRequest,
+    apply_art_direction_to_prompt,
+    compile_art_direction_spec,
+    resolve_art_direction,
+)
 from app.auth import (
     AuthResponse,
     UserLoginRequest,
@@ -62,6 +74,7 @@ from app.curiosity import (
     SeedPlantRequest,
 )
 from app.db import (
+    add_gallery_collection_item_record,
     add_gathering_contribution,
     add_group_memory_anchor_record,
     add_group_memory_member_record,
@@ -72,9 +85,12 @@ from app.db import (
     approve_portrait_candidate_transaction,
     approve_world_visual_candidate_transaction,
     compile_memory_object_record,
+    create_art_direction_profile_record,
+    create_art_direction_profile_version_record,
     create_aspect_record,
     create_community_symbol_record,
     create_cross_aspect_bond_record,
+    create_gallery_collection_record,
     create_group_memory_record,
     create_portrait_candidate_record,
     create_portrait_version_record,
@@ -88,12 +104,16 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_approved_chronicle_paintings_records,
+    get_art_direction_profile_record,
+    get_art_direction_profile_version_record,
     get_biography_record,
     get_chronicle_painting_record,
     get_chronicle_paintings_records,
     get_community_symbols_records,
+    get_current_art_direction_profile_record,
     get_current_biography_record,
     get_db_connection,
+    get_gallery_collection_record,
     get_group_memory_anchors_records,
     get_group_memory_by_event_record,
     get_group_memory_members_records,
@@ -125,7 +145,10 @@ from app.db import (
     get_world_visual_candidate_record,
     get_world_visual_candidates_records,
     init_database,
+    list_art_direction_profile_versions_records,
+    list_art_direction_profiles_records,
     list_biography_records,
+    list_gallery_collections_records,
     list_group_memory_records,
     log_canonical_event,
     log_probable_path_record,
@@ -134,11 +157,15 @@ from app.db import (
     reject_chronicle_painting_record,
     reject_portrait_candidate_record,
     reject_world_visual_candidate_record,
+    remove_gallery_collection_item_record,
     remove_group_memory_member_record,
     remove_group_memory_tag_record,
+    reorder_gallery_collection_items_record,
     resolve_open_question,
+    set_art_direction_profile_status_record,
     update_awakening_stage_record,
     update_candidate_generation_result,
+    update_gallery_collection_record,
     update_group_memory_significance_record,
     update_preferences_record,
     update_probable_path_manifestation,
@@ -223,6 +250,7 @@ from app.soulprint import (
     SoulprintRequest,
     generate_astrological_soulprint,
 )
+from app.style_reviewer import get_art_direction_reviewer
 from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
 from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
 from app.visual_memory import (
@@ -248,6 +276,15 @@ from app.visual_world import (
     GenerateWorldVisualCandidateRequest,
     VisualEntityVersionModel,
     WorldVisualCandidateModel,
+)
+from app.world_gallery import (
+    AddGalleryCollectionItemRequest,
+    CreateGalleryCollectionRequest,
+    GalleryCollectionItemModel,
+    GalleryCollectionModel,
+    ReorderGalleryCollectionRequest,
+    UpdateGalleryCollectionRequest,
+    list_gallery_artifacts,
 )
 from app.world_visual_provider import (
     WorldVisualGenerationRequest,
@@ -1061,16 +1098,25 @@ def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
         style_preset=req.style_preset,
     )
 
+    profile_id, profile_version_id, final_prompt = _apply_art_direction_to_compiled(
+        req.art_direction_profile_version_id,
+        "portrait",
+        compiled.compiled_prompt,
+        canonical={"soul_id": req.soul_id, "identity": identity.model_dump()},
+    )
+
     candidate = create_portrait_candidate_record(
         soul_id=req.soul_id,
         generation_type=req.generation_type,
-        compiled_prompt=compiled.compiled_prompt,
+        compiled_prompt=final_prompt,
         canonical_identity_snapshot=identity.model_dump(),
         story_marks_snapshot=[m.model_dump() for m in story_marks],
         equipment_snapshot=equipment.model_dump(),
         source_portrait_version_id=req.source_portrait_version_id,
         reference_image_url=ref_url,
         negative_prompt=", ".join(compiled.negative_constraints),
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
     )
     return {"candidate": PortraitGenerationCandidateModel(**candidate)}
 
@@ -1270,17 +1316,26 @@ def create_world_visual_candidate_endpoint(req: CreateWorldVisualCandidateReques
     canonical_delta = compile_canonical_delta(previous_snapshot, req.canonical_state)
     workflow_role = select_world_workflow_role(req.entity_type, req.generation_type)
 
+    profile_id, profile_version_id, final_prompt = _apply_art_direction_to_compiled(
+        req.art_direction_profile_version_id,
+        req.entity_type,
+        compiled.compiled_prompt,
+        canonical=req.canonical_state,
+    )
+
     candidate = create_world_visual_candidate_record(
         entity_id=req.entity_id,
         entity_type=req.entity_type,
         generation_type=req.generation_type,
         canonical_snapshot=req.canonical_state,
         canonical_delta=canonical_delta,
-        compiled_prompt=compiled.compiled_prompt,
+        compiled_prompt=final_prompt,
         workflow_role=workflow_role,
         negative_prompt=", ".join(compiled.negative_constraints),
         source_visual_version_id=req.source_visual_version_id,
         reference_image_url=source_version["image_url"] if source_version else None,
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
     )
     return {"candidate": WorldVisualCandidateModel(**candidate)}
 
@@ -1408,6 +1463,10 @@ def create_chronicle_painting_endpoint(req: CreateChroniclePaintingRequest):
         for p in participants
     ]
 
+    profile_id, profile_version_id, resolved = _resolve_art_direction_profile(
+        req.art_direction_profile_version_id, "chronicle_painting"
+    )
+
     painting = create_painting_attempt(
         memory_object=memory_object,
         scene_spec=scene_spec,
@@ -1415,6 +1474,9 @@ def create_chronicle_painting_endpoint(req: CreateChroniclePaintingRequest):
         generation_type=req.generation_type,
         composition=scene_spec.composition,
         source_painting_id=req.source_painting_id,
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
+        resolved_art_direction=resolved,
     )
     return {"painting": painting}
 
@@ -1967,6 +2029,367 @@ def get_biography_section_provenance_endpoint(
         if source_visible_to(ref["source_type"], ref["source_id"], viewer_soul_id)
     ]
     return {"provenance": visible, "section": section}
+
+
+# Phase 15: Art Director & World Gallery
+
+
+def _resolve_art_direction_profile(
+    profile_version_id: str | None, artifact_type: str
+) -> tuple[str | None, str | None, ResolvedArtDirectionModel | None]:
+    """
+    Resolve an optional profile version into (profile_id, version_id, resolved).
+    Returns (None, None, None) when no profile was requested.
+    """
+    if not profile_version_id:
+        return None, None, None
+    version_record = get_art_direction_profile_version_record(profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, artifact_type)  # type: ignore[arg-type]
+    return version.profile_id, version.version_id, resolved
+
+
+def _apply_art_direction_to_compiled(
+    profile_version_id: str | None,
+    artifact_type: str,
+    compiled_prompt: str,
+    canonical: dict,
+) -> tuple[str | None, str | None, str]:
+    """Resolve a profile and append its treatment to a compiled prompt."""
+    profile_id, version_id, resolved = _resolve_art_direction_profile(
+        profile_version_id, artifact_type
+    )
+    if resolved is None:
+        return None, None, compiled_prompt
+    return (
+        profile_id,
+        version_id,
+        apply_art_direction_to_prompt(compiled_prompt, resolved),
+    )
+
+
+@app.post("/api/v1/art-direction/profiles")
+def create_art_direction_profile_endpoint(req: CreateArtDirectionProfileRequest):
+    result = create_art_direction_profile_record(
+        name=req.name,
+        description=req.description,
+        medium_style=req.medium_style,
+        palette_guidance=req.palette_guidance,
+        lighting_guidance=req.lighting_guidance,
+        atmosphere=req.atmosphere,
+        texture_material=req.texture_material,
+        camera_framing=req.camera_framing,
+        composition_guidance=req.composition_guidance,
+        portrait_treatment=req.portrait_treatment,
+        environment_treatment=req.environment_treatment,
+        relic_treatment=req.relic_treatment,
+        phenomenon_treatment=req.phenomenon_treatment,
+        chronicle_treatment=req.chronicle_treatment,
+        negative_guidance=req.negative_guidance,
+        provider_hints=req.provider_hints,
+        accessibility_notes=req.accessibility_notes,
+    )
+    return {
+        "profile": ArtDirectionProfileModel(**result["profile"]),
+        "version": ArtDirectionProfileVersionModel(**result["version"]),
+    }
+
+
+@app.get("/api/v1/art-direction/profiles")
+def list_art_direction_profiles_endpoint():
+    return {
+        "profiles": [
+            ArtDirectionProfileModel(**p) for p in list_art_direction_profiles_records()
+        ]
+    }
+
+
+@app.get("/api/v1/art-direction/profiles/{profile_id}")
+def get_art_direction_profile_endpoint(profile_id: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    versions = [
+        ArtDirectionProfileVersionModel(**v)
+        for v in list_art_direction_profile_versions_records(profile_id)
+    ]
+    return {
+        "profile": ArtDirectionProfileModel(**profile),
+        "versions": versions,
+    }
+
+
+@app.get("/api/v1/art-direction/profiles/{profile_id}/versions")
+def list_art_direction_profile_versions_endpoint(profile_id: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    return {
+        "versions": [
+            ArtDirectionProfileVersionModel(**v)
+            for v in list_art_direction_profile_versions_records(profile_id)
+        ]
+    }
+
+
+@app.post("/api/v1/art-direction/profiles/{profile_id}/versions")
+def create_art_direction_profile_version_endpoint(
+    profile_id: str, req: UpdateArtDirectionProfileRequest
+):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    version = create_art_direction_profile_version_record(
+        profile_id=profile_id,
+        medium_style=req.medium_style,
+        palette_guidance=req.palette_guidance,
+        lighting_guidance=req.lighting_guidance,
+        atmosphere=req.atmosphere,
+        texture_material=req.texture_material,
+        camera_framing=req.camera_framing,
+        composition_guidance=req.composition_guidance,
+        portrait_treatment=req.portrait_treatment,
+        environment_treatment=req.environment_treatment,
+        relic_treatment=req.relic_treatment,
+        phenomenon_treatment=req.phenomenon_treatment,
+        chronicle_treatment=req.chronicle_treatment,
+        negative_guidance=req.negative_guidance,
+        provider_hints=req.provider_hints,
+        accessibility_notes=req.accessibility_notes,
+    )
+    return {"version": ArtDirectionProfileVersionModel(**version)}
+
+
+@app.post("/api/v1/art-direction/profiles/{profile_id}/status")
+def set_art_direction_profile_status_endpoint(profile_id: str, status_value: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    if status_value not in ("draft", "current", "superseded", "archived"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid profile status '{status_value}'",
+        )
+    updated = set_art_direction_profile_status_record(profile_id, status_value)
+    return {"profile": ArtDirectionProfileModel(**updated)}
+
+
+@app.get("/api/v1/art-direction/current")
+def get_current_art_direction_endpoint():
+    profile = get_current_art_direction_profile_record()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No current Art Direction Profile is set.",
+        )
+    version = (
+        get_art_direction_profile_version_record(profile["current_version_id"])
+        if profile.get("current_version_id")
+        else None
+    )
+    return {
+        "profile": ArtDirectionProfileModel(**profile),
+        "version": ArtDirectionProfileVersionModel(**version) if version else None,
+    }
+
+
+@app.post("/api/v1/art-direction/resolve")
+def resolve_art_direction_endpoint(req: ResolveArtDirectionRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, req.artifact_type, req.override)  # type: ignore[arg-type]
+    return {"resolved": resolved}
+
+
+@app.post("/api/v1/art-direction/preview")
+def compile_art_direction_spec_endpoint(req: CompileArtDirectionSpecRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    capabilities = get_painting_provider(None).capabilities()
+    spec = compile_art_direction_spec(
+        artifact_type=req.artifact_type,
+        profile_version=version,
+        canonical=req.canonical,
+        historical_references=req.historical_references,
+        provider_capabilities=capabilities,
+        composition_intent=req.composition_intent,
+        accessibility=req.accessibility,
+        override=req.override,
+    )
+    return {"spec": spec}
+
+
+@app.post("/api/v1/art-direction/review")
+def review_style_endpoint(req: ResolveArtDirectionRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, req.artifact_type, req.override)  # type: ignore[arg-type]
+    reviewer = get_art_direction_reviewer()
+    result = reviewer.review(resolved=resolved)
+    return {"style_review": result}
+
+
+# World Gallery
+
+
+@app.get("/api/v1/gallery")
+def list_gallery_artifacts_endpoint(
+    viewer_soul_id: str | None = None,
+    mode: str = "all",
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    artifacts = list_gallery_artifacts(
+        viewer_soul_id=viewer_soul_id,
+        mode=mode,  # type: ignore[arg-type]
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    return {"artifacts": [a.model_dump() for a in artifacts]}
+
+
+@app.get("/api/v1/gallery/timeline")
+def gallery_timeline_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    from app.world_gallery import build_timeline
+
+    return {
+        "artifacts": [
+            a.model_dump()
+            for a in build_timeline(
+                viewer_soul_id=viewer_soul_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+        ]
+    }
+
+
+@app.post("/api/v1/gallery/collections")
+def create_gallery_collection_endpoint(req: CreateGalleryCollectionRequest):
+    collection = create_gallery_collection_record(
+        title=req.title,
+        description=req.description,
+        visibility=req.visibility,
+        curator_soul_id=req.curator_soul_id,
+    )
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.get("/api/v1/gallery/collections")
+def list_gallery_collections_endpoint():
+    return {
+        "collections": [
+            GalleryCollectionModel(**c) for c in list_gallery_collections_records()
+        ]
+    }
+
+
+@app.get("/api/v1/gallery/collections/{collection_id}")
+def get_gallery_collection_endpoint(collection_id: str):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.patch("/api/v1/gallery/collections/{collection_id}")
+def update_gallery_collection_endpoint(
+    collection_id: str, req: UpdateGalleryCollectionRequest
+):
+    try:
+        collection = update_gallery_collection_record(
+            collection_id,
+            title=req.title,
+            description=req.description,
+            visibility=req.visibility,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.post("/api/v1/gallery/collections/{collection_id}/items")
+def add_gallery_collection_item_endpoint(
+    collection_id: str, req: AddGalleryCollectionItemRequest
+):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    item = add_gallery_collection_item_record(
+        collection_id=collection_id,
+        artifact_type=req.artifact_type,
+        artifact_ref=req.artifact_ref,
+        caption=req.caption,
+        position=req.position,
+    )
+    return {"item": GalleryCollectionItemModel(**item)}
+
+
+@app.delete("/api/v1/gallery/collections/{collection_id}/items/{item_id}")
+def remove_gallery_collection_item_endpoint(collection_id: str, item_id: str):
+    removed = remove_gallery_collection_item_record(collection_id, item_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item '{item_id}' not found in collection '{collection_id}'",
+        )
+    return {"removed": True}
+
+
+@app.post("/api/v1/gallery/collections/{collection_id}/reorder")
+def reorder_gallery_collection_endpoint(
+    collection_id: str, req: ReorderGalleryCollectionRequest
+):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    updated = reorder_gallery_collection_items_record(
+        collection_id, req.ordered_item_ids
+    )
+    return {"collection": GalleryCollectionModel(**updated)}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

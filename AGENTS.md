@@ -98,6 +98,9 @@ npm run build       # tsc -b && vite build
 | `biography_compiler.py` | Phase 14 deterministic biography compiler: gathers consent-filtered canonical records into an inspectable `BiographySpec` before prose. |
 | `biography_provider.py` | Phase 14 narrative provider abstraction (mock + future LLM scaffold). |
 | `biography_guardian.py` | Phase 14 Biography Guardian: deterministic validation of generated narrative against provenance (not the Visual Canon Guardian). |
+| `art_director.py` | Phase 15 Art Director: versioned Art Direction Profile models, deterministic style hierarchy/resolution, Art Direction Spec compiler, provider-capability awareness. Controls interpretation, never canon. |
+| `style_reviewer.py` | Phase 15 optional Art Direction Reviewer: deterministic mock style-compliance check that can never override a Visual Canon Guardian BLOCK. |
+| `world_gallery.py` | Phase 15 World Gallery: consent-safe projection/query service for approved portraits, world visuals, Chronicle Paintings, shared moments, and biography illustrations, plus Collections/Exhibitions and timelines. |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -184,6 +187,8 @@ This is the single most important rule in the codebase:
 
 17. **The Biography is derived, never canonical.** Phase 14 (`biography*.py`) enforces `CANON -> SPEC -> NARRATIVE -> REVIEW`, never `BIOGRAPHY -> CANON`. Provenance is stored as normalized `biography_provenance` rows, not an opaque JSON graph; every read goes through `project_biography_for_viewer` for consent filtering. Regeneration always creates a new immutable `biography_versions` row (status `draft`/`current`/`superseded`/`rejected`/`failed`), and only Guardian-passed drafts may become `current`. See `docs/LIVING_BIOGRAPHY.md`.
 
+18. **The Art Director controls interpretation, not canon.** Phase 15 (`art_director.py`, `style_reviewer.py`, `world_gallery.py`) keeps style and canon separate: Art Direction Profiles store only stylistic treatment, updating a profile appends an immutable `art_direction_profile_versions` row, and profile selection on candidate/painting creation is optional (tracked via `art_direction_profile_id`/`art_direction_profile_version_id` columns). The World Gallery (`world_gallery.py`) is a publication surface that returns only approved, consent-safe artifacts; private participants must never leak through images, captions, provenance, counts, or alt text. The optional style reviewer can never override a Visual Canon Guardian BLOCK. See `docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`.
+
 ---
 
 ## Testing approach
@@ -201,4 +206,5 @@ This is the single most important rule in the codebase:
 - Persistence schema → `backend/app/db.py`
 - Frontend API surface → `frontend/src/lib/api.ts`, `frontend/src/types.ts`
 - 3D dice renderer → `frontend/src/three/`, `docs/DICE_RENDERING_SYSTEM.md`
+- Art direction & gallery → `backend/app/art_director.py`, `backend/app/world_gallery.py`, `docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`
 - Current design intent and roadmap → `docs/ROADMAP.md`
