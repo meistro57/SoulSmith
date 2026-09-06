@@ -7,11 +7,10 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import HTTPException, Header, status
+from fastapi import Header, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.db import get_user_by_id
@@ -35,7 +34,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(pwd_bytes, hash_bytes)
 
 
-def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(user_id: str, expires_delta: timedelta | None = None) -> str:
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     )
@@ -43,11 +42,11 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def decode_access_token(token: str) -> Optional[str]:
+def decode_access_token(token: str) -> str | None:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload.get("sub")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -71,7 +70,7 @@ class UserModel(BaseModel):
     email: str
     username: str
     display_name: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class AuthResponse(BaseModel):
@@ -80,7 +79,7 @@ class AuthResponse(BaseModel):
     user: UserModel
 
 
-def get_current_user(authorization: Optional[str] = Header(None)) -> UserModel:
+def get_current_user(authorization: str | None = Header(None)) -> UserModel:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

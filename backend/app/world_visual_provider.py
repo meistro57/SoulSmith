@@ -9,11 +9,10 @@ Generated images are owned by SoulSmith and never become canonical automatically
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import os
-from pathlib import Path
 import secrets
-from typing import Dict, Optional
+from abc import ABC, abstractmethod
+from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -45,19 +44,19 @@ class WorldVisualGenerationRequest(BaseModel):
     compiled_prompt: str
     workflow_role: str
     generation_type: str = "initial"
-    negative_prompt: Optional[str] = None
-    reference_image_url: Optional[str] = None
-    seed: Optional[int] = None
+    negative_prompt: str | None = None
+    reference_image_url: str | None = None
+    seed: int | None = None
 
 
 class WorldVisualGenerationResult(BaseModel):
     success: bool
-    generated_image_url: Optional[str] = None
+    generated_image_url: str | None = None
     provider: str = "comfyui"
     provider_model: str = "soulsmith-comfyui-world-v1"
-    provider_request_id: Optional[str] = None
-    generation_seed: Optional[int] = None
-    failure_reason: Optional[str] = None
+    provider_request_id: str | None = None
+    generation_seed: int | None = None
+    failure_reason: str | None = None
 
 
 class WorldVisualProvider(ABC):
@@ -66,7 +65,6 @@ class WorldVisualProvider(ABC):
         self, request: WorldVisualGenerationRequest
     ) -> WorldVisualGenerationResult:
         """Generate a world-entity visual candidate."""
-        pass
 
 
 class MockWorldVisualProvider(WorldVisualProvider):
@@ -98,12 +96,12 @@ class ComfyUIWorldVisualProvider(WorldVisualProvider):
         self,
         *,
         server_url: str,
-        workflow_paths: Dict[str, str],
+        workflow_paths: dict[str, str],
         reference_strength: float = 0.6,
         timeout_seconds: float = 180.0,
         poll_interval_seconds: float = 1.0,
-        asset_root: Optional[str] = None,
-        client: Optional[ComfyUIClient] = None,
+        asset_root: str | None = None,
+        client: ComfyUIClient | None = None,
     ) -> None:
         self._workflow_paths = workflow_paths
         self._reference_strength = min(max(reference_strength, 0.0), 1.0)
@@ -119,7 +117,7 @@ class ComfyUIWorldVisualProvider(WorldVisualProvider):
         )
 
     @classmethod
-    def from_env(cls) -> "ComfyUIWorldVisualProvider":
+    def from_env(cls) -> ComfyUIWorldVisualProvider:
         server_url = os.environ.get("COMFYUI_SERVER_URL", "http://127.0.0.1:8188")
         workflow_paths = {
             ENVIRONMENT_INITIAL_ROLE: str(
@@ -232,7 +230,7 @@ class ComfyUIWorldVisualProvider(WorldVisualProvider):
                 provider_request_id=prompt_id,
                 generation_seed=seed,
             )
-        except Exception as exc:  # convert any rendering failure into a clean result
+        except Exception as exc:  # noqa: BLE001 - convert any rendering failure into a clean result
             return WorldVisualGenerationResult(
                 success=False,
                 provider=self.PROVIDER,
@@ -259,7 +257,7 @@ class ComfyUIWorldVisualProvider(WorldVisualProvider):
 
 
 def get_world_visual_provider(
-    provider_type: Optional[str] = None,
+    provider_type: str | None = None,
 ) -> WorldVisualProvider:
     selected = provider_type or os.environ.get("SOULSMITH_IMAGE_PROVIDER", "mock")
     if selected == "comfyui":

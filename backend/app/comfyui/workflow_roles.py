@@ -11,8 +11,6 @@ no route handler or provider scatters workflow choices.
 
 from __future__ import annotations
 
-from typing import Dict
-
 INITIAL_ROLE = "portrait_initial"
 REFERENCE_ROLE = "portrait_reference"
 
@@ -38,7 +36,7 @@ ENVIRONMENT_REFERENCE_ROLE = "environment_reference"
 OBJECT_INITIAL_ROLE = "object_initial"
 OBJECT_REFERENCE_ROLE = "object_reference"
 
-WORLD_ENTITY_ROLES: Dict[str, tuple[str, str]] = {
+WORLD_ENTITY_ROLES: dict[str, tuple[str, str]] = {
     "location": (ENVIRONMENT_INITIAL_ROLE, ENVIRONMENT_REFERENCE_ROLE),
     "relic": (OBJECT_INITIAL_ROLE, OBJECT_REFERENCE_ROLE),
     "phenomenon": (ENVIRONMENT_INITIAL_ROLE, ENVIRONMENT_REFERENCE_ROLE),

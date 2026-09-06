@@ -5,7 +5,7 @@ SoulSmith versioned seven-dice grammar and canonical numeric roll contract.
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -25,7 +25,7 @@ class DieDefinition(BaseModel):
     role: str
     die_type: str
     narrative_function: str
-    faces: Dict[str, str]
+    faces: dict[str, str]
 
 
 class NumericDiceRoll(BaseModel):
@@ -45,13 +45,13 @@ class NumericDiceRoll(BaseModel):
             raise ValueError(f"Unknown grammar_version '{value}'")
         return value
 
-    def raw_values(self) -> Dict[str, int]:
+    def raw_values(self) -> dict[str, int]:
         return {die: getattr(self, die) for die in DIE_LIMITS}
 
 
 class RollRequest(BaseModel):
     grammar_version: str = CURRENT_GRAMMAR_VERSION
-    seed: Optional[int | str] = None
+    seed: int | str | None = None
 
     @field_validator("grammar_version")
     @classmethod
@@ -79,7 +79,7 @@ class DiceRollRead(BaseModel):
 
 
 class InterpretedDiceRoll(BaseModel):
-    raw: Dict[str, int]
+    raw: dict[str, int]
     grammar_version: str
     interpretation: DiceRollRead
     grammar_sentence: str
@@ -100,11 +100,11 @@ class GrammarEntry(BaseModel):
 
 class VersionedGrammar(BaseModel):
     version: str
-    dice: Dict[str, DieDefinition]
-    mappings: Dict[str, List[GrammarEntry]]
+    dice: dict[str, DieDefinition]
+    mappings: dict[str, list[GrammarEntry]]
 
     @model_validator(mode="after")
-    def validate_full_coverage(self) -> "VersionedGrammar":
+    def validate_full_coverage(self) -> VersionedGrammar:
         for die, limit in DIE_LIMITS.items():
             covered = {
                 value
@@ -119,14 +119,14 @@ class VersionedGrammar(BaseModel):
         return self
 
 
-def _entries(symbols: List[tuple[int, int, str, str]]) -> List[GrammarEntry]:
+def _entries(symbols: list[tuple[int, int, str, str]]) -> list[GrammarEntry]:
     return [
         GrammarEntry(value_min=a, value_max=b, symbol=s, description=d)
         for a, b, s, d in symbols
     ]
 
 
-V1_DICE: Dict[str, DieDefinition] = {
+V1_DICE: dict[str, DieDefinition] = {
     "spark": DieDefinition(
         role="Spark",
         die_type="d20",
@@ -293,11 +293,11 @@ V1_GRAMMAR = VersionedGrammar(
     },
 )
 
-GRAMMAR_REGISTRY: Dict[str, VersionedGrammar] = {CURRENT_GRAMMAR_VERSION: V1_GRAMMAR}
+GRAMMAR_REGISTRY: dict[str, VersionedGrammar] = {CURRENT_GRAMMAR_VERSION: V1_GRAMMAR}
 SEVEN_DICE_GRAMMAR = V1_DICE
 
 
-def get_available_versions() -> Dict[str, Any]:
+def get_available_versions() -> dict[str, Any]:
     return {
         "current_default": CURRENT_GRAMMAR_VERSION,
         "versions": list(GRAMMAR_REGISTRY.keys()),
@@ -338,7 +338,7 @@ def interpret_numeric_roll(roll: NumericDiceRoll) -> InterpretedDiceRoll:
 
 
 def generate_numeric_roll(
-    grammar_version: str = CURRENT_GRAMMAR_VERSION, seed: Optional[int | str] = None
+    grammar_version: str = CURRENT_GRAMMAR_VERSION, seed: int | str | None = None
 ) -> InterpretedDiceRoll:
     rng = random.Random(seed) if seed is not None else random.SystemRandom()
     roll = NumericDiceRoll(

@@ -11,7 +11,7 @@ every important memory into a glowing superhero poster.
 
 from __future__ import annotations
 
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 from app.chronicle_paintings import COMPOSITION_MODES
 
@@ -30,7 +30,7 @@ _EVENT_RITUAL = {"ritual", "ceremony", "oath", "funeral"}
 _EVENT_AFTERMATH = {"aftermath", "consequence", "ruin", "loss"}
 
 
-def _has_any(text: Optional[str], keywords: Iterable[str]) -> bool:
+def _has_any(text: str | None, keywords: Iterable[str]) -> bool:
     if not text:
         return False
     lowered = text.lower()
@@ -44,8 +44,8 @@ def select_composition(
     importance_score: int = 5,
     has_phenomena: bool = False,
     has_relic: bool = False,
-    event_type: Optional[str] = None,
-    emotional_tone: Optional[str] = None,
+    event_type: str | None = None,
+    emotional_tone: str | None = None,
 ) -> str:
     """
     Return a composition mode from the canonical memory facts.
@@ -151,6 +151,6 @@ def composition_guidance(mode: str) -> str:
     }.get(mode, "balanced painterly composition with clear focal separation")
 
 
-def list_composition_modes() -> List[str]:
+def list_composition_modes() -> list[str]:
     """Return the supported composition modes."""
     return list(COMPOSITION_MODES)

@@ -14,7 +14,6 @@ approval of a painting ever mutates the canonical Memory Object.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from app.chronicle_paintings import (
     ChroniclePaintingModel,
@@ -49,9 +48,9 @@ def create_painting_attempt(
     historical_participant_refs,
     generation_type: str,
     composition: str,
-    source_painting_id: Optional[str] = None,
+    source_painting_id: str | None = None,
     retry_count: int = 0,
-    correction_instructions: Optional[list] = None,
+    correction_instructions: list | None = None,
 ) -> ChroniclePaintingModel:
     compiled_prompt = compile_painting_prompt(scene_spec)
     if correction_instructions:
@@ -74,9 +73,9 @@ def generate_chronicle_painting(
     painting_id: str,
     memory_object: MemoryObjectModel,
     *,
-    provider_type: Optional[str] = None,
-    seed: Optional[int] = None,
-    guardian: Optional[VisualCanonGuardian] = None,
+    provider_type: str | None = None,
+    seed: int | None = None,
+    guardian: VisualCanonGuardian | None = None,
 ) -> ChroniclePaintingModel:
     """
     Run the full generation -> quarantine -> Guardian inspection loop.

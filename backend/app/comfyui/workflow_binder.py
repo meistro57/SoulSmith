@@ -9,7 +9,7 @@ brittle index logic through the provider.
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ class BindingTarget(BaseModel):
 #: - ``negative_prompt`` -> node ``7`` ``CLIPTextEncode.inputs.text``
 #: - ``seed``            -> node ``10`` ``KSampler.inputs.seed``
 #: - ``filename_prefix`` -> node ``24`` ``SaveImage.inputs.filename_prefix``
-DEFAULT_PORTRAIT_BINDINGS: Dict[str, BindingTarget] = {
+DEFAULT_PORTRAIT_BINDINGS: dict[str, BindingTarget] = {
     "positive_prompt": BindingTarget(node_id="6", input_name="text"),
     "negative_prompt": BindingTarget(node_id="7", input_name="text"),
     "seed": BindingTarget(node_id="10", input_name="seed"),
@@ -45,7 +45,7 @@ DEFAULT_PORTRAIT_BINDINGS: Dict[str, BindingTarget] = {
 #: ``denoise`` is how SoulSmith's reference-strength setting is expressed: a
 #: higher reference strength maps to a lower denoise (stronger identity
 #: preservation), so this is the Phase 2 reference-image continuity extension.
-REFERENCE_PORTRAIT_BINDINGS: Dict[str, BindingTarget] = {
+REFERENCE_PORTRAIT_BINDINGS: dict[str, BindingTarget] = {
     **DEFAULT_PORTRAIT_BINDINGS,
     "reference_image": BindingTarget(node_id="11", input_name="image"),
     "denoise": BindingTarget(node_id="10", input_name="denoise"),
@@ -55,16 +55,16 @@ REFERENCE_PORTRAIT_BINDINGS: Dict[str, BindingTarget] = {
 class WorkflowBinder:
     """Applies a set of concept bindings to a workflow, returning a new dict."""
 
-    def __init__(self, bindings: Optional[Dict[str, BindingTarget]] = None) -> None:
-        self._bindings: Dict[str, BindingTarget] = dict(
+    def __init__(self, bindings: dict[str, BindingTarget] | None = None) -> None:
+        self._bindings: dict[str, BindingTarget] = dict(
             bindings if bindings is not None else DEFAULT_PORTRAIT_BINDINGS
         )
 
     @property
-    def bindings(self) -> Dict[str, BindingTarget]:
+    def bindings(self) -> dict[str, BindingTarget]:
         return dict(self._bindings)
 
-    def bind(self, workflow: Dict[str, Any], **values: Any) -> Dict[str, Any]:
+    def bind(self, workflow: dict[str, Any], **values: Any) -> dict[str, Any]:
         """
         Return a deep copy of ``workflow`` with known inputs overwritten.
 
@@ -80,7 +80,7 @@ class WorkflowBinder:
 
     @staticmethod
     def _set_input(
-        workflow: Dict[str, Any],
+        workflow: dict[str, Any],
         target: BindingTarget,
         value: Any,
         concept: str,

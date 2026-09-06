@@ -2,16 +2,10 @@
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
-
-import app.db as db
-from app.main import app
+from app import db
 from app.chronicle_paintings import SceneSpecModel
-from app.visual_memory import MemoryObjectModel, ParticipantRefModel
-from app.painting_reference import (
-    ParticipantResolutionError,
-    resolve_historical_participants,
-)
+from app.comfyui.storage import ChronicleImageStore
+from app.main import app
 from app.painting_pipeline import generate_chronicle_painting
 from app.painting_provider import (
     MockPaintingImageProvider,
@@ -19,8 +13,13 @@ from app.painting_provider import (
     PaintingGenerationResult,
     get_painting_provider,
 )
+from app.painting_reference import (
+    ParticipantResolutionError,
+    resolve_historical_participants,
+)
 from app.visual_canon_guardian import MockVisualCanonGuardian
-from app.comfyui.storage import ChronicleImageStore
+from app.visual_memory import MemoryObjectModel, ParticipantRefModel
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

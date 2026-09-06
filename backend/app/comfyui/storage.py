@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Optional
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -36,7 +35,7 @@ def get_asset_root() -> Path:
     return Path(os.environ.get("SOULSMITH_ASSET_ROOT", DEFAULT_ASSET_ROOT))
 
 
-def resolve_asset_path(url: str, asset_root: Optional[Path] = None) -> Path:
+def resolve_asset_path(url: str, asset_root: Path | None = None) -> Path:
     """
     Map a SoulSmith ``/assets/...`` URL back to a local file path, rejecting any
     path that escapes the asset root (prevents traversal).
@@ -54,7 +53,7 @@ def resolve_asset_path(url: str, asset_root: Optional[Path] = None) -> Path:
 class CandidateImageStore:
     """Persist candidate images into SoulSmith-owned storage."""
 
-    def __init__(self, asset_root: Optional[Path] = None) -> None:
+    def __init__(self, asset_root: Path | None = None) -> None:
         self._root = Path(asset_root) if asset_root is not None else get_asset_root()
 
     @property
@@ -122,7 +121,7 @@ class ChronicleImageStore:
     Guardian passes. Quarantined files are never served as normal Chronicle assets.
     """
 
-    def __init__(self, asset_root: Optional[Path] = None) -> None:
+    def __init__(self, asset_root: Path | None = None) -> None:
         self._root = Path(asset_root) if asset_root is not None else get_asset_root()
 
     @property

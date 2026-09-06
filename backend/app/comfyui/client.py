@@ -12,27 +12,27 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
 from app.comfyui.errors import (
+    ComfyUIDownloadFailed,
     ComfyUIError,
     ComfyUIGenerationFailed,
     ComfyUIOutputMissing,
-    ComfyUIDownloadFailed,
     ComfyUITimeout,
     ComfyUIUnavailable,
     ComfyUIWorkflowRejected,
 )
 
 
-def extract_output_images(history_entry: Dict[str, Any]) -> List[Dict[str, Any]]:
+def extract_output_images(history_entry: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Collect every ``{"filename", "subfolder", "type"}`` image record produced by a
     completed workflow, scanning all node outputs.
     """
-    images: List[Dict[str, Any]] = []
+    images: list[dict[str, Any]] = []
     outputs = history_entry.get("outputs") or {}
     for node_output in outputs.values():
         if not isinstance(node_output, dict):
@@ -52,13 +52,13 @@ class ComfyUIClient:
         *,
         timeout_seconds: float = 180.0,
         poll_interval_seconds: float = 1.0,
-        transport: Optional[httpx.BaseTransport] = None,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.server_url = server_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.poll_interval_seconds = poll_interval_seconds
         self._transport = transport
-        self._client: Optional[httpx.Client] = None
+        self._client: httpx.Client | None = None
 
     def _get_client(self) -> httpx.Client:
         if self._client is None:
@@ -83,7 +83,7 @@ class ComfyUIClient:
         except httpx.HTTPError:
             return False
 
-    def submit_workflow(self, workflow: Dict[str, Any]) -> str:
+    def submit_workflow(self, workflow: dict[str, Any]) -> str:
         """Submit an API-format workflow and return the assigned ``prompt_id``."""
         payload = {"prompt": workflow, "client_id": str(uuid.uuid4())}
         try:
@@ -112,7 +112,7 @@ class ComfyUIClient:
             raise ComfyUIError("ComfyUI /prompt response missing 'prompt_id'")
         return prompt_id
 
-    def get_history(self, prompt_id: str) -> Dict[str, Any]:
+    def get_history(self, prompt_id: str) -> dict[str, Any]:
         """Fetch the raw history entry for a prompt (may be empty while pending)."""
         try:
             response = self._get_client().get(f"/history/{prompt_id}")
@@ -127,7 +127,7 @@ class ComfyUIClient:
         except ValueError as exc:
             raise ComfyUIError("ComfyUI returned a non-JSON history response") from exc
 
-    def wait_for_completion(self, prompt_id: str) -> Dict[str, Any]:
+    def wait_for_completion(self, prompt_id: str) -> dict[str, Any]:
         """Poll ``/history/{prompt_id}`` until completion, failure, or timeout."""
         deadline = time.monotonic() + self.timeout_seconds
         while True:
@@ -152,7 +152,7 @@ class ComfyUIClient:
             if self.poll_interval_seconds > 0:
                 time.sleep(self.poll_interval_seconds)
 
-    def download_image(self, image: Dict[str, Any]) -> bytes:
+    def download_image(self, image: dict[str, Any]) -> bytes:
         """Download a generated image through ComfyUI ``/view``."""
         filename = image.get("filename")
         if not filename:

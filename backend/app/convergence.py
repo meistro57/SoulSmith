@@ -6,7 +6,8 @@ Multiplayer gatherings, consent-aware shared canon, community world symbols, and
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 CanonStatus = Literal["private", "opt_in_shared", "public_canon"]
@@ -19,9 +20,9 @@ class CommunitySymbolModel(BaseModel):
     world_id: str = "world_starforge_01"
     description: str
     significance_score: int = 1
-    contributing_souls: List[str] = Field(default_factory=list)
+    contributing_souls: list[str] = Field(default_factory=list)
     canon_status: CanonStatus = "opt_in_shared"
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class GatheringContributionModel(BaseModel):
@@ -30,7 +31,7 @@ class GatheringContributionModel(BaseModel):
     role: Literal["Focus", "Anchor", "Witness", "Tempest"]
     resonance_amount: int
     notes: str
-    timestamp: Optional[str] = None
+    timestamp: str | None = None
 
 
 class GatheringSessionModel(BaseModel):
@@ -39,16 +40,16 @@ class GatheringSessionModel(BaseModel):
     phenomenon_name: str
     target_resonance: int = 10
     current_resonance: int = 0
-    roles: Dict[str, str] = Field(default_factory=dict)  # Role -> Soul Name
-    contributions: List[GatheringContributionModel] = Field(default_factory=list)
+    roles: dict[str, str] = Field(default_factory=dict)  # Role -> Soul Name
+    contributions: list[GatheringContributionModel] = Field(default_factory=list)
     status: GatheringStatus = "active"
-    outcome_summary: Optional[str] = None
+    outcome_summary: str | None = None
 
 
 class CreateCommunitySymbolRequest(BaseModel):
     symbol_name: str
     description: str
-    contributing_souls: List[str] = Field(default_factory=list)
+    contributing_souls: list[str] = Field(default_factory=list)
     canon_status: CanonStatus = "opt_in_shared"
 
 
@@ -64,7 +65,7 @@ class CanonMergeRequest(BaseModel):
     gathering_id: str
     symbol_name: str
     description: str
-    consenting_souls: List[str]
+    consenting_souls: list[str]
 
 
 class CanonForkRequest(BaseModel):

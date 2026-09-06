@@ -6,7 +6,8 @@ Relic progression driven by narrative conditions and Chronicle evidence.
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 RelicStage = Literal[
@@ -18,7 +19,7 @@ RelicStage = Literal[
     "Transfigured",
 ]
 
-RELIC_STAGES_ORDER: List[RelicStage] = [
+RELIC_STAGES_ORDER: list[RelicStage] = [
     "Dormant",
     "Remembered",
     "Awakened",
@@ -31,17 +32,17 @@ RELIC_STAGES_ORDER: List[RelicStage] = [
 class RelicModel(BaseModel):
     id: str
     soul_id: str
-    constellation_id: Optional[str] = None
+    constellation_id: str | None = None
     name: str
     stage: RelicStage = "Dormant"
     effect: str
     overdraw_consequence: str
     evocative_question: str
-    required_thread_type: Optional[str] = None
-    cross_aspect_forms: Dict[str, str] = Field(default_factory=dict)
+    required_thread_type: str | None = None
+    cross_aspect_forms: dict[str, str] = Field(default_factory=dict)
     is_anchor: bool = False
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class RelicEventModel(BaseModel):
@@ -53,7 +54,7 @@ class RelicEventModel(BaseModel):
     new_stage: str
     narrative_condition_met: str
     chronicle_evidence_summary: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 # Deprecated simple request format maintained for backward compatibility

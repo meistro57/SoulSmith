@@ -7,12 +7,12 @@ synthesis without mutating canonical character state.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import os
-from pathlib import Path
 import secrets
 import uuid
-from typing import Any, Dict, Optional
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -36,26 +36,25 @@ class ProviderGenerationRequest(BaseModel):
     soul_id: str
     compiled_prompt: str
     generation_type: str = "initial"
-    reference_image_url: Optional[str] = None
-    negative_prompt: Optional[str] = None
-    seed: Optional[int] = None
+    reference_image_url: str | None = None
+    negative_prompt: str | None = None
+    seed: int | None = None
 
 
 class ProviderGenerationResult(BaseModel):
     success: bool
-    generated_image_url: Optional[str] = None
+    generated_image_url: str | None = None
     provider: str = "mock"
     provider_model: str = "soulsmith-mock-v1"
-    provider_request_id: Optional[str] = None
-    generation_seed: Optional[int] = None
-    failure_reason: Optional[str] = None
+    provider_request_id: str | None = None
+    generation_seed: int | None = None
+    failure_reason: str | None = None
 
 
 class PortraitImageProvider(ABC):
     @abstractmethod
     def generate(self, request: ProviderGenerationRequest) -> ProviderGenerationResult:
         """Generate a portrait candidate representation."""
-        pass
 
 
 class MockPortraitImageProvider(PortraitImageProvider):
@@ -123,14 +122,14 @@ class ComfyUIPortraitImageProvider(PortraitImageProvider):
         *,
         server_url: str,
         initial_workflow_path: str,
-        reference_workflow_path: Optional[str] = None,
+        reference_workflow_path: str | None = None,
         reference_strength: float = 0.75,
         timeout_seconds: float = 180.0,
         poll_interval_seconds: float = 1.0,
-        bindings: Optional[dict] = None,
-        reference_bindings: Optional[dict] = None,
-        asset_root: Optional[str] = None,
-        client: Optional[ComfyUIClient] = None,
+        bindings: dict | None = None,
+        reference_bindings: dict | None = None,
+        asset_root: str | None = None,
+        client: ComfyUIClient | None = None,
     ) -> None:
         self._initial_workflow_path = initial_workflow_path
         self._reference_workflow_path = reference_workflow_path
@@ -149,7 +148,7 @@ class ComfyUIPortraitImageProvider(PortraitImageProvider):
         )
 
     @classmethod
-    def from_env(cls) -> "ComfyUIPortraitImageProvider":
+    def from_env(cls) -> ComfyUIPortraitImageProvider:
         server_url = os.environ.get("COMFYUI_SERVER_URL", "http://127.0.0.1:8188")
         initial_ref = os.environ.get(
             "COMFYUI_PORTRAIT_INITIAL_WORKFLOW",
@@ -234,7 +233,7 @@ class ComfyUIPortraitImageProvider(PortraitImageProvider):
                 provider_request_id=prompt_id,
                 generation_seed=seed,
             )
-        except Exception as exc:  # convert any rendering failure into a clean result
+        except Exception as exc:  # noqa: BLE001 - convert any rendering failure into a clean result
             return ProviderGenerationResult(
                 success=False,
                 provider=self.PROVIDER,
@@ -263,7 +262,7 @@ class ComfyUIPortraitImageProvider(PortraitImageProvider):
             )
         return self._client.upload_image(ref_path.name, ref_path.read_bytes())
 
-    def diagnose(self) -> Dict[str, Any]:
+    def diagnose(self) -> dict[str, Any]:
         """Return provider health and configuration diagnostics."""
         return {
             "provider": self.PROVIDER,
@@ -287,7 +286,7 @@ class ComfyUIPortraitImageProvider(PortraitImageProvider):
             return False
 
 
-def get_portrait_provider(provider_type: Optional[str] = None) -> PortraitImageProvider:
+def get_portrait_provider(provider_type: str | None = None) -> PortraitImageProvider:
     selected = provider_type or os.environ.get("SOULSMITH_IMAGE_PROVIDER", "mock")
     if selected == "comfyui":
         return ComfyUIPortraitImageProvider.from_env()
@@ -296,6 +295,6 @@ def get_portrait_provider(provider_type: Optional[str] = None) -> PortraitImageP
     return MockPortraitImageProvider()
 
 
-def get_comfyui_status() -> Dict[str, Any]:
+def get_comfyui_status() -> dict[str, Any]:
     """Diagnostics for the ComfyUI portrait provider (used by the status endpoint)."""
     return ComfyUIPortraitImageProvider.from_env().diagnose()

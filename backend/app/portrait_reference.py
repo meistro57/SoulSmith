@@ -10,7 +10,7 @@ substitutes a newer portrait for the explicitly requested one.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.db import get_portrait_version_record
 
@@ -20,8 +20,8 @@ class SourcePortraitError(ValueError):
 
 
 def resolve_source_portrait(
-    soul_id: str, source_portrait_version_id: Optional[str]
-) -> Optional[Dict[str, Any]]:
+    soul_id: str, source_portrait_version_id: str | None
+) -> dict[str, Any] | None:
     """
     Resolve and validate a source portrait version.
 

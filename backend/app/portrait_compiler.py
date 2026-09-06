@@ -6,8 +6,10 @@ Compiles canonical character identity, active story marks, equipment state, and 
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel
+
 from app.visual_memory import (
     AvatarIdentityModel,
     EquipmentAppearanceModel,
@@ -17,20 +19,20 @@ from app.visual_memory import (
 
 class PromptCompilationResult(BaseModel):
     subject_identity: str
-    continuity_requirements: List[str]
-    story_marks: List[str]
-    equipment: Dict[str, Any]
+    continuity_requirements: list[str]
+    story_marks: list[str]
+    equipment: dict[str, Any]
     expression: str
     composition: str
     lighting: str
     style: str
-    negative_constraints: List[str]
+    negative_constraints: list[str]
     compiled_prompt: str
 
 
 def _build_changes_text(
     generation_type: str,
-    marks: List[StoryMarkModel],
+    marks: list[StoryMarkModel],
     equipment: EquipmentAppearanceModel,
 ) -> str:
     if generation_type == "story_mark_update":
@@ -56,9 +58,9 @@ def _build_changes_text(
 def compile_portrait_prompt(
     *,
     identity: AvatarIdentityModel,
-    equipment: Optional[EquipmentAppearanceModel] = None,
-    story_marks: Optional[List[StoryMarkModel]] = None,
-    reference_image_url: Optional[str] = None,
+    equipment: EquipmentAppearanceModel | None = None,
+    story_marks: list[StoryMarkModel] | None = None,
+    reference_image_url: str | None = None,
     generation_type: str = "initial",
     emotional_state: str = "focused",
     style_preset: str = "storybook_painterly",

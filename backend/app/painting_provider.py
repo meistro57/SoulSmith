@@ -16,7 +16,6 @@ import os
 import secrets
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -31,19 +30,19 @@ class PaintingGenerationRequest(BaseModel):
     painting_id: str
     memory_object_id: str
     compiled_prompt: str
-    negative_prompt: Optional[str] = None
-    seed: Optional[int] = None
-    reference_image_url: Optional[str] = None
+    negative_prompt: str | None = None
+    seed: int | None = None
+    reference_image_url: str | None = None
 
 
 class PaintingGenerationResult(BaseModel):
     success: bool
-    image_bytes: Optional[bytes] = None
+    image_bytes: bytes | None = None
     provider: str = "mock"
-    provider_model: Optional[str] = None
-    provider_request_id: Optional[str] = None
-    generation_seed: Optional[int] = None
-    failure_reason: Optional[str] = None
+    provider_model: str | None = None
+    provider_request_id: str | None = None
+    generation_seed: int | None = None
+    failure_reason: str | None = None
 
 
 class PaintingImageProvider(ABC):
@@ -60,7 +59,7 @@ def _deterministic_png(painting_id: str, seed: int) -> bytes:
     """Deterministic minimal PNG bytes for mock mode (no GPU/network)."""
     # A tiny 1x1 PNG whose byte payload varies with the seed so the file is
     # stable and non-empty without requiring an image library.
-    marker = f"SoulSmith-Chronicle-{painting_id}-{seed}".encode("utf-8")
+    marker = f"SoulSmith-Chronicle-{painting_id}-{seed}".encode()
     header = bytes.fromhex(
         "89504e470d0a1a0a0000000d494844520000000100000001080600000"
         "01f15c4890000000a49444154789c6360000002000100"
@@ -122,8 +121,8 @@ class ComfyUIChroniclePaintingProvider(PaintingImageProvider):
         workflow_path: str,
         timeout_seconds: float = 180.0,
         poll_interval_seconds: float = 1.0,
-        bindings: Optional[dict] = None,
-        client: Optional[ComfyUIClient] = None,
+        bindings: dict | None = None,
+        client: ComfyUIClient | None = None,
     ) -> None:
         self._workflow_path = workflow_path
         self._client = client or ComfyUIClient(
@@ -134,7 +133,7 @@ class ComfyUIChroniclePaintingProvider(PaintingImageProvider):
         self._binder = WorkflowBinder(bindings or DEFAULT_PORTRAIT_BINDINGS)
 
     @classmethod
-    def from_env(cls) -> "ComfyUIChroniclePaintingProvider":
+    def from_env(cls) -> ComfyUIChroniclePaintingProvider:
         server_url = os.environ.get("COMFYUI_SERVER_URL", "http://127.0.0.1:8188")
         workflow_ref = os.environ.get(
             "COMFYUI_CHRONICLE_PAINTING_WORKFLOW", "chronicle_painting_v1_api.json"
@@ -179,7 +178,7 @@ class ComfyUIChroniclePaintingProvider(PaintingImageProvider):
                 provider_request_id=prompt_id,
                 generation_seed=seed,
             )
-        except Exception as exc:  # convert any rendering failure into a clean result
+        except Exception as exc:  # noqa: BLE001 - convert any rendering failure into a clean result
             return PaintingGenerationResult(
                 success=False,
                 provider=self.PROVIDER,
@@ -201,7 +200,7 @@ class ComfyUIChroniclePaintingProvider(PaintingImageProvider):
 
 
 def get_painting_provider(
-    provider_type: Optional[str] = None,
+    provider_type: str | None = None,
 ) -> PaintingImageProvider:
     selected = provider_type or os.environ.get("SOULSMITH_IMAGE_PROVIDER", "mock")
     if selected == "comfyui":

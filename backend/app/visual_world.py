@@ -9,7 +9,7 @@ separate from immutable visual versions, mirroring the portrait candidate flow.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -25,12 +25,12 @@ class VisualEntityVersionModel(BaseModel):
     entity_type: VisualEntityType
     version_number: int
     label: str
-    canonical_snapshot: Dict[str, Any] = Field(default_factory=dict)
+    canonical_snapshot: dict[str, Any] = Field(default_factory=dict)
     image_url: str
-    source_version_id: Optional[str] = None
+    source_version_id: str | None = None
     provider: str = "comfyui"
-    provider_model: Optional[str] = None
-    created_at: Optional[str] = None
+    provider_model: str | None = None
+    created_at: str | None = None
 
 
 class WorldVisualCandidateModel(BaseModel):
@@ -39,36 +39,36 @@ class WorldVisualCandidateModel(BaseModel):
     candidate_id: str
     entity_id: str
     entity_type: VisualEntityType
-    source_visual_version_id: Optional[str] = None
+    source_visual_version_id: str | None = None
     generation_type: str = "initial"
-    canonical_snapshot: Dict[str, Any] = Field(default_factory=dict)
-    canonical_delta: Dict[str, Any] = Field(default_factory=dict)
+    canonical_snapshot: dict[str, Any] = Field(default_factory=dict)
+    canonical_delta: dict[str, Any] = Field(default_factory=dict)
     compiled_prompt: str
-    negative_prompt: Optional[str] = None
-    reference_image_url: Optional[str] = None
-    workflow_role: Optional[str] = None
+    negative_prompt: str | None = None
+    reference_image_url: str | None = None
+    workflow_role: str | None = None
     provider: str = "mock"
-    provider_model: Optional[str] = None
-    provider_request_id: Optional[str] = None
-    generation_seed: Optional[int] = None
-    generated_image_url: Optional[str] = None
+    provider_model: str | None = None
+    provider_request_id: str | None = None
+    generation_seed: int | None = None
+    generated_image_url: str | None = None
     status: WorldCandidateStatus = "pending"
-    failure_reason: Optional[str] = None
-    resulting_visual_version_id: Optional[str] = None
-    created_at: Optional[str] = None
-    reviewed_at: Optional[str] = None
+    failure_reason: str | None = None
+    resulting_visual_version_id: str | None = None
+    created_at: str | None = None
+    reviewed_at: str | None = None
 
 
 class CreateWorldVisualCandidateRequest(BaseModel):
     entity_type: VisualEntityType
     entity_id: str
     name: str
-    canonical_state: Dict[str, Any] = Field(default_factory=dict)
+    canonical_state: dict[str, Any] = Field(default_factory=dict)
     generation_type: str = "initial"
-    source_visual_version_id: Optional[str] = None
+    source_visual_version_id: str | None = None
     style: str = "soulsmith_painterly"
 
 
 class GenerateWorldVisualCandidateRequest(BaseModel):
-    provider_type: Optional[str] = None
-    seed: Optional[int] = None
+    provider_type: str | None = None
+    seed: int | None = None

@@ -4,6 +4,7 @@ Extracts 25 Relics, 10 Weapons, 7 Elemental Essences, 14 Rune Stones, 8 Books & 
 """
 
 import os
+
 from PIL import Image
 
 PACK_PATH = "art/recils-art-assets.png"

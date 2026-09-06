@@ -3,7 +3,6 @@ import json
 
 import httpx
 import pytest
-
 from app.comfyui.client import ComfyUIClient, extract_output_images
 from app.comfyui.errors import (
     ComfyUIGenerationFailed,

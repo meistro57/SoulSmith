@@ -10,11 +10,11 @@ preserve identity and apply only the recorded change.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
-STYLE_PRESETS: Dict[str, str] = {
+STYLE_PRESETS: dict[str, str] = {
     "soulsmith_painterly": "painterly mythic realism, rich HSL palette, soft brushwork",
     "etched_chronicle": "etched chronicle plate, fine linework, archival engraving",
     "dark_mythic": "dark mythic atmosphere, deep shadows, dramatic specular detail",
@@ -29,18 +29,18 @@ DEFAULT_STYLE = "soulsmith_painterly"
 class VisualCompilationResult(BaseModel):
     entity_type: str
     subject: str
-    visual_anchors: List[str]
-    continuity_requirements: List[str]
-    requested_changes: List[str]
+    visual_anchors: list[str]
+    continuity_requirements: list[str]
+    requested_changes: list[str]
     composition: str
     style: str
-    negative_constraints: List[str]
+    negative_constraints: list[str]
     compiled_prompt: str
 
 
 def compile_canonical_delta(
-    previous: Optional[Dict[str, Any]], current: Dict[str, Any]
-) -> Dict[str, List[str]]:
+    previous: dict[str, Any] | None, current: dict[str, Any]
+) -> dict[str, list[str]]:
     """
     Deterministically diff two snapshots into preserve/change/remove descriptions.
 
@@ -49,9 +49,9 @@ def compile_canonical_delta(
     diff engine is assumed.
     """
     previous = previous or {}
-    preserve: List[str] = []
-    change: List[str] = []
-    remove: List[str] = []
+    preserve: list[str] = []
+    change: list[str] = []
+    remove: list[str] = []
 
     for key in sorted(previous):
         old = previous[key]
@@ -77,8 +77,8 @@ def _fmt(value: Any) -> str:
     return str(value)
 
 
-def _anchors_from_state(state: Dict[str, Any], keys: List[str]) -> List[str]:
-    anchors: List[str] = []
+def _anchors_from_state(state: dict[str, Any], keys: list[str]) -> list[str]:
+    anchors: list[str] = []
     for key in keys:
         value = state.get(key)
         if isinstance(value, list):
@@ -91,12 +91,12 @@ def _anchors_from_state(state: Dict[str, Any], keys: List[str]) -> List[str]:
 def _assemble(
     entity_type: str,
     subject: str,
-    anchors: List[str],
-    changes: List[str],
-    continuity: List[str],
+    anchors: list[str],
+    changes: list[str],
+    continuity: list[str],
     composition: str,
     style_key: str,
-    negative: List[str],
+    negative: list[str],
 ) -> VisualCompilationResult:
     style = STYLE_PRESETS.get(style_key, STYLE_PRESETS[DEFAULT_STYLE])
     anchors_text = "; ".join(anchors) if anchors else "None recorded."
@@ -130,8 +130,8 @@ def _assemble(
 def compile_location_prompt(
     *,
     name: str,
-    state: Dict[str, Any],
-    previous_snapshot: Optional[Dict[str, Any]] = None,
+    state: dict[str, Any],
+    previous_snapshot: dict[str, Any] | None = None,
     generation_type: str = "initial",
     style: str = DEFAULT_STYLE,
 ) -> VisualCompilationResult:
@@ -176,8 +176,8 @@ def compile_location_prompt(
 def compile_relic_prompt(
     *,
     name: str,
-    state: Dict[str, Any],
-    previous_snapshot: Optional[Dict[str, Any]] = None,
+    state: dict[str, Any],
+    previous_snapshot: dict[str, Any] | None = None,
     generation_type: str = "initial",
     style: str = DEFAULT_STYLE,
 ) -> VisualCompilationResult:
@@ -223,8 +223,8 @@ def compile_relic_prompt(
 def compile_phenomenon_prompt(
     *,
     name: str,
-    state: Dict[str, Any],
-    previous_snapshot: Optional[Dict[str, Any]] = None,
+    state: dict[str, Any],
+    previous_snapshot: dict[str, Any] | None = None,
     generation_type: str = "initial",
     style: str = DEFAULT_STYLE,
 ) -> VisualCompilationResult:
@@ -277,9 +277,9 @@ def compile_visual_prompt(
     *,
     entity_type: str,
     name: str,
-    canonical_state: Dict[str, Any],
+    canonical_state: dict[str, Any],
     generation_type: str = "initial",
-    previous_snapshot: Optional[Dict[str, Any]] = None,
+    previous_snapshot: dict[str, Any] | None = None,
     style: str = DEFAULT_STYLE,
 ) -> VisualCompilationResult:
     if entity_type == "location":

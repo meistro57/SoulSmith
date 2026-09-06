@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 from app.chronicle_paintings import (
     GuardianReportModel,
@@ -34,7 +33,7 @@ class VisualCanonGuardian(ABC):
         memory_object: MemoryObjectModel,
         scene_spec: SceneSpecModel,
         provider: str,
-        provider_model: Optional[str] = None,
+        provider_model: str | None = None,
     ) -> GuardianReportModel:
         """Inspect a generated image and return a structured review verdict."""
 
@@ -65,13 +64,13 @@ class MockVisualCanonGuardian(VisualCanonGuardian):
       that verdict so tests can exercise every pipeline branch.
     """
 
-    def __init__(self, forced_verdict: Optional[GuardianVerdict] = None) -> None:
+    def __init__(self, forced_verdict: GuardianVerdict | None = None) -> None:
         self._forced_verdict = forced_verdict
 
     @classmethod
-    def from_env(cls) -> "MockVisualCanonGuardian":
+    def from_env(cls) -> MockVisualCanonGuardian:
         raw = os.environ.get("SOULSMITH_MOCK_GUARDIAN_VERDICT", "").strip().lower()
-        verdict: Optional[GuardianVerdict] = (
+        verdict: GuardianVerdict | None = (
             raw if raw in ("pass", "retry", "block") else None
         )
         return cls(forced_verdict=verdict)
@@ -83,7 +82,7 @@ class MockVisualCanonGuardian(VisualCanonGuardian):
         memory_object: MemoryObjectModel,
         scene_spec: SceneSpecModel,
         provider: str,
-        provider_model: Optional[str] = None,
+        provider_model: str | None = None,
     ) -> GuardianReportModel:
         if not image_bytes:
             return GuardianReportModel(
@@ -137,7 +136,7 @@ class MockVisualCanonGuardian(VisualCanonGuardian):
             )
 
         # Deterministic default: inspect canonical inputs for hard violations.
-        violations: List[GuardianViolationModel] = []
+        violations: list[GuardianViolationModel] = []
         if not memory_object.participants and not _is_environmental(scene_spec):
             violations.append(
                 _violation(

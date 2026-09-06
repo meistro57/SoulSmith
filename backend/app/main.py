@@ -6,7 +6,6 @@ SoulSmith FastAPI Main Application.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Dict, List, Optional
 
 from fastapi import (
     FastAPI,
@@ -29,35 +28,56 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.curiosity import (
-    IntegrateThreadRequest,
-    QuestionResolveRequest,
-    SeedPlantRequest,
+from app.chronicle_paintings import (
+    ChroniclePaintingModel,
+    CreateChroniclePaintingRequest,
+    GenerateChroniclePaintingRequest,
 )
+from app.comfyui.storage import get_asset_root
+from app.comfyui.workflow_roles import select_world_workflow_role
 from app.constellation import (
     AWAKENING_STAGE_DESCRIPTIONS,
     AdvanceAwakeningRequest,
     CreateAspectRequest,
     CreateBondRequest,
 )
+from app.convergence import (
+    CanonForkRequest,
+    CanonMergeRequest,
+    CommunitySymbolModel,
+    CreateCommunitySymbolRequest,
+    GatheringContributeRequest,
+    GatheringSessionModel,
+)
+from app.curiosity import (
+    IntegrateThreadRequest,
+    QuestionResolveRequest,
+    SeedPlantRequest,
+)
 from app.db import (
-    create_aspect_record,
-    create_cross_aspect_bond_record,
-    create_user_record,
     add_gathering_contribution,
     add_story_mark_record,
+    approve_chronicle_painting_transaction,
     approve_portrait_candidate_transaction,
+    approve_world_visual_candidate_transaction,
     compile_memory_object_record,
+    create_aspect_record,
     create_community_symbol_record,
+    create_cross_aspect_bond_record,
     create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
     create_reflection_record,
+    create_user_record,
+    create_world_visual_candidate_record,
     execute_integration_event,
     get_all_canonical_events,
     get_all_local_threads,
     get_all_open_questions,
     get_all_seeds,
+    get_approved_chronicle_paintings_records,
+    get_chronicle_painting_record,
+    get_chronicle_paintings_records,
     get_community_symbols_records,
     get_memory_object_record,
     get_memory_objects_records,
@@ -79,31 +99,92 @@ from app.db import (
     get_story_marks_records,
     get_user_by_email,
     get_user_by_username,
+    get_visual_entity_version_record,
+    get_visual_entity_versions_records,
+    get_world_visual_candidate_record,
+    get_world_visual_candidates_records,
     init_database,
     log_canonical_event,
     log_probable_path_record,
     plant_or_echo_seed,
+    reject_chronicle_painting_record,
     reject_portrait_candidate_record,
+    reject_world_visual_candidate_record,
     resolve_open_question,
     update_awakening_stage_record,
     update_candidate_generation_result,
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
-    approve_world_visual_candidate_transaction,
-    create_world_visual_candidate_record,
-    get_visual_entity_version_record,
-    get_visual_entity_versions_records,
-    get_world_visual_candidate_record,
-    get_world_visual_candidates_records,
-    reject_world_visual_candidate_record,
     update_world_visual_candidate_result,
-    approve_chronicle_painting_transaction,
-    get_approved_chronicle_paintings_records,
-    get_chronicle_painting_record,
-    get_chronicle_paintings_records,
-    reject_chronicle_painting_record,
 )
+from app.encounters import (
+    EncounterFrame,
+    EncounterFrameRequest,
+    generate_encounter_frame,
+)
+from app.grammar import (
+    CURRENT_GRAMMAR_VERSION,
+    NumericDiceRoll,
+    RollRequest,
+    generate_numeric_roll,
+    get_available_versions,
+    get_versioned_grammar,
+    interpret_numeric_roll,
+)
+from app.painting_compiler import compile_chronicle_painting_scene
+from app.painting_pipeline import (
+    create_painting_attempt,
+    generate_chronicle_painting,
+)
+from app.painting_provider import get_painting_provider
+from app.painting_reference import (
+    ParticipantResolutionError,
+    resolve_historical_participants,
+)
+from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
+from app.portrait_compiler import PromptCompilationResult, compile_portrait_prompt
+from app.portrait_provider import (
+    ProviderGenerationRequest,
+    get_comfyui_status,
+    get_portrait_provider,
+)
+from app.portrait_reference import SourcePortraitError, resolve_source_portrait
+from app.probable_paths import (
+    CreateProbablePathRequest,
+    ExploreAlternateSceneRequest,
+    ManifestPathRequest,
+    ProbablePathModel,
+    simulate_alternate_scene_exploration,
+)
+from app.reflection import (
+    CreatePrivateNoteRequest,
+    CreateReflectionRequest,
+    PlayerPreferencesModel,
+    PrivateNoteModel,
+    ReflectionSessionModel,
+    UpdatePreferencesRequest,
+)
+from app.relics import (
+    RelicAttuneRequest,
+    RelicAttuneResponse,
+    RelicEventModel,
+    RelicModel,
+    RelicNarrativeAttuneRequest,
+    RelicOverdrawRequest,
+    RelicRepairRequest,
+    RelicTransfigureRequest,
+    process_relic_attunement,
+)
+from app.rules import ResolveSceneRequest, ResolveSceneResponse, evaluate_scene_outcome
+from app.soulkeeper import SoulkeeperNarration, generate_soulkeeper_narration
+from app.soulprint import (
+    SoulprintProfile,
+    SoulprintRequest,
+    generate_astrological_soulprint,
+)
+from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
+from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
 from app.visual_memory import (
     AddStoryMarkRequest,
     ApproveCandidateRequest,
@@ -122,14 +203,6 @@ from app.visual_memory import (
     RejectCandidateRequest,
     StoryMarkModel,
 )
-from app.portrait_compiler import compile_portrait_prompt, PromptCompilationResult
-from app.portrait_provider import (
-    get_comfyui_status,
-    get_portrait_provider,
-    ProviderGenerationRequest,
-)
-from app.portrait_reference import SourcePortraitError, resolve_source_portrait
-from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
 from app.visual_world import (
     CreateWorldVisualCandidateRequest,
     GenerateWorldVisualCandidateRequest,
@@ -137,81 +210,9 @@ from app.visual_world import (
     WorldVisualCandidateModel,
 )
 from app.world_visual_provider import (
-    get_world_visual_provider,
     WorldVisualGenerationRequest,
+    get_world_visual_provider,
 )
-from app.chronicle_paintings import (
-    ChroniclePaintingModel,
-    CreateChroniclePaintingRequest,
-    GenerateChroniclePaintingRequest,
-)
-from app.painting_compiler import compile_chronicle_painting_scene
-from app.painting_pipeline import (
-    create_painting_attempt,
-    generate_chronicle_painting,
-)
-from app.painting_provider import get_painting_provider
-from app.painting_reference import (
-    ParticipantResolutionError,
-    resolve_historical_participants,
-)
-from app.comfyui.workflow_roles import select_world_workflow_role
-from app.reflection import (
-    CreatePrivateNoteRequest,
-    CreateReflectionRequest,
-    PlayerPreferencesModel,
-    PrivateNoteModel,
-    ReflectionSessionModel,
-    UpdatePreferencesRequest,
-)
-from app.convergence import (
-    CanonForkRequest,
-    CanonMergeRequest,
-    CommunitySymbolModel,
-    CreateCommunitySymbolRequest,
-    GatheringContributeRequest,
-    GatheringSessionModel,
-)
-from app.relics import (
-    RelicEventModel,
-    RelicModel,
-    RelicNarrativeAttuneRequest,
-    RelicOverdrawRequest,
-    RelicRepairRequest,
-    RelicTransfigureRequest,
-)
-from app.probable_paths import (
-    CreateProbablePathRequest,
-    ExploreAlternateSceneRequest,
-    ManifestPathRequest,
-    ProbablePathModel,
-    simulate_alternate_scene_exploration,
-)
-from app.encounters import (
-    EncounterFrame,
-    EncounterFrameRequest,
-    generate_encounter_frame,
-)
-from app.grammar import (
-    CURRENT_GRAMMAR_VERSION,
-    NumericDiceRoll,
-    RollRequest,
-    generate_numeric_roll,
-    get_available_versions,
-    get_versioned_grammar,
-    interpret_numeric_roll,
-)
-from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
-from app.relics import RelicAttuneRequest, RelicAttuneResponse, process_relic_attunement
-from app.rules import ResolveSceneRequest, ResolveSceneResponse, evaluate_scene_outcome
-from app.soulkeeper import SoulkeeperNarration, generate_soulkeeper_narration
-from app.soulprint import (
-    SoulprintProfile,
-    SoulprintRequest,
-    generate_astrological_soulprint,
-)
-from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
-from app.comfyui.storage import get_asset_root
 
 
 @asynccontextmanager
@@ -243,7 +244,7 @@ app.mount("/assets", StaticFiles(directory=str(_asset_root)), name="assets")
 
 class RoomManager:
     def __init__(self) -> None:
-        self.rooms: Dict[str, List[WebSocket]] = {}
+        self.rooms: dict[str, list[WebSocket]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -323,7 +324,7 @@ def login(req: UserLoginRequest):
 
 
 @app.get("/api/v1/auth/me", response_model=UserModel)
-def get_me(authorization: Optional[str] = Header(None)):
+def get_me(authorization: str | None = Header(None)):
     return get_current_user(authorization=authorization)
 
 
@@ -484,7 +485,7 @@ def integrate_local_thread(req: IntegrateThreadRequest):
 
 
 @app.get("/api/v1/phenomena")
-def get_active_phenomena() -> List[Phenomenon]:
+def get_active_phenomena() -> list[Phenomenon]:
     return DEFAULT_ACTIVE_PHENOMENA
 
 
@@ -1036,7 +1037,7 @@ def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
 
 @app.post("/api/v1/visual-memory/portraits/candidates/{candidate_id}/generate")
 def generate_portrait_candidate_endpoint(
-    candidate_id: str, req: Optional[GenerateCandidateRequest] = None
+    candidate_id: str, req: GenerateCandidateRequest | None = None
 ):
     candidate = get_portrait_candidate_record(candidate_id)
     if not candidate:
@@ -1246,7 +1247,7 @@ def create_world_visual_candidate_endpoint(req: CreateWorldVisualCandidateReques
 
 @app.post("/api/v1/visual-world/candidates/{candidate_id}/generate")
 def generate_world_visual_candidate_endpoint(
-    candidate_id: str, req: Optional[GenerateWorldVisualCandidateRequest] = None
+    candidate_id: str, req: GenerateWorldVisualCandidateRequest | None = None
 ):
     candidate = get_world_visual_candidate_record(candidate_id)
     if not candidate:
@@ -1380,7 +1381,7 @@ def create_chronicle_painting_endpoint(req: CreateChroniclePaintingRequest):
 
 @app.post("/api/v1/chronicle-paintings/{painting_id}/generate")
 def generate_chronicle_painting_endpoint(
-    painting_id: str, req: Optional[GenerateChroniclePaintingRequest] = None
+    painting_id: str, req: GenerateChroniclePaintingRequest | None = None
 ):
     painting_record = get_chronicle_painting_record(painting_id)
     if not painting_record:
@@ -1447,7 +1448,7 @@ def get_chronicle_painting_endpoint(painting_id: str):
 
 
 @app.get("/api/v1/chronicle-paintings")
-def list_chronicle_paintings_endpoint(memory_object_id: Optional[str] = None):
+def list_chronicle_paintings_endpoint(memory_object_id: str | None = None):
     if memory_object_id:
         records = get_chronicle_paintings_records(memory_object_id)
     else:

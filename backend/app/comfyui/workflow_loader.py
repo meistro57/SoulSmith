@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from app.comfyui.errors import WorkflowLoadError
 
@@ -31,7 +31,7 @@ def resolve_workflow_path(name_or_path: str) -> Path:
     return _WORKFLOWS_DIR / candidate.name
 
 
-def load_workflow(path: Path) -> Dict[str, Any]:
+def load_workflow(path: Path) -> dict[str, Any]:
     """Load and validate an API-format workflow file."""
     try:
         raw = path.read_text(encoding="utf-8")
@@ -52,7 +52,7 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return validate_workflow(workflow)
 
 
-def validate_workflow(workflow: Any) -> Dict[str, Any]:
+def validate_workflow(workflow: Any) -> dict[str, Any]:
     """Validate that a parsed workflow is in ComfyUI API format."""
     if not isinstance(workflow, dict):
         raise WorkflowLoadError("Workflow must be a JSON object of node_id -> node")

@@ -1,13 +1,12 @@
 # backend/tests/test_comfyui_workflow_binder.py
 import pytest
-
+from app.comfyui.errors import WorkflowBindingError
 from app.comfyui.workflow_binder import (
-    BindingTarget,
     DEFAULT_PORTRAIT_BINDINGS,
     REFERENCE_PORTRAIT_BINDINGS,
+    BindingTarget,
     WorkflowBinder,
 )
-from app.comfyui.errors import WorkflowBindingError
 
 SAMPLE_WORKFLOW = {
     "4": {

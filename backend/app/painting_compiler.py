@@ -10,8 +10,6 @@ details when canonical appearance is unavailable.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from app.chronicle_paintings import (
     ParticipantAppearanceModel,
     SceneSpecModel,
@@ -21,10 +19,10 @@ from app.visual_memory import MemoryObjectModel
 
 
 def _format_story_marks(
-    participants: List[ParticipantAppearanceModel],
-) -> List[str]:
+    participants: list[ParticipantAppearanceModel],
+) -> list[str]:
     """Collect distinct, provenance-backed story marks across participants."""
-    marks: List[str] = []
+    marks: list[str] = []
     seen: set[str] = set()
     for p in participants:
         for m in p.story_marks:
@@ -40,10 +38,10 @@ def _format_story_marks(
 
 
 def _format_equipment(
-    participants: List[ParticipantAppearanceModel],
-) -> List[str]:
+    participants: list[ParticipantAppearanceModel],
+) -> list[str]:
     """Collect distinct canonical equipment facts across participants."""
-    items: List[str] = []
+    items: list[str] = []
     seen: set[str] = set()
     for p in participants:
         equip = p.equipment
@@ -72,10 +70,10 @@ def _format_equipment(
 def compile_chronicle_painting_scene(
     *,
     memory_object: MemoryObjectModel,
-    participants: List[ParticipantAppearanceModel],
-    composition: Optional[str] = None,
-    style: Optional[str] = None,
-    correction_instructions: Optional[List[str]] = None,
+    participants: list[ParticipantAppearanceModel],
+    composition: str | None = None,
+    style: str | None = None,
+    correction_instructions: list[str] | None = None,
 ) -> SceneSpecModel:
     """
     Compile a canonical Memory Object into a structured scene specification.
@@ -190,7 +188,7 @@ def compile_painting_prompt(scene_spec: SceneSpecModel) -> str:
         or "No participants."
     )
 
-    historical_lines: List[str] = []
+    historical_lines: list[str] = []
     for p in scene_spec.participants:
         if p.identity_strategy == "historical_portrait" and p.portrait_image_url:
             historical_lines.append(

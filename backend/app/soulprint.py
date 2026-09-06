@@ -3,15 +3,14 @@ SoulSmith Astrological Soulprint Generator & Privacy Engine
 Computes symbolic character lenses from natal chart motifs with strict GDPR opt-in compliance.
 """
 
-from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 
 class SoulprintRequest(BaseModel):
     user_consent: bool = True
     birth_date: str  # YYYY-MM-DD
-    birth_time: Optional[str] = "12:00"
-    birth_location: Optional[str] = "Global"
+    birth_time: str | None = "12:00"
+    birth_location: str | None = "Global"
 
 
 class SoulprintMotif(BaseModel):
@@ -24,11 +23,11 @@ class SoulprintProfile(BaseModel):
     sun_sign: str
     moon_sign: str
     ascendant_sign: str
-    elemental_balance: Dict[str, float]
-    motifs: List[SoulprintMotif]
-    favored_domains: List[str]
-    favored_threads: List[str]
-    narrative_hooks: List[str]
+    elemental_balance: dict[str, float]
+    motifs: list[SoulprintMotif]
+    favored_domains: list[str]
+    favored_threads: list[str]
+    narrative_hooks: list[str]
     privacy_notice: str
 
 

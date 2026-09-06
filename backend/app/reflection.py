@@ -6,7 +6,8 @@ Optional end-of-session reflection prompts, private notes controls, intensity se
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel
 
 NarrativeIntensity = Literal["gentle", "balanced", "deep_mythic", "unfiltered"]
@@ -20,7 +21,7 @@ class PlayerPreferencesModel(BaseModel):
     reduced_motion: bool = False
     high_contrast: bool = False
     allow_ai_indexing_default: bool = False
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
 
 
 class ReflectionSessionModel(BaseModel):
@@ -29,7 +30,7 @@ class ReflectionSessionModel(BaseModel):
     prompt_question: str
     player_reflection: str
     share_with_ai: bool = False
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class PrivateNoteModel(BaseModel):
@@ -38,8 +39,8 @@ class PrivateNoteModel(BaseModel):
     title: str
     content: str
     allow_ai_indexing: bool = False
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class CreateReflectionRequest(BaseModel):

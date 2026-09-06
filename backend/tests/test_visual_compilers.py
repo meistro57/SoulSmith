@@ -1,17 +1,17 @@
 # backend/tests/test_visual_compilers.py
-from app.visual_compilers import (
-    compile_canonical_delta,
-    compile_location_prompt,
-    compile_phenomenon_prompt,
-    compile_relic_prompt,
-    compile_visual_prompt,
-)
 from app.comfyui.workflow_roles import (
     ENVIRONMENT_INITIAL_ROLE,
     ENVIRONMENT_REFERENCE_ROLE,
     OBJECT_INITIAL_ROLE,
     OBJECT_REFERENCE_ROLE,
     select_world_workflow_role,
+)
+from app.visual_compilers import (
+    compile_canonical_delta,
+    compile_location_prompt,
+    compile_phenomenon_prompt,
+    compile_relic_prompt,
+    compile_visual_prompt,
 )
 
 LOCATION_STATE = {

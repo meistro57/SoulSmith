@@ -4,12 +4,12 @@ SoulSmith Canonical Database Engine (SQLite-first storage abstraction).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import os
 import sqlite3
 import uuid
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any
 
 DB_FILE = os.environ.get(
     "SOULSMITH_DB_FILE",
@@ -539,7 +539,7 @@ def log_canonical_event(
     outcome_class: str,
     dice_read: dict[str, Any],
     narration: dict[str, Any],
-    canon_facts: List[str],
+    canon_facts: list[str],
     player_intent: str,
     chosen_approach: str,
     resource_investment: dict[str, Any],
@@ -586,11 +586,11 @@ def log_canonical_event(
     return event_id
 
 
-def _json_or_none(value: Optional[str]) -> Any:
+def _json_or_none(value: str | None) -> Any:
     return json.loads(value) if value else None
 
 
-def get_all_canonical_events() -> List[Dict[str, Any]]:
+def get_all_canonical_events() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM scene_events ORDER BY created_at DESC")
@@ -625,9 +625,9 @@ def plant_or_echo_seed(
     symbol: str,
     thread_type: str,
     narrative_context: str,
-    soul_id: Optional[str] = "Unbound Soul",
-    initial_question: Optional[str] = None,
-) -> Dict[str, Any]:
+    soul_id: str | None = "Unbound Soul",
+    initial_question: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM worlds LIMIT 1")
@@ -742,7 +742,7 @@ def plant_or_echo_seed(
     }
 
 
-def get_all_seeds() -> List[Dict[str, Any]]:
+def get_all_seeds() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM seeds ORDER BY updated_at DESC")
@@ -765,7 +765,7 @@ def get_all_seeds() -> List[Dict[str, Any]]:
     ]
 
 
-def get_all_open_questions() -> List[Dict[str, Any]]:
+def get_all_open_questions() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM open_questions ORDER BY created_at DESC")
@@ -800,7 +800,7 @@ def resolve_open_question(
     return count > 0
 
 
-def get_all_local_threads(soul_id: str = "Unbound Soul") -> List[Dict[str, Any]]:
+def get_all_local_threads(soul_id: str = "Unbound Soul") -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -829,8 +829,8 @@ def execute_integration_event(
     thread_id: str,
     soul_id: str,
     choice_made: str,
-    target_relic_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    target_relic_id: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM local_threads WHERE id = ?", (thread_id,))
@@ -881,7 +881,7 @@ def execute_integration_event(
 # Constellation & Aspect Database Helpers
 
 
-def get_or_create_primary_constellation() -> Dict[str, Any]:
+def get_or_create_primary_constellation() -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM constellations ORDER BY created_at ASC LIMIT 1")
@@ -1059,7 +1059,7 @@ def create_aspect_record(
     calling: str,
     origin: str,
     era_or_world: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     aspect_id = str(uuid.uuid4())
@@ -1093,7 +1093,7 @@ def create_cross_aspect_bond_record(
     target_aspect_id: str,
     bond_type: str,
     description: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     bond_id = str(uuid.uuid4())
@@ -1128,7 +1128,7 @@ def create_cross_aspect_bond_record(
 
 
 def update_awakening_stage_record(
-    *, constellation_id: str, target_stage: Optional[str] = None
+    *, constellation_id: str, target_stage: str | None = None
 ) -> str:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1180,10 +1180,10 @@ def log_probable_path_record(
     chosen_path: str,
     unchosen_approach: str,
     potential_outcome_class: str,
-    event_id: Optional[str] = None,
+    event_id: str | None = None,
     manifestation_type: str = "dream",
-    provenance_summary: Optional[str] = None,
-) -> Dict[str, Any]:
+    provenance_summary: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     path_id = str(uuid.uuid4())
@@ -1229,7 +1229,7 @@ def log_probable_path_record(
     }
 
 
-def get_probable_paths_records(soul_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_probable_paths_records(soul_id: str | None = None) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1269,7 +1269,7 @@ def get_probable_paths_records(soul_id: Optional[str] = None) -> List[Dict[str, 
 
 def update_probable_path_manifestation(
     *, path_id: str, manifestation_type: str, status: str = "echoing"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1358,7 +1358,7 @@ def _seed_default_probable_paths(conn: sqlite3.Connection, soul_id: str) -> None
 
 def create_user_record(
     *, email: str, username: str, password_hash: str, display_name: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     user_id = str(uuid.uuid4())
@@ -1385,7 +1385,7 @@ def create_user_record(
     }
 
 
-def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+def get_user_by_email(email: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE email = ?", (email.lower().strip(),))
@@ -1403,7 +1403,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+def get_user_by_username(username: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1423,7 +1423,7 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -1446,7 +1446,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 
 def get_or_create_relics_records(
     soul_id: str = "Kaelen the Star-Watcher",
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1484,7 +1484,7 @@ def get_or_create_relics_records(
     ]
 
 
-def get_relic_history_records(relic_id: str) -> List[Dict[str, Any]]:
+def get_relic_history_records(relic_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -1518,9 +1518,9 @@ def update_relic_stage_record(
     new_stage: str,
     narrative_condition_met: str,
     chronicle_evidence_summary: str,
-    new_effect: Optional[str] = None,
-    is_anchor: Optional[bool] = None,
-) -> Dict[str, Any]:
+    new_effect: str | None = None,
+    is_anchor: bool | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1689,7 +1689,7 @@ def _seed_default_relics(conn: sqlite3.Connection, soul_id: str) -> None:
 # Convergence & Community Mythology Helpers
 
 
-def get_community_symbols_records() -> List[Dict[str, Any]]:
+def get_community_symbols_records() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) as cnt FROM community_symbols")
@@ -1722,9 +1722,9 @@ def create_community_symbol_record(
     symbol_name: str,
     world_id: str = "world_starforge_01",
     description: str,
-    contributing_souls: List[str],
+    contributing_souls: list[str],
     canon_status: str = "opt_in_shared",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     symbol_id = str(uuid.uuid4())
@@ -1762,7 +1762,7 @@ def get_or_create_gathering_session(
     room_id: str = "convergence_alpha",
     phenomenon_name: str = "Awakening of the Salt Spire",
     target_resonance: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1834,7 +1834,7 @@ def add_gathering_contribution(
     role: str,
     resonance_amount: int,
     notes: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -1949,7 +1949,7 @@ def _seed_default_community_symbols(conn: sqlite3.Connection) -> None:
 
 def get_or_create_preferences_record(
     soul_id: str = "Kaelen the Star-Watcher",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM player_preferences WHERE soul_id = ?", (soul_id,))
@@ -1996,7 +1996,7 @@ def update_preferences_record(
     reduced_motion: bool,
     high_contrast: bool,
     allow_ai_indexing_default: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2041,7 +2041,7 @@ def create_reflection_record(
     prompt_question: str,
     player_reflection: str,
     share_with_ai: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     ref_id = str(uuid.uuid4())
@@ -2071,7 +2071,7 @@ def create_reflection_record(
     }
 
 
-def get_reflections_records(soul_id: str) -> List[Dict[str, Any]]:
+def get_reflections_records(soul_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2100,7 +2100,7 @@ def create_private_note_record(
     title: str,
     content: str,
     allow_ai_indexing: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     note_id = str(uuid.uuid4())
@@ -2124,7 +2124,7 @@ def create_private_note_record(
     }
 
 
-def get_private_notes_records(soul_id: str) -> List[Dict[str, Any]]:
+def get_private_notes_records(soul_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2158,7 +2158,7 @@ def get_or_create_avatar_identity_record(
     body: str = "Athletic build worn by travel",
     species: str = "Human Aspect",
     eyes: str = "Deep amber eyes reflecting starlight",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM avatar_identities WHERE soul_id = ?", (soul_id,))
@@ -2203,7 +2203,7 @@ def add_story_mark_record(
     acquired_at: str,
     visibility: str = "prominent",
     status: str = "permanent",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     mark_id = str(uuid.uuid4())
@@ -2239,7 +2239,7 @@ def add_story_mark_record(
     }
 
 
-def get_story_marks_records(soul_id: str) -> List[Dict[str, Any]]:
+def get_story_marks_records(soul_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2266,7 +2266,7 @@ def get_story_marks_records(soul_id: str) -> List[Dict[str, Any]]:
 
 def get_or_create_equipment_appearance_record(
     soul_id: str = "Kaelen the Star-Watcher",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM equipment_appearances WHERE soul_id = ?", (soul_id,))
@@ -2316,7 +2316,7 @@ def create_portrait_version_record(
     soul_id: str,
     label: str,
     image_url: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -2390,7 +2390,7 @@ def create_portrait_version_record(
     }
 
 
-def get_portrait_versions_records(soul_id: str) -> List[Dict[str, Any]]:
+def get_portrait_versions_records(soul_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2426,7 +2426,7 @@ def get_portrait_versions_records(soul_id: str) -> List[Dict[str, Any]]:
 
 def get_or_create_visual_consent_record(
     soul_id: str = "Kaelen the Star-Watcher",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -2469,23 +2469,23 @@ def compile_memory_object_record(
     *,
     event_id: str,
     event_title: str,
-    participants: List[Dict[str, Any]],
+    participants: list[dict[str, Any]],
     location_environment: str,
-    relics_involved: List[str],
+    relics_involved: list[str],
     emotional_tone: str,
     action_composition: str,
     lasting_consequence: str,
     privacy_consent_scope: str = "public_canon",
     importance_tier: str = "personal",
-    importance_score: Optional[int] = None,
-    importance_rationale: Optional[str] = None,
-) -> Dict[str, Any]:
+    importance_score: int | None = None,
+    importance_rationale: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     mem_id = f"mem_{str(uuid.uuid4())[:8]}"
 
     normalized_scope = privacy_consent_scope.strip().lower()
-    redacted_real_person_tags: List[str] = []
+    redacted_real_person_tags: list[str] = []
 
     # Importance score logic
     if importance_score is None:
@@ -2618,7 +2618,7 @@ def compile_memory_object_record(
     }
 
 
-def get_memory_objects_records() -> List[Dict[str, Any]]:
+def get_memory_objects_records() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM memory_objects ORDER BY created_at DESC")
@@ -2637,17 +2637,17 @@ def get_memory_objects_records() -> List[Dict[str, Any]]:
             "action_composition": r["action_composition"],
             "lasting_consequence": r["lasting_consequence"],
             "privacy_consent_scope": r["privacy_consent_scope"],
-            "importance_tier": r["importance_tier"]
-            if "importance_tier" in r.keys()
+            "importance_tier": r["importance_tier"]  # noqa: SIM401
+            if "importance_tier" in r
             else "personal",
-            "importance_score": r["importance_score"]
-            if "importance_score" in r.keys()
+            "importance_score": r["importance_score"]  # noqa: SIM401
+            if "importance_score" in r
             else 5,
             "is_painting_eligible": bool(r["is_painting_eligible"])
-            if "is_painting_eligible" in r.keys()
+            if "is_painting_eligible" in r
             else True,
-            "importance_rationale": r["importance_rationale"]
-            if "importance_rationale" in r.keys()
+            "importance_rationale": r["importance_rationale"]  # noqa: SIM401
+            if "importance_rationale" in r
             else None,
             "visual_generation_status": r["visual_generation_status"],
             "painting_image_url": r["painting_image_url"],
@@ -2657,7 +2657,7 @@ def get_memory_objects_records() -> List[Dict[str, Any]]:
     ]
 
 
-def get_memory_object_record(mem_id: str) -> Optional[Dict[str, Any]]:
+def get_memory_object_record(mem_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM memory_objects WHERE id = ?", (mem_id,))
@@ -2676,17 +2676,17 @@ def get_memory_object_record(mem_id: str) -> Optional[Dict[str, Any]]:
         "action_composition": r["action_composition"],
         "lasting_consequence": r["lasting_consequence"],
         "privacy_consent_scope": r["privacy_consent_scope"],
-        "importance_tier": r["importance_tier"]
-        if "importance_tier" in r.keys()
+        "importance_tier": r["importance_tier"]  # noqa: SIM401
+        if "importance_tier" in r
         else "personal",
-        "importance_score": r["importance_score"]
-        if "importance_score" in r.keys()
+        "importance_score": r["importance_score"]  # noqa: SIM401
+        if "importance_score" in r
         else 5,
         "is_painting_eligible": bool(r["is_painting_eligible"])
-        if "is_painting_eligible" in r.keys()
+        if "is_painting_eligible" in r
         else True,
-        "importance_rationale": r["importance_rationale"]
-        if "importance_rationale" in r.keys()
+        "importance_rationale": r["importance_rationale"]  # noqa: SIM401
+        if "importance_rationale" in r
         else None,
         "visual_generation_status": r["visual_generation_status"],
         "painting_image_url": r["painting_image_url"],
@@ -2697,7 +2697,7 @@ def get_memory_object_record(mem_id: str) -> Optional[Dict[str, Any]]:
 # Phase 10: Candidate & Continuity DB Helpers
 
 
-def _map_candidate_row(row: sqlite3.Row) -> Dict[str, Any]:
+def _map_candidate_row(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "candidate_id": row["candidate_id"],
         "soul_id": row["soul_id"],
@@ -2730,13 +2730,13 @@ def create_portrait_candidate_record(
     soul_id: str,
     generation_type: str,
     compiled_prompt: str,
-    canonical_identity_snapshot: Dict[str, Any],
-    story_marks_snapshot: List[Dict[str, Any]],
-    equipment_snapshot: Optional[Dict[str, Any]] = None,
-    source_portrait_version_id: Optional[str] = None,
-    reference_image_url: Optional[str] = None,
-    negative_prompt: Optional[str] = None,
-) -> Dict[str, Any]:
+    canonical_identity_snapshot: dict[str, Any],
+    story_marks_snapshot: list[dict[str, Any]],
+    equipment_snapshot: dict[str, Any] | None = None,
+    source_portrait_version_id: str | None = None,
+    reference_image_url: str | None = None,
+    negative_prompt: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -2780,13 +2780,13 @@ def update_candidate_generation_result(
     candidate_id: str,
     *,
     status: str,
-    generated_image_url: Optional[str] = None,
+    generated_image_url: str | None = None,
     provider: str = "mock",
     provider_model: str = "soulsmith-mock-v1",
-    provider_request_id: Optional[str] = None,
-    generation_seed: Optional[int] = None,
-    failure_reason: Optional[str] = None,
-) -> Dict[str, Any]:
+    provider_request_id: str | None = None,
+    generation_seed: int | None = None,
+    failure_reason: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -2831,8 +2831,8 @@ def update_candidate_generation_result(
 def approve_portrait_candidate_transaction(
     candidate_id: str,
     soul_id: str,
-    custom_label: Optional[str] = None,
-) -> Dict[str, Any]:
+    custom_label: str | None = None,
+) -> dict[str, Any]:
     """
     Transactionally approves a generated candidate into a permanent PortraitVersion.
     Uses the exact identity, marks, and equipment snapshots stored on the candidate.
@@ -2963,7 +2963,7 @@ def approve_portrait_candidate_transaction(
         raise
 
 
-def reject_portrait_candidate_record(candidate_id: str, soul_id: str) -> Dict[str, Any]:
+def reject_portrait_candidate_record(candidate_id: str, soul_id: str) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -3009,7 +3009,7 @@ def reject_portrait_candidate_record(candidate_id: str, soul_id: str) -> Dict[st
     return _map_candidate_row(updated_row)
 
 
-def get_portrait_candidate_record(candidate_id: str) -> Optional[Dict[str, Any]]:
+def get_portrait_candidate_record(candidate_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3023,7 +3023,7 @@ def get_portrait_candidate_record(candidate_id: str) -> Optional[Dict[str, Any]]
     return _map_candidate_row(row)
 
 
-def get_portrait_candidates_records(soul_id: str) -> List[Dict[str, Any]]:
+def get_portrait_candidates_records(soul_id: str) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3035,7 +3035,7 @@ def get_portrait_candidates_records(soul_id: str) -> List[Dict[str, Any]]:
     return [_map_candidate_row(r) for r in rows]
 
 
-def get_portrait_version_record(version_id: str) -> Optional[Dict[str, Any]]:
+def get_portrait_version_record(version_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3060,7 +3060,7 @@ def get_portrait_version_record(version_id: str) -> Optional[Dict[str, Any]]:
 # Phase 4: Visual Worldsmith DB Helpers
 
 
-def _map_visual_version_row(r: sqlite3.Row) -> Dict[str, Any]:
+def _map_visual_version_row(r: sqlite3.Row) -> dict[str, Any]:
     return {
         "version_id": r["version_id"],
         "entity_id": r["entity_id"],
@@ -3076,7 +3076,7 @@ def _map_visual_version_row(r: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
-def _map_world_candidate_row(r: sqlite3.Row) -> Dict[str, Any]:
+def _map_world_candidate_row(r: sqlite3.Row) -> dict[str, Any]:
     return {
         "candidate_id": r["candidate_id"],
         "entity_id": r["entity_id"],
@@ -3107,14 +3107,14 @@ def create_world_visual_candidate_record(
     entity_id: str,
     entity_type: str,
     generation_type: str,
-    canonical_snapshot: Dict[str, Any],
-    canonical_delta: Dict[str, Any],
+    canonical_snapshot: dict[str, Any],
+    canonical_delta: dict[str, Any],
     compiled_prompt: str,
     workflow_role: str,
-    negative_prompt: Optional[str] = None,
-    source_visual_version_id: Optional[str] = None,
-    reference_image_url: Optional[str] = None,
-) -> Dict[str, Any]:
+    negative_prompt: str | None = None,
+    source_visual_version_id: str | None = None,
+    reference_image_url: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cand_id = f"wvc_{str(uuid.uuid4())[:8]}"
@@ -3156,13 +3156,13 @@ def update_world_visual_candidate_result(
     candidate_id: str,
     *,
     status: str,
-    generated_image_url: Optional[str] = None,
+    generated_image_url: str | None = None,
     provider: str = "comfyui",
-    provider_model: Optional[str] = None,
-    provider_request_id: Optional[str] = None,
-    generation_seed: Optional[int] = None,
-    failure_reason: Optional[str] = None,
-) -> Dict[str, Any]:
+    provider_model: str | None = None,
+    provider_request_id: str | None = None,
+    generation_seed: int | None = None,
+    failure_reason: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3195,8 +3195,8 @@ def update_world_visual_candidate_result(
 
 
 def approve_world_visual_candidate_transaction(
-    candidate_id: str, label: Optional[str] = None
-) -> Dict[str, Any]:
+    candidate_id: str, label: str | None = None
+) -> dict[str, Any]:
     """
     Transactionally approve a generated world candidate into an immutable
     VisualEntityVersion. Idempotent: repeated approval returns the existing version.
@@ -3287,7 +3287,7 @@ def approve_world_visual_candidate_transaction(
         raise
 
 
-def reject_world_visual_candidate_record(candidate_id: str) -> Dict[str, Any]:
+def reject_world_visual_candidate_record(candidate_id: str) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3315,7 +3315,7 @@ def reject_world_visual_candidate_record(candidate_id: str) -> Dict[str, Any]:
     return _map_world_candidate_row(updated)
 
 
-def get_world_visual_candidate_record(candidate_id: str) -> Optional[Dict[str, Any]]:
+def get_world_visual_candidate_record(candidate_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3328,7 +3328,7 @@ def get_world_visual_candidate_record(candidate_id: str) -> Optional[Dict[str, A
 
 def get_world_visual_candidates_records(
     entity_type: str, entity_id: str
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3342,7 +3342,7 @@ def get_world_visual_candidates_records(
 
 def get_visual_entity_versions_records(
     entity_type: str, entity_id: str
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3354,7 +3354,7 @@ def get_visual_entity_versions_records(
     return [_map_visual_version_row(r) for r in rows]
 
 
-def get_visual_entity_version_record(version_id: str) -> Optional[Dict[str, Any]]:
+def get_visual_entity_version_record(version_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3368,7 +3368,7 @@ def get_visual_entity_version_record(version_id: str) -> Optional[Dict[str, Any]
 # Phase 12: Chronicle Paintings DB Helpers
 
 
-def _map_chronicle_painting_row(row: sqlite3.Row) -> Dict[str, Any]:
+def _map_chronicle_painting_row(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "painting_id": row["painting_id"],
         "memory_object_id": row["memory_object_id"],
@@ -3400,7 +3400,7 @@ def _map_chronicle_painting_row(row: sqlite3.Row) -> Dict[str, Any]:
     }
 
 
-def _map_guardian_report_row(row: sqlite3.Row) -> Dict[str, Any]:
+def _map_guardian_report_row(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "report_id": row["report_id"],
         "painting_id": row["painting_id"],
@@ -3418,13 +3418,13 @@ def create_chronicle_painting_record(
     memory_object_id: str,
     generation_type: str,
     compiled_prompt: str,
-    scene_spec: Dict[str, Any],
+    scene_spec: dict[str, Any],
     composition: str,
-    historical_participant_refs: List[Dict[str, Any]],
-    negative_prompt: Optional[str] = None,
-    source_painting_id: Optional[str] = None,
+    historical_participant_refs: list[dict[str, Any]],
+    negative_prompt: str | None = None,
+    source_painting_id: str | None = None,
     retry_count: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     painting_id = f"pnt_{str(uuid.uuid4())[:8]}"
@@ -3464,14 +3464,14 @@ def update_chronicle_painting_generation(
     painting_id: str,
     *,
     guardian_status: str,
-    status: Optional[str] = None,
-    quarantined_image_url: Optional[str] = None,
-    provider: Optional[str] = None,
-    provider_model: Optional[str] = None,
-    provider_request_id: Optional[str] = None,
-    generation_seed: Optional[int] = None,
-    failure_reason: Optional[str] = None,
-) -> Dict[str, Any]:
+    status: str | None = None,
+    quarantined_image_url: str | None = None,
+    provider: str | None = None,
+    provider_model: str | None = None,
+    provider_request_id: str | None = None,
+    generation_seed: int | None = None,
+    failure_reason: str | None = None,
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3515,9 +3515,9 @@ def update_chronicle_painting_promotion(
     painting_id: str,
     *,
     image_url: str,
-    guardian_report: Dict[str, Any],
+    guardian_report: dict[str, Any],
     status: str = "candidate",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3545,8 +3545,8 @@ def update_chronicle_painting_promotion(
 
 
 def record_chronicle_painting_guardian_report(
-    painting_id: str, report: Dict[str, Any]
-) -> Dict[str, Any]:
+    painting_id: str, report: dict[str, Any]
+) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     report_id = f"vgr_{str(uuid.uuid4())[:8]}"
@@ -3578,7 +3578,7 @@ def record_chronicle_painting_guardian_report(
 
 def get_chronicle_painting_guardian_reports(
     painting_id: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3591,7 +3591,7 @@ def get_chronicle_painting_guardian_reports(
     return [_map_guardian_report_row(r) for r in rows]
 
 
-def get_chronicle_painting_record(painting_id: str) -> Optional[Dict[str, Any]]:
+def get_chronicle_painting_record(painting_id: str) -> dict[str, Any] | None:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3604,7 +3604,7 @@ def get_chronicle_painting_record(painting_id: str) -> Optional[Dict[str, Any]]:
 
 def get_chronicle_paintings_records(
     memory_object_id: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -3617,7 +3617,7 @@ def get_chronicle_paintings_records(
     return [_map_chronicle_painting_row(r) for r in rows]
 
 
-def get_approved_chronicle_paintings_records() -> List[Dict[str, Any]]:
+def get_approved_chronicle_paintings_records() -> list[dict[str, Any]]:
     """
     Gallery-ready query: only approved paintings with a promoted SoulSmith-owned
     image URL are returned, joined with useful memory metadata.
@@ -3647,7 +3647,7 @@ def get_approved_chronicle_paintings_records() -> List[Dict[str, Any]]:
 
 def approve_chronicle_painting_transaction(
     painting_id: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Approve a Guardian-passed candidate as the preferred artistic interpretation
     of its Memory Object. Approving a replacement supersedes the previous
@@ -3729,7 +3729,7 @@ def approve_chronicle_painting_transaction(
         raise
 
 
-def reject_chronicle_painting_record(painting_id: str) -> Dict[str, Any]:
+def reject_chronicle_painting_record(painting_id: str) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(

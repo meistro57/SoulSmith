@@ -12,15 +12,13 @@ metadata.
 
 from __future__ import annotations
 
-from typing import List, Optional
-
+from app.chronicle_paintings import ParticipantAppearanceModel
 from app.db import get_portrait_version_record
 from app.visual_memory import (
     EquipmentAppearanceModel,
     MemoryObjectModel,
     StoryMarkModel,
 )
-from app.chronicle_paintings import ParticipantAppearanceModel
 
 
 class ParticipantResolutionError(ValueError):
@@ -29,7 +27,7 @@ class ParticipantResolutionError(ValueError):
 
 def resolve_historical_participants(
     memory_object: MemoryObjectModel,
-) -> List[ParticipantAppearanceModel]:
+) -> list[ParticipantAppearanceModel]:
     """
     Resolve each Memory Object participant to their exact historical appearance.
 
@@ -39,7 +37,7 @@ def resolve_historical_participants(
     - When no portrait reference is available, we emit a non-identifying
       strategy and deliberately omit identity-specific details.
     """
-    resolved: List[ParticipantAppearanceModel] = []
+    resolved: list[ParticipantAppearanceModel] = []
     for participant in memory_object.participants:
         portrait_version_id = participant.portrait_version_id or None
         if portrait_version_id:
@@ -98,8 +96,8 @@ def resolve_historical_participants(
 
 
 def primary_reference_image(
-    participants: List[ParticipantAppearanceModel],
-) -> Optional[str]:
+    participants: list[ParticipantAppearanceModel],
+) -> str | None:
     """
     Return the single participant reference image when exactly one participant
     has a historical portrait. Multiple distinct references cannot be preserved
