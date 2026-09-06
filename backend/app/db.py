@@ -674,6 +674,106 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 16: Legendary Figures & World Memory. Derived cultural memory; never
+    # authoritative over canonical history. Provenance, deviations, and memory
+    # state are relational, never an opaque JSON graph.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_memories (
+            memory_id TEXT PRIMARY KEY,
+            subject_entity_type TEXT NOT NULL,
+            subject_entity_id TEXT NOT NULL,
+            culture TEXT NOT NULL DEFAULT '',
+            era_context TEXT NOT NULL DEFAULT '',
+            memory_form TEXT NOT NULL,
+            interpretation_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            narrative TEXT NOT NULL DEFAULT '',
+            memory_state TEXT NOT NULL DEFAULT 'widely_remembered',
+            remembrance_scale TEXT NOT NULL DEFAULT 'local',
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            perspective TEXT NOT NULL DEFAULT 'omniscient_narrator',
+            status TEXT NOT NULL DEFAULT 'draft',
+            guardian_status TEXT NOT NULL DEFAULT 'pending',
+            guardian_report_json TEXT,
+            version_number INTEGER NOT NULL DEFAULT 1,
+            compiler_version TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT,
+            significance_rationale TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_memory_source_links (
+            link_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            claim_kind TEXT NOT NULL DEFAULT 'canonical_fact',
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_memory_deviations (
+            deviation_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            deviation_kind TEXT NOT NULL,
+            canon_supports TEXT NOT NULL DEFAULT '',
+            legend_claims TEXT NOT NULL DEFAULT '',
+            entry_note TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS legendary_figures (
+            figure_id TEXT PRIMARY KEY,
+            subject_soul_id TEXT,
+            subject_entity_type TEXT NOT NULL,
+            subject_entity_id TEXT NOT NULL,
+            figure_title TEXT NOT NULL,
+            later_cultural_titles_json TEXT NOT NULL DEFAULT '[]',
+            remembrance_scale TEXT NOT NULL DEFAULT 'regional',
+            memory_state TEXT NOT NULL DEFAULT 'widely_remembered',
+            eligibility_rationale TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS legendary_figure_links (
+            link_id TEXT PRIMARY KEY,
+            figure_id TEXT NOT NULL,
+            link_type TEXT NOT NULL,
+            link_ref TEXT NOT NULL,
+            link_label TEXT NOT NULL DEFAULT '',
+            is_canonical INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_memory_placements (
+            placement_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            placement_type TEXT NOT NULL,
+            placement_ref TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS world_memory_state_history (
+            state_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            previous_state TEXT NOT NULL,
+            new_state TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Track which Art Direction Profile/version produced a generated candidate.
     _add_column_if_missing(
         cursor,
@@ -5165,3 +5265,588 @@ def list_all_visual_entity_versions_records() -> list[dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     return [_map_visual_version_row(r) for r in rows]
+
+
+# Phase 16: Legendary Figures & World Memory DB Helpers
+
+
+def _map_world_memory_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "memory_id": row["memory_id"],
+        "subject_entity_type": row["subject_entity_type"],
+        "subject_entity_id": row["subject_entity_id"],
+        "culture": row["culture"],
+        "era_context": row["era_context"],
+        "memory_form": row["memory_form"],
+        "interpretation_type": row["interpretation_type"],
+        "title": row["title"],
+        "narrative": row["narrative"],
+        "memory_state": row["memory_state"],
+        "remembrance_scale": row["remembrance_scale"],
+        "visibility": row["visibility"],
+        "perspective": row["perspective"],
+        "status": row["status"],
+        "guardian_status": row["guardian_status"],
+        "guardian_report": _json_or_none(row["guardian_report_json"]),
+        "version_number": row["version_number"],
+        "compiler_version": row["compiler_version"],
+        "provider": row["provider"],
+        "provider_model": row["provider_model"],
+        "significance_rationale": row["significance_rationale"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_world_memory_deviation_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "deviation_id": row["deviation_id"],
+        "memory_id": row["memory_id"],
+        "deviation_kind": row["deviation_kind"],
+        "canon_supports": row["canon_supports"],
+        "legend_claims": row["legend_claims"],
+        "entry_note": row["entry_note"],
+        "created_at": row["created_at"],
+    }
+
+
+def _map_legendary_figure_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "figure_id": row["figure_id"],
+        "subject_soul_id": row["subject_soul_id"],
+        "subject_entity_type": row["subject_entity_type"],
+        "subject_entity_id": row["subject_entity_id"],
+        "figure_title": row["figure_title"],
+        "later_cultural_titles": _json_or_none(row["later_cultural_titles_json"]) or [],
+        "remembrance_scale": row["remembrance_scale"],
+        "memory_state": row["memory_state"],
+        "eligibility_rationale": row["eligibility_rationale"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_legendary_figure_link_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "link_id": row["link_id"],
+        "figure_id": row["figure_id"],
+        "link_type": row["link_type"],
+        "link_ref": row["link_ref"],
+        "link_label": row["link_label"],
+        "is_canonical": bool(row["is_canonical"]),
+        "created_at": row["created_at"],
+    }
+
+
+def create_world_memory_transaction(
+    *,
+    subject_entity_type: str,
+    subject_entity_id: str,
+    culture: str,
+    era_context: str,
+    memory_form: str,
+    interpretation_type: str,
+    title: str,
+    narrative: str,
+    memory_state: str,
+    remembrance_scale: str,
+    visibility: str,
+    perspective: str,
+    status: str,
+    guardian_status: str,
+    guardian_report: dict[str, Any],
+    compiler_version: str,
+    provider: str,
+    provider_model: str | None,
+    significance_rationale: str,
+    source_refs: list[dict[str, Any]],
+    deviations: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Atomically create an immutable World Memory with its provenance links and
+    declared deviations. World Memory is derived, never authoritative.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) as count FROM world_memories WHERE subject_entity_type = ? "
+            "AND subject_entity_id = ? AND culture = ? AND memory_form = ?",
+            (subject_entity_type, subject_entity_id, culture, memory_form),
+        )
+        version_number = (cursor.fetchone()["count"] or 0) + 1
+        memory_id = f"wm_{str(uuid.uuid4())[:8]}"
+
+        cursor.execute(
+            """
+            INSERT INTO world_memories (
+                memory_id, subject_entity_type, subject_entity_id, culture, era_context,
+                memory_form, interpretation_type, title, narrative, memory_state,
+                remembrance_scale, visibility, perspective, status, guardian_status,
+                guardian_report_json, version_number, compiler_version, provider,
+                provider_model, significance_rationale
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                memory_id,
+                subject_entity_type,
+                subject_entity_id,
+                culture,
+                era_context,
+                memory_form,
+                interpretation_type,
+                title,
+                narrative,
+                memory_state,
+                remembrance_scale,
+                visibility,
+                perspective,
+                status,
+                guardian_status,
+                json.dumps(guardian_report),
+                version_number,
+                compiler_version,
+                provider,
+                provider_model,
+                significance_rationale,
+            ),
+        )
+
+        for ref in source_refs:
+            cursor.execute(
+                """
+                INSERT INTO world_memory_source_links (
+                    link_id, memory_id, source_type, source_id, claim_kind, note
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    f"wmsl_{str(uuid.uuid4())[:8]}",
+                    memory_id,
+                    ref["source_type"],
+                    ref["source_id"],
+                    ref.get("claim_kind", "canonical_fact"),
+                    ref.get("note"),
+                ),
+            )
+
+        for deviation in deviations:
+            cursor.execute(
+                """
+                INSERT INTO world_memory_deviations (
+                    deviation_id, memory_id, deviation_kind, canon_supports,
+                    legend_claims, entry_note
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    f"wmd_{str(uuid.uuid4())[:8]}",
+                    memory_id,
+                    deviation["deviation_kind"],
+                    deviation.get("canon_supports", ""),
+                    deviation.get("legend_claims", ""),
+                    deviation.get("entry_note", ""),
+                ),
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+    memory = get_world_memory_record(memory_id)
+    conn.close()
+    return memory
+
+
+def _load_world_memory_children(
+    conn: sqlite3.Connection, memory_id: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_memory_source_links WHERE memory_id = ? ORDER BY created_at ASC",
+        (memory_id,),
+    )
+    source_refs = [
+        {
+            "source_type": r["source_type"],
+            "source_id": r["source_id"],
+            "claim_kind": r["claim_kind"],
+            "note": r["note"],
+        }
+        for r in cursor.fetchall()
+    ]
+    cursor.execute(
+        "SELECT * FROM world_memory_deviations WHERE memory_id = ? ORDER BY created_at ASC",
+        (memory_id,),
+    )
+    deviations = [_map_world_memory_deviation_row(r) for r in cursor.fetchall()]
+    return source_refs, deviations
+
+
+def get_world_memory_record(memory_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM world_memories WHERE memory_id = ?", (memory_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    memory = _map_world_memory_row(row)
+    source_refs, deviations = _load_world_memory_children(conn, memory_id)
+    conn.close()
+    memory["source_refs"] = source_refs
+    memory["deviations"] = deviations
+    return memory
+
+
+def list_world_memory_records(
+    *,
+    subject_entity_type: str | None = None,
+    subject_entity_id: str | None = None,
+    culture: str | None = None,
+    era_context: str | None = None,
+    memory_form: str | None = None,
+    memory_state: str | None = None,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "SELECT * FROM world_memories WHERE 1=1"
+    params: list[Any] = []
+    if subject_entity_type:
+        query += " AND subject_entity_type = ?"
+        params.append(subject_entity_type)
+    if subject_entity_id:
+        query += " AND subject_entity_id = ?"
+        params.append(subject_entity_id)
+    if culture:
+        query += " AND culture = ?"
+        params.append(culture)
+    if era_context:
+        query += " AND era_context = ?"
+        params.append(era_context)
+    if memory_form:
+        query += " AND memory_form = ?"
+        params.append(memory_form)
+    if memory_state:
+        query += " AND memory_state = ?"
+        params.append(memory_state)
+    query += " ORDER BY version_number DESC, created_at DESC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        memory = _map_world_memory_row(row)
+        source_refs, deviations = _load_world_memory_children(conn, row["memory_id"])
+        memory["source_refs"] = source_refs
+        memory["deviations"] = deviations
+        results.append(memory)
+    conn.close()
+    return results
+
+
+def list_world_memory_versions_records(
+    subject_entity_type: str, subject_entity_id: str, culture: str, memory_form: str
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_memories WHERE subject_entity_type = ? AND "
+        "subject_entity_id = ? AND culture = ? AND memory_form = ? "
+        "ORDER BY version_number DESC",
+        (subject_entity_type, subject_entity_id, culture, memory_form),
+    )
+    rows = cursor.fetchall()
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        memory = _map_world_memory_row(row)
+        source_refs, deviations = _load_world_memory_children(conn, row["memory_id"])
+        memory["source_refs"] = source_refs
+        memory["deviations"] = deviations
+        results.append(memory)
+    conn.close()
+    return results
+
+
+def approve_world_memory_record(memory_id: str) -> dict[str, Any]:
+    """Approve a Guardian-passed draft, superseding any prior current version."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM world_memories WHERE memory_id = ?", (memory_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"World memory '{memory_id}' not found")
+    if row["status"] == "current":
+        conn.close()
+        return get_world_memory_record(memory_id)
+    if row["status"] != "draft":
+        conn.close()
+        raise ValueError(
+            f"Cannot approve world memory '{memory_id}' in status '{row['status']}'."
+        )
+    if row["guardian_status"] != "passed":
+        conn.close()
+        raise ValueError(
+            f"World memory '{memory_id}' has not passed the World Memory Guardian."
+        )
+    cursor.execute(
+        """
+        UPDATE world_memories SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
+        WHERE subject_entity_type = ? AND subject_entity_id = ? AND culture = ?
+        AND memory_form = ? AND status = 'current'
+    """,
+        (
+            row["subject_entity_type"],
+            row["subject_entity_id"],
+            row["culture"],
+            row["memory_form"],
+        ),
+    )
+    cursor.execute(
+        "UPDATE world_memories SET status = 'current', updated_at = CURRENT_TIMESTAMP "
+        "WHERE memory_id = ?",
+        (memory_id,),
+    )
+    conn.commit()
+    conn.close()
+    return get_world_memory_record(memory_id)
+
+
+def reject_world_memory_record(memory_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM world_memories WHERE memory_id = ?", (memory_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"World memory '{memory_id}' not found")
+    if row["status"] == "current":
+        conn.close()
+        raise ValueError(
+            f"World memory '{memory_id}' is current and cannot be rejected."
+        )
+    cursor.execute(
+        "UPDATE world_memories SET status = 'rejected', updated_at = CURRENT_TIMESTAMP "
+        "WHERE memory_id = ?",
+        (memory_id,),
+    )
+    conn.commit()
+    conn.close()
+    return get_world_memory_record(memory_id)
+
+
+def mark_world_memory_state_record(
+    memory_id: str, new_state: str, reason: str
+) -> dict[str, Any]:
+    """Record a memory-state transition without deleting canonical history."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM world_memories WHERE memory_id = ?", (memory_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"World memory '{memory_id}' not found")
+    previous_state = row["memory_state"]
+    state_id = f"wms_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO world_memory_state_history (
+            state_id, memory_id, previous_state, new_state, reason
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (state_id, memory_id, previous_state, new_state, reason),
+    )
+    cursor.execute(
+        "UPDATE world_memories SET memory_state = ?, updated_at = CURRENT_TIMESTAMP "
+        "WHERE memory_id = ?",
+        (new_state, memory_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_world_memory_record(memory_id)
+
+
+def get_world_memory_state_history_records(memory_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_memory_state_history WHERE memory_id = ? "
+        "ORDER BY created_at ASC",
+        (memory_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "state_id": r["state_id"],
+            "memory_id": r["memory_id"],
+            "previous_state": r["previous_state"],
+            "new_state": r["new_state"],
+            "reason": r["reason"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def create_legendary_figure_record(
+    *,
+    subject_soul_id: str | None,
+    subject_entity_type: str,
+    subject_entity_id: str,
+    figure_title: str,
+    later_cultural_titles: list[str],
+    remembrance_scale: str,
+    memory_state: str,
+    eligibility_rationale: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    figure_id = f"lgf_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO legendary_figures (
+            figure_id, subject_soul_id, subject_entity_type, subject_entity_id,
+            figure_title, later_cultural_titles_json, remembrance_scale,
+            memory_state, eligibility_rationale, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+    """,
+        (
+            figure_id,
+            subject_soul_id,
+            subject_entity_type,
+            subject_entity_id,
+            figure_title,
+            json.dumps(later_cultural_titles),
+            remembrance_scale,
+            memory_state,
+            eligibility_rationale,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return get_legendary_figure_record(figure_id)
+
+
+def add_legendary_figure_link_record(
+    *,
+    figure_id: str,
+    link_type: str,
+    link_ref: str,
+    link_label: str = "",
+    is_canonical: bool = True,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    link_id = f"lgfl_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO legendary_figure_links (
+            link_id, figure_id, link_type, link_ref, link_label, is_canonical
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (link_id, figure_id, link_type, link_ref, link_label, 1 if is_canonical else 0),
+    )
+    conn.commit()
+    conn.close()
+    return _get_legendary_figure_link_record(link_id)
+
+
+def _get_legendary_figure_link_record(link_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM legendary_figure_links WHERE link_id = ?", (link_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_legendary_figure_link_row(row)
+
+
+def get_legendary_figure_record(figure_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM legendary_figures WHERE figure_id = ?", (figure_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    figure = _map_legendary_figure_row(row)
+    cursor.execute(
+        "SELECT * FROM legendary_figure_links WHERE figure_id = ? ORDER BY created_at ASC",
+        (figure_id,),
+    )
+    figure["links"] = [_map_legendary_figure_link_row(r) for r in cursor.fetchall()]
+    conn.close()
+    return figure
+
+
+def list_legendary_figures_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM legendary_figures ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [get_legendary_figure_record(r["figure_id"]) for r in rows]
+
+
+def create_world_memory_placement_record(
+    *,
+    memory_id: str,
+    placement_type: str,
+    placement_ref: str,
+    visibility: str = "public_canon",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    placement_id = f"wmp_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO world_memory_placements (
+            placement_id, memory_id, placement_type, placement_ref, visibility
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (placement_id, memory_id, placement_type, placement_ref, visibility),
+    )
+    conn.commit()
+    conn.close()
+    return _get_world_memory_placement_record(placement_id)
+
+
+def _get_world_memory_placement_record(placement_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_memory_placements WHERE placement_id = ?", (placement_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "placement_id": row["placement_id"],
+        "memory_id": row["memory_id"],
+        "placement_type": row["placement_type"],
+        "placement_ref": row["placement_ref"],
+        "visibility": row["visibility"],
+        "created_at": row["created_at"],
+    }
+
+
+def list_world_memory_placements_records(memory_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM world_memory_placements WHERE memory_id = ? ORDER BY created_at ASC",
+        (memory_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "placement_id": r["placement_id"],
+            "memory_id": r["memory_id"],
+            "placement_type": r["placement_type"],
+            "placement_ref": r["placement_ref"],
+            "visibility": r["visibility"],
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]

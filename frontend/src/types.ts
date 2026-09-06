@@ -751,3 +751,150 @@ export const isCanonicalDiceRead = (value: unknown): value is CanonicalDiceRead 
 };
 
 export const toNumericDiceRoll = (raw: CanonicalDiceRead['raw'], grammarVersion: string): NumericDiceRoll => ({ ...raw, grammar_version: grammarVersion });
+// Phase 16: Legendary Figures & World Memory
+export type WorldMemoryForm =
+  | 'legend'
+  | 'historical_account'
+  | 'folk_tale'
+  | 'rumor'
+  | 'oral_tradition'
+  | 'song_ballad'
+  | 'inscription'
+  | 'memorial'
+  | 'monument_statue'
+  | 'displayed_artwork'
+  | 'archival_document'
+  | 'festival_tradition'
+  | 'place_name_inheritance'
+  | 'relic_legend'
+  | 'lineage_tradition'
+  | 'religious_mythic_interpretation'
+  | 'forgotten_fragment';
+
+export type InterpretationType =
+  | 'faithful'
+  | 'simplified'
+  | 'selective'
+  | 'symbolic'
+  | 'exaggerated'
+  | 'contradictory'
+  | 'corrupted'
+  | 'fragmented'
+  | 'mythologized'
+  | 'disputed'
+  | 'unknown';
+
+export type MemoryState =
+  | 'widely_remembered'
+  | 'locally_remembered'
+  | 'archived_obscure'
+  | 'fragmented'
+  | 'misattributed'
+  | 'suppressed'
+  | 'forgotten'
+  | 'rediscovered';
+
+export type RemembranceScale = 'personal' | 'local' | 'regional' | 'world_famous' | 'forgotten';
+
+export interface WorldMemorySourceRef {
+  source_type: string;
+  source_id: string;
+  claim_kind: string;
+  note?: string;
+}
+
+export interface WorldMemoryDeviation {
+  deviation_id: string;
+  memory_id: string;
+  deviation_kind: string;
+  canon_supports: string;
+  legend_claims: string;
+  entry_note: string;
+  created_at?: string;
+}
+
+export interface WorldMemoryGuardianReport {
+  status: string;
+  confidence: number;
+  violations: Array<Record<string, any>>;
+  diagnostics: string[];
+  correction_instructions: string[];
+}
+
+export interface WorldMemory {
+  memory_id: string;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  culture: string;
+  era_context: string;
+  memory_form: WorldMemoryForm;
+  interpretation_type: InterpretationType;
+  title: string;
+  narrative: string;
+  memory_state: MemoryState;
+  remembrance_scale: RemembranceScale;
+  visibility: string;
+  perspective: string;
+  status: string;
+  guardian_status: string;
+  guardian_report?: WorldMemoryGuardianReport;
+  version_number: number;
+  compiler_version: string;
+  provider: string;
+  provider_model?: string;
+  significance_rationale: string;
+  source_refs: WorldMemorySourceRef[];
+  deviations: WorldMemoryDeviation[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LegendaryFigureLink {
+  link_id: string;
+  figure_id: string;
+  link_type: string;
+  link_ref: string;
+  link_label: string;
+  is_canonical: boolean;
+  created_at?: string;
+}
+
+export interface LegendaryFigure {
+  figure_id: string;
+  subject_soul_id?: string;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  figure_title: string;
+  later_cultural_titles: string[];
+  remembrance_scale: RemembranceScale;
+  memory_state: MemoryState;
+  eligibility_rationale: string;
+  status: string;
+  links: LegendaryFigureLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorldMemoryPlacement {
+  placement_id: string;
+  memory_id: string;
+  placement_type: string;
+  placement_ref: string;
+  visibility: string;
+  created_at?: string;
+}
+
+export interface NPCKnowledgeEntry {
+  memory: WorldMemory;
+  fidelity: string;
+  canonical_truth_visible: boolean;
+  reason: string;
+}
+
+export interface NPCKnowledgeProjection {
+  npc: Record<string, any>;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  entries: NPCKnowledgeEntry[];
+  canonical_truth_accessible: boolean;
+}

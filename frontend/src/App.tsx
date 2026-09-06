@@ -19,13 +19,14 @@ import { ReflectionAccessibilityView } from './components/ReflectionAccessibilit
 import { VisualMemoryView } from './components/visual-memory/VisualMemoryView';
 import { WorldAtlasView } from './components/WorldAtlasView';
 import { WorldGalleryView } from './components/WorldGalleryView';
+import { WorldMemoryView } from './components/WorldMemoryView';
 import { BiographyView } from './components/BiographyView';
 import { AuthModal } from './components/AuthModal';
 
 import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe, Landmark } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -249,6 +250,7 @@ export function App() {
               { id: 'visual_memory', label: 'Visual Memory', icon: Layers },
               { id: 'world_atlas', label: 'World Atlas', icon: Globe },
               { id: 'world_gallery', label: 'World Gallery', icon: Landmark },
+              { id: 'world_memory', label: 'World Memory', icon: BookOpen },
               { id: 'art', label: 'Mythic Art', icon: Image }
             ].map((tab) => {
               const Icon = tab.icon;
@@ -506,6 +508,8 @@ export function App() {
         {activeTab === 'world_atlas' && <WorldAtlasView />}
 
         {activeTab === 'world_gallery' && <WorldGalleryView soulName={soulSheet.name} />}
+
+        {activeTab === 'world_memory' && <WorldMemoryView soulName={soulSheet.name} />}
 
         {activeTab === 'art' && <MythicGalleryView />}
       </main>

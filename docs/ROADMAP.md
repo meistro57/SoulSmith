@@ -679,6 +679,68 @@ Campaign-level visual voice and world galleries.
 
 See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](ART_DIRECTOR_AND_WORLD_GALLERY.md).
 
+### Phase 16: Legendary Figures & World Memory `[Status: Integrated]`
+
+Let the world itself remember, centuries after the original participants are gone.
+
+> **HISTORY MAY BECOME LEGEND. LEGEND MUST NEVER BECOME HISTORY BY ACCIDENT.**
+
+- A persistent, derived `WorldMemory` record (stable ID, source links, subject,
+  culture/faction/region perspective, era, memory form, interpretation type,
+  provenance, declared drift, visibility, in-world placement, version history)
+  that never mutates its canonical sources.
+- Structured memory forms (legend, historical account, folk tale, rumor, oral
+  tradition, song, inscription, memorial, monument/statue, displayed artwork,
+  archival document, festival, place-name inheritance, relic legend, lineage
+  tradition, mythic/religious interpretation, forgotten fragment) kept
+  extensible without becoming arbitrary free text.
+- An explicit truth-distance model (`faithful`, `simplified`, `selective`,
+  `symbolic`, `exaggerated`, `contradictory`, `corrupted`, `fragmented`,
+  `mythologized`, `disputed`, `unknown`) with inspectable per-deviation records
+  (`canon_supports`, `legend_claims`, `deviation_kind`, entry note).
+- Competing histories: multiple cultures may remember one event differently
+  without reconciliation; provenance distinguishes what happened, who says what,
+  and what later culture believes.
+- Legendary Figure records that reference canonical identity, Biography, portrait
+  timeline, Chronicle events, StoryMarks, relationships, relics, locations,
+  Group Memories, and approved artworks without copying or mutating them.
+  Canonical titles and later cultural titles stay visibly distinct.
+- Significance/eligibility derived from canonical importance, group
+  significance, and recurring references only; no popularity counter overrides
+  narrative significance. Remembrance scales range from personal memory to
+  world-famous legend to forgotten/obscure.
+- Forgetting and rediscovery as a derived lifecycle (widely remembered, locally
+  remembered, archived, fragmented, misattributed, suppressed, forgotten,
+  rediscovered) that never deletes canonical records.
+- Consent-safe, provenance-aware NPC historical-knowledge projection scoped by
+  culture, location, era, social role, archive access, education, local
+  tradition, direct relationship, and publication state. NPCs never
+  automatically receive the canonical database truth.
+- Relic legend integration (relic legends stay distinct from relic history) and
+  Soul Constellation integration (cross-Aspect echoes that never force a
+  metaphysical interpretation).
+- World Gallery integration: selected artifacts may be placed in-world while
+  gallery visibility and in-world availability remain independent.
+- Provider-backed cultural-artifact generation (legend, song, inscription, etc.)
+  from a structured, consent-filtered `WorldMemorySpec`, with a deterministic
+  mock and no external AI requirement.
+- A World Memory Guardian (pass/retry/block) that rejects undeclared drift,
+  undeclared hallucinated facts, unknown sources, private information leaks,
+  omniscient claims from scoped perspectives, undeclared participant invention,
+  and unapproved visual references — a declared exaggeration may pass, an
+  undeclared one must fail.
+
+**Exit criteria**
+- A canonical event can become a derived World Memory while its source Chronicle
+  record remains unchanged.
+- A past player or Aspect can become a Legendary Figure whose portrait, relics,
+  and stories survive, with every legend traceable to history and every
+  deviation explicit.
+- Forgetting does not delete canon; rediscovery restores visibility, not canon.
+- NPC knowledge is scoped and never omniscient; privacy remains intact.
+
+See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
+
 ---
 
 ## Near-Term Implementation Priorities

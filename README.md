@@ -416,6 +416,7 @@ Key Features Built:
 25. **Group Memories & Tags**: A relational `GroupMemory` linking participant-specific Memory Objects to the same shared event without rewriting them — deterministic exact-event-ID grouping, typed ID-anchored tags, shared anchors locked to historical visual versions, participant-specific consent filtering, and a narrative "everyone remembers the same moment differently" perspective view. See [`docs/GROUP_MEMORIES.md`](docs/GROUP_MEMORIES.md).
 26. **Living Biography**: An evolving, provenance-aware life story derived from the Chronicle (never rewriting it) — a deterministic structured compiler, immutable version/section/provenance model, chronology without invented dates, recurring-thread extraction, fact-vs-perspective classification, a deterministic narrative provider, a Biography Guardian, draft/current/version lifecycle, consent-aware public/private publication, and a reading experience with expandable "From the Chronicle" provenance. See [`docs/LIVING_BIOGRAPHY.md`](docs/LIVING_BIOGRAPHY.md).
 27. **Art Director & World Gallery**: Persistent, versioned Art Direction Profiles that give portraits, world visuals, and Chronicle artwork a coherent visual language *without changing what they depict* — a deterministic style hierarchy and inspectable Art Direction Spec, honest provider-capability degradation, an optional style reviewer that can never override a Visual Canon Guardian BLOCK, and a consent-safe, accessible World Gallery with curated Collections and immutable timelines. See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
+28. **Legendary Figures & World Memory**: The world itself remembers — preserved Chronicle, Group Memory, Biography, relic, and Gallery history becomes derived in-world cultural memory (legends, monuments, songs, festivals, relic legends, NPC knowledge) under the invariant **history may become legend, legend must never become history by accident**. Every legend carries normalized provenance and declared drift, Legendary Figures reference canonical identity without mutating it, forgetting never deletes canon, and a World Memory Guardian rejects undeclared hallucinations while letting declared exaggeration pass. See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
 
 ---
 
@@ -626,6 +627,52 @@ POST  /api/v1/gallery/collections/{id}/reorder
 ```
 
 See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
+
+## Legendary Figures & World Memory
+
+Phase 16 lets the world itself remember. Preserved canonical history — Chronicle
+Memory Objects, Group Memories, Living Biographies, relic history, and approved
+visual history — becomes derived in-world cultural memory: legends, monuments,
+books, festivals, renamed places, inherited relic stories, memorials, statues,
+songs, oral traditions, archives, and NPC knowledge.
+
+```text
+CANONICAL HISTORY -> WORLD MEMORY COMPILER -> CULTURAL MEMORY ARTIFACTS -> IN-WORLD PRESENCE
+```
+
+> **HISTORY MAY BECOME LEGEND. LEGEND MUST NEVER BECOME HISTORY BY ACCIDENT.**
+
+- **World Memory** is derived, never authoritative. Every record carries normalized
+  source links, an interpretation type (`faithful` … `mythologized`), and declared
+  deviations (`canon_supports` vs `legend_claims`) so drift is explicit and traceable.
+- **Competing histories** coexist: multiple cultures may remember one event
+  differently, and provenance distinguishes what happened from what later culture
+  believes happened.
+- **Legendary Figures** reference canonical identity, Biography, portraits,
+  Chronicle events, StoryMarks, relics, locations, Group Memories, and approved
+  artworks without copying or mutating them; canonical titles stay distinct from
+  later cultural titles.
+- **Forgetting and rediscovery** are derived lifecycle states; forgetting never
+  deletes canon.
+- **NPC historical knowledge** is consent-safe and scoped by culture, location,
+  era, role, archive access, education, tradition, and relationship — an NPC never
+  automatically receives the canonical database truth.
+- **World Memory Guardian** (pass/retry/block) rejects undeclared drift,
+  undeclared hallucinated facts, private leaks, scoped-perspective omniscience, and
+  unapproved visual references. A declared exaggeration passes; an undeclared one
+  fails.
+
+```text
+POST /api/v1/world-memory/compile
+GET  /api/v1/world-memory?subject_entity_type=...&subject_entity_id=...
+GET  /api/v1/world-memory/{memory_id}/deviations
+POST /api/v1/world-memory/{memory_id}/mark-state
+POST /api/v1/world-memory/npc-knowledge
+POST /api/v1/legendary-figures/promote
+GET  /api/v1/legendary-figures
+```
+
+See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
 
 ## Canonical Roll Contract
 

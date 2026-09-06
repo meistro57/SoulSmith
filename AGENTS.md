@@ -101,6 +101,10 @@ npm run build       # tsc -b && vite build
 | `art_director.py` | Phase 15 Art Director: versioned Art Direction Profile models, deterministic style hierarchy/resolution, Art Direction Spec compiler, provider-capability awareness. Controls interpretation, never canon. |
 | `style_reviewer.py` | Phase 15 optional Art Direction Reviewer: deterministic mock style-compliance check that can never override a Visual Canon Guardian BLOCK. |
 | `world_gallery.py` | Phase 15 World Gallery: consent-safe projection/query service for approved portraits, world visuals, Chronicle Paintings, shared moments, and biography illustrations, plus Collections/Exhibitions and timelines. |
+| `world_memory.py` | Phase 16 World Memory: derived cultural-memory models (World Memory, deviations, Legendary Figures, placements, memory states), truth-distance/drift, significance/eligibility, forgetting/rediscovery, and consent-safe NPC knowledge projection. |
+| `world_memory_compiler.py` | Phase 16 deterministic World Memory compiler: gathers consent-filtered canonical sources into an inspectable `WorldMemorySpec` before provider generation and Guardian validation. |
+| `world_memory_provider.py` | Phase 16 cultural-artifact provider abstraction (mock default) that renders a structured spec into legend/song/inscription/etc. without inventing undeclared canon. |
+| `world_memory_guardian.py` | Phase 16 World Memory Guardian (pass/retry/block): verifies deviations are declared and safe, never "corrects" legends into canon. |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -189,6 +193,8 @@ This is the single most important rule in the codebase:
 
 18. **The Art Director controls interpretation, not canon.** Phase 15 (`art_director.py`, `style_reviewer.py`, `world_gallery.py`) keeps style and canon separate: Art Direction Profiles store only stylistic treatment, updating a profile appends an immutable `art_direction_profile_versions` row, and profile selection on candidate/painting creation is optional (tracked via `art_direction_profile_id`/`art_direction_profile_version_id` columns). The World Gallery (`world_gallery.py`) is a publication surface that returns only approved, consent-safe artifacts; private participants must never leak through images, captions, provenance, counts, or alt text. The optional style reviewer can never override a Visual Canon Guardian BLOCK. See `docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`.
 
+19. **World Memory is derived, never canonical.** Phase 16 (`world_memory.py`, `world_memory_compiler.py`, `world_memory_provider.py`, `world_memory_guardian.py`) turns preserved history into cultural memory (legends, monuments, songs, festivals, relic legends, NPC knowledge) under the invariant **history may become legend, legend must never become history by accident**. World Memory rows (`world_memories`) carry normalized source links, declared deviations, memory-state history, and Legendary Figure links; they never mutate Memory Objects, Group Memories, Biographies, relics, or approved visual history. The World Memory Guardian (pass/retry/block) rejects undeclared drift, undeclared hallucinated facts, private leaks, scoped-perspective omniscience, and unapproved visual references — a declared exaggeration passes, an undeclared one fails. NPC knowledge projection is consent-safe and scoped; an NPC never automatically receives canonical database truth. See `docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`.
+
 ---
 
 ## Testing approach
@@ -207,4 +213,5 @@ This is the single most important rule in the codebase:
 - Frontend API surface → `frontend/src/lib/api.ts`, `frontend/src/types.ts`
 - 3D dice renderer → `frontend/src/three/`, `docs/DICE_RENDERING_SYSTEM.md`
 - Art direction & gallery → `backend/app/art_director.py`, `backend/app/world_gallery.py`, `docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`
+- Legendary Figures & World Memory → `backend/app/world_memory.py`, `backend/app/world_memory_compiler.py`, `backend/app/world_memory_guardian.py`, `docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`
 - Current design intent and roadmap → `docs/ROADMAP.md`

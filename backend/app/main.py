@@ -79,10 +79,12 @@ from app.db import (
     add_group_memory_anchor_record,
     add_group_memory_member_record,
     add_group_memory_tag_record,
+    add_legendary_figure_link_record,
     add_story_mark_record,
     approve_biography_transaction,
     approve_chronicle_painting_transaction,
     approve_portrait_candidate_transaction,
+    approve_world_memory_record,
     approve_world_visual_candidate_transaction,
     compile_memory_object_record,
     create_art_direction_profile_record,
@@ -92,11 +94,13 @@ from app.db import (
     create_cross_aspect_bond_record,
     create_gallery_collection_record,
     create_group_memory_record,
+    create_legendary_figure_record,
     create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
     create_reflection_record,
     create_user_record,
+    create_world_memory_placement_record,
     create_world_visual_candidate_record,
     execute_integration_event,
     get_all_canonical_events,
@@ -119,6 +123,7 @@ from app.db import (
     get_group_memory_members_records,
     get_group_memory_record,
     get_group_memory_tags_records,
+    get_legendary_figure_record,
     get_memory_object_record,
     get_memory_objects_by_event_record,
     get_memory_objects_records,
@@ -142,6 +147,8 @@ from app.db import (
     get_user_by_username,
     get_visual_entity_version_record,
     get_visual_entity_versions_records,
+    get_world_memory_record,
+    get_world_memory_state_history_records,
     get_world_visual_candidate_record,
     get_world_visual_candidates_records,
     init_database,
@@ -150,12 +157,18 @@ from app.db import (
     list_biography_records,
     list_gallery_collections_records,
     list_group_memory_records,
+    list_legendary_figures_records,
+    list_world_memory_placements_records,
+    list_world_memory_records,
+    list_world_memory_versions_records,
     log_canonical_event,
     log_probable_path_record,
+    mark_world_memory_state_record,
     plant_or_echo_seed,
     reject_biography_record,
     reject_chronicle_painting_record,
     reject_portrait_candidate_record,
+    reject_world_memory_record,
     reject_world_visual_candidate_record,
     remove_gallery_collection_item_record,
     remove_group_memory_member_record,
@@ -285,6 +298,25 @@ from app.world_gallery import (
     ReorderGalleryCollectionRequest,
     UpdateGalleryCollectionRequest,
     list_gallery_artifacts,
+)
+from app.world_memory import (
+    CompileWorldMemoryRequest,
+    LegendaryFigureModel,
+    MarkMemoryStateRequest,
+    NPCKnowledgeRequest,
+    PlaceWorldMemoryRequest,
+    PromoteLegendaryFigureRequest,
+    WorldMemoryDeviationModel,
+    WorldMemoryModel,
+    WorldMemoryPlacementModel,
+    project_npc_knowledge,
+    project_world_memory_for_viewer,
+    world_memory_visible_to,
+)
+from app.world_memory_compiler import (
+    WorldMemoryCompilationError,
+    compile_world_memory,
+    gather_world_memory_sources,
 )
 from app.world_visual_provider import (
     WorldVisualGenerationRequest,
@@ -2390,6 +2422,318 @@ def reorder_gallery_collection_endpoint(
         collection_id, req.ordered_item_ids
     )
     return {"collection": GalleryCollectionModel(**updated)}
+
+
+# Phase 16: Legendary Figures & World Memory
+
+
+def _project_world_memory(memory: dict, viewer_soul_id: str | None) -> WorldMemoryModel:
+    projected = project_world_memory_for_viewer(memory, viewer_soul_id)
+    return WorldMemoryModel(**projected)
+
+
+@app.post("/api/v1/world-memory/compile")
+def compile_world_memory_endpoint(req: CompileWorldMemoryRequest):
+    try:
+        result = compile_world_memory(
+            subject_entity_type=req.subject_entity_type,
+            subject_entity_id=req.subject_entity_id,
+            culture=req.culture,
+            era_context=req.era_context,
+            memory_form=req.memory_form,
+            interpretation_type=req.interpretation_type,
+            remembrance_scale=req.remembrance_scale,
+            visibility=req.visibility,
+            perspective=req.perspective,
+            viewer_soul_id=req.viewer_soul_id,
+        )
+    except WorldMemoryCompilationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    memory = _project_world_memory(result["memory"], req.viewer_soul_id)
+    return {"memory": memory.model_dump(), "guardian_report": result["guardian_report"]}
+
+
+@app.get("/api/v1/world-memory")
+def list_world_memory_endpoint(
+    viewer_soul_id: str | None = None,
+    subject_entity_type: str | None = None,
+    subject_entity_id: str | None = None,
+    culture: str | None = None,
+    era_context: str | None = None,
+    memory_form: str | None = None,
+    memory_state: str | None = None,
+):
+    records = list_world_memory_records(
+        subject_entity_type=subject_entity_type,
+        subject_entity_id=subject_entity_id,
+        culture=culture,
+        era_context=era_context,
+        memory_form=memory_form,
+        memory_state=memory_state,
+    )
+    return {
+        "memories": [
+            _project_world_memory(m, viewer_soul_id).model_dump()
+            for m in records
+            if world_memory_visible_to(m, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}")
+def get_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {"memory": _project_world_memory(memory, viewer_soul_id).model_dump()}
+
+
+@app.get("/api/v1/world-memory/{memory_id}/versions")
+def list_world_memory_versions_endpoint(
+    memory_id: str, viewer_soul_id: str | None = None
+):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    versions = list_world_memory_versions_records(
+        memory["subject_entity_type"],
+        memory["subject_entity_id"],
+        memory["culture"],
+        memory["memory_form"],
+    )
+    return {
+        "versions": [
+            _project_world_memory(v, viewer_soul_id).model_dump() for v in versions
+        ]
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}/deviations")
+def get_world_memory_deviations_endpoint(
+    memory_id: str, viewer_soul_id: str | None = None
+):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    if not world_memory_visible_to(memory, viewer_soul_id):
+        return {"deviations": [], "provenance": []}
+    return {
+        "deviations": [WorldMemoryDeviationModel(**d) for d in memory["deviations"]],
+        "provenance": memory["source_refs"],
+    }
+
+
+@app.get("/api/v1/world-memory/query")
+def query_world_memory_endpoint(
+    subject_entity_type: str,
+    subject_entity_id: str,
+    culture: str | None = None,
+    era_context: str | None = None,
+    viewer_soul_id: str | None = None,
+):
+    records = list_world_memory_records(
+        subject_entity_type=subject_entity_type,
+        subject_entity_id=subject_entity_id,
+        culture=culture,
+        era_context=era_context,
+    )
+    return {
+        "memories": [
+            _project_world_memory(m, viewer_soul_id).model_dump()
+            for m in records
+            if world_memory_visible_to(m, viewer_soul_id)
+        ]
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/approve")
+def approve_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    try:
+        memory = approve_world_memory_record(memory_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": "World Memory approved as current. Canonical Chronicle was untouched.",
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/reject")
+def reject_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    try:
+        memory = reject_world_memory_record(memory_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": "World Memory rejected. Canonical Chronicle was untouched.",
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/mark-state")
+def mark_world_memory_state_endpoint(
+    memory_id: str, req: MarkMemoryStateRequest, viewer_soul_id: str | None = None
+):
+    try:
+        memory = mark_world_memory_state_record(memory_id, req.new_state, req.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": f"World Memory state marked '{req.new_state}'. Canon was not deleted.",
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}/state-history")
+def get_world_memory_state_history_endpoint(memory_id: str):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {"history": get_world_memory_state_history_records(memory_id)}
+
+
+@app.post("/api/v1/world-memory/{memory_id}/placements")
+def place_world_memory_endpoint(memory_id: str, req: PlaceWorldMemoryRequest):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    placement = create_world_memory_placement_record(
+        memory_id=memory_id,
+        placement_type=req.placement_type,
+        placement_ref=req.placement_ref,
+        visibility=req.visibility,
+    )
+    return {"placement": WorldMemoryPlacementModel(**placement)}
+
+
+@app.get("/api/v1/world-memory/{memory_id}/placements")
+def list_world_memory_placements_endpoint(memory_id: str):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {
+        "placements": [
+            WorldMemoryPlacementModel(**p)
+            for p in list_world_memory_placements_records(memory_id)
+        ]
+    }
+
+
+@app.post("/api/v1/world-memory/npc-knowledge")
+def project_npc_knowledge_endpoint(req: NPCKnowledgeRequest):
+    records = list_world_memory_records(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+    )
+    projection = project_npc_knowledge(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        npc=req,
+        memories=records,
+    )
+    return {"knowledge": projection.model_dump()}
+
+
+@app.post("/api/v1/legendary-figures/promote")
+def promote_legendary_figure_endpoint(req: PromoteLegendaryFigureRequest):
+    from app.world_memory import evaluate_legendary_eligibility
+
+    gathered = gather_world_memory_sources(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        viewer_soul_id=None,
+    )
+    eligible, scale, rationale = evaluate_legendary_eligibility(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        memory_objects=gathered["memory_objects"],
+        group_significance=gathered["group_significance"],
+    )
+    if not eligible:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Subject '{req.subject_entity_id}' is not eligible for "
+            "Legendary Figure status. " + rationale,
+        )
+    figure = create_legendary_figure_record(
+        subject_soul_id=req.subject_soul_id,
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        figure_title=req.figure_title,
+        later_cultural_titles=req.later_cultural_titles,
+        remembrance_scale=req.remembrance_scale or scale,
+        memory_state=req.memory_state,
+        eligibility_rationale=rationale,
+    )
+    # Link canonical identity/portrait/biography sources without copying them.
+    for ref in gathered["source_refs"]:
+        add_legendary_figure_link_record(
+            figure_id=figure["figure_id"],
+            link_type=_link_type_for_source(ref.source_type),
+            link_ref=ref.source_id,
+            link_label=ref.source_type,
+            is_canonical=True,
+        )
+    for title in req.later_cultural_titles:
+        add_legendary_figure_link_record(
+            figure_id=figure["figure_id"],
+            link_type="monument",
+            link_ref=title,
+            link_label=title,
+            is_canonical=False,
+        )
+    return {
+        "figure": LegendaryFigureModel(
+            **get_legendary_figure_record(figure["figure_id"])
+        )
+    }
+
+
+def _link_type_for_source(source_type: str) -> str:
+    return {
+        "memory_object": "chronicle_event",
+        "biography": "biography",
+        "portrait_version": "portrait",
+        "story_mark": "story_mark",
+        "relic_event": "relic",
+        "chronicle_painting": "artwork",
+    }.get(source_type, "identity")
+
+
+@app.get("/api/v1/legendary-figures")
+def list_legendary_figures_endpoint():
+    return {
+        "figures": [LegendaryFigureModel(**f) for f in list_legendary_figures_records()]
+    }
+
+
+@app.get("/api/v1/legendary-figures/{figure_id}")
+def get_legendary_figure_endpoint(figure_id: str):
+    figure = get_legendary_figure_record(figure_id)
+    if not figure:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Legendary figure '{figure_id}' not found",
+        )
+    return {"figure": LegendaryFigureModel(**figure)}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")
