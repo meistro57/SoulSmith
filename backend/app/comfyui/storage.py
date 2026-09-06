@@ -107,3 +107,84 @@ class CandidateImageStore:
             return True
         except OSError:
             return False
+
+
+CHRONICLE_QUARANTINE_REL_DIR = Path("chronicle") / "quarantine"
+CHRONICLE_PAINTINGS_REL_DIR = Path("chronicle") / "paintings"
+
+
+class ChronicleImageStore:
+    """
+    SoulSmith-owned storage for Chronicle Paintings.
+
+    Unreviewed/failed output is written into the quarantine directory and is only
+    copied into the player-visible paintings directory after the Visual Canon
+    Guardian passes. Quarantined files are never served as normal Chronicle assets.
+    """
+
+    def __init__(self, asset_root: Optional[Path] = None) -> None:
+        self._root = Path(asset_root) if asset_root is not None else get_asset_root()
+
+    @property
+    def asset_root(self) -> Path:
+        return self._root
+
+    @property
+    def quarantine_dir(self) -> Path:
+        return self._root / CHRONICLE_QUARANTINE_REL_DIR
+
+    @property
+    def paintings_dir(self) -> Path:
+        return self._root / CHRONICLE_PAINTINGS_REL_DIR
+
+    def quarantine(self, painting_id: str, data: bytes, extension: str = ".png") -> str:
+        """Write unreviewed image bytes into quarantine and return its URL path."""
+        safe_id = sanitize_filename(painting_id)
+        directory = self.quarantine_dir
+        directory.mkdir(parents=True, exist_ok=True)
+        filename = f"{safe_id}{extension}"
+        (directory / filename).write_bytes(data)
+        return f"/assets/{CHRONICLE_QUARANTINE_REL_DIR.as_posix()}/{filename}"
+
+    def promote(self, painting_id: str, data: bytes, extension: str = ".png") -> str:
+        """Write approved image bytes into the player-visible paintings area."""
+        safe_id = sanitize_filename(painting_id)
+        directory = self.paintings_dir
+        directory.mkdir(parents=True, exist_ok=True)
+        filename = f"{safe_id}{extension}"
+        (directory / filename).write_bytes(data)
+        return f"/assets/{CHRONICLE_PAINTINGS_REL_DIR.as_posix()}/{filename}"
+
+    def promote_from_quarantine(self, painting_id: str, extension: str = ".png") -> str:
+        """
+        Copy an existing quarantined image into the player-visible area.
+
+        Raises ``FileNotFoundError`` when the quarantined file does not exist.
+        """
+        safe_id = sanitize_filename(painting_id)
+        source = self.quarantine_dir / f"{safe_id}{extension}"
+        if not source.exists():
+            raise FileNotFoundError(
+                f"Quarantined image for painting '{painting_id}' not found"
+            )
+        return self.promote(painting_id, source.read_bytes(), extension)
+
+    def is_quarantined_url(self, url: str) -> bool:
+        """Return True when a URL points into the quarantine area."""
+        return url.startswith(f"/assets/{CHRONICLE_QUARANTINE_REL_DIR.as_posix()}/")
+
+    def is_promoted_url(self, url: str) -> bool:
+        """Return True when a URL points into the player-visible paintings area."""
+        return url.startswith(f"/assets/{CHRONICLE_PAINTINGS_REL_DIR.as_posix()}/")
+
+    def is_writable(self) -> bool:
+        """Return True when both quarantine and paintings storage are writable."""
+        try:
+            self.quarantine_dir.mkdir(parents=True, exist_ok=True)
+            self.paintings_dir.mkdir(parents=True, exist_ok=True)
+            probe = self.quarantine_dir / ".write_probe"
+            probe.write_bytes(b"")
+            probe.unlink()
+            return True
+        except OSError:
+            return False

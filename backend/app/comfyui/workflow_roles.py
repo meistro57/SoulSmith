@@ -16,6 +16,11 @@ from typing import Dict
 INITIAL_ROLE = "portrait_initial"
 REFERENCE_ROLE = "portrait_reference"
 
+# Chronicle Paintings (Phase 12) use their own text-to-image workflow. v1 does
+# not support multi-participant identity conditioning, so this is a single
+# role, not an initial/reference pair.
+CHRONICLE_PAINTING_ROLE = "chronicle_painting"
+
 #: Generation types that require a source portrait for identity continuity.
 REFERENCE_REQUIRED_GENERATION_TYPES = frozenset(
     {

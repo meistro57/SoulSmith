@@ -558,7 +558,7 @@ Formalize the `MemoryObject` schema as the first-class bridge between Chronicle 
 - Participants link to the exact `PortraitVersion` they had when the event occurred, with hard rejection of unknown or mismatched portrait references.
 - Private material is excluded unless each affected player permits it, and real-person tags are auto-redacted when consent is absent.
 
-### Phase 12: Chronicle Paintings `[Status: Designed]`
+### Phase 12: Chronicle Paintings `[Status: Integrated]`
 
 Connect `MemoryObject` schemas to the event painting pipeline.
 
@@ -567,10 +567,20 @@ Connect `MemoryObject` schemas to the event painting pipeline.
 - Review and approval workflow.
 - Immutable event-to-image association.
 
+**Purpose & Deliverables:**
+- Dedicated scene compiler (`app/painting_compiler.py`) separating canonical extraction from artistic phrasing into an inspectable `SceneSpec`.
+- Deterministic composition selector (`app/composition_selector.py`) with ten framing modes.
+- Historical participant portrait locking (`app/painting_reference.py`) with non-identifying degradation when appearance is unavailable.
+- Chronicle Painting provider abstraction (`app/painting_provider.py`) extending the existing ComfyUI architecture with honest capability reporting.
+- Mandatory Visual Canon Guardian (`app/visual_canon_guardian.py`) with a deterministic mock exercising PASS/RETRY/BLOCK.
+- Quarantine-then-promote storage (`ChronicleImageStore`) so unreviewed output is never served as a player-visible asset.
+- Lifecycle API (create/list/get/approve/reject/regenerate) and a gallery-ready approved-paintings query under `/api/v1/chronicle-paintings/*`.
+
 **Exit criteria**
 - High-significance events produce approved Chronicle paintings.
 - Historical paintings preserve the exact appearance of participants at the time of the event.
 - Regeneration creates candidate versions without replacing approved history.
+- No generated image reaches the player before the Visual Canon Guardian passes.
 
 ### Phase 13: Group Memories, Tags, and Recognition `[Status: Designed]`
 

@@ -477,6 +477,45 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             reviewed_at TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chronicle_paintings (
+            painting_id TEXT PRIMARY KEY,
+            memory_object_id TEXT NOT NULL,
+            source_painting_id TEXT,
+            generation_type TEXT NOT NULL DEFAULT 'initial',
+            status TEXT NOT NULL DEFAULT 'candidate',
+            guardian_status TEXT NOT NULL DEFAULT 'pending',
+            compiler_version TEXT NOT NULL DEFAULT '1.0.0',
+            scene_spec_json TEXT NOT NULL DEFAULT '{}',
+            composition TEXT NOT NULL DEFAULT 'environmental',
+            historical_participant_refs_json TEXT NOT NULL DEFAULT '[]',
+            compiled_prompt TEXT NOT NULL,
+            negative_prompt TEXT,
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT,
+            provider_request_id TEXT,
+            generation_seed INTEGER,
+            quarantined_image_url TEXT,
+            image_url TEXT,
+            guardian_report_json TEXT,
+            failure_reason TEXT,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TIMESTAMP,
+            approved_at TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chronicle_painting_guardian_reports (
+            report_id TEXT PRIMARY KEY,
+            painting_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 0.0,
+            violations_json TEXT NOT NULL DEFAULT '[]',
+            correction_instructions_json TEXT NOT NULL DEFAULT '[]',
+            inspected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -3324,3 +3363,399 @@ def get_visual_entity_version_record(version_id: str) -> Optional[Dict[str, Any]
     row = cursor.fetchone()
     conn.close()
     return _map_visual_version_row(row) if row else None
+
+
+# Phase 12: Chronicle Paintings DB Helpers
+
+
+def _map_chronicle_painting_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "painting_id": row["painting_id"],
+        "memory_object_id": row["memory_object_id"],
+        "source_painting_id": row["source_painting_id"],
+        "generation_type": row["generation_type"],
+        "status": row["status"],
+        "guardian_status": row["guardian_status"],
+        "compiler_version": row["compiler_version"],
+        "scene_spec": _json_or_none(row["scene_spec_json"]) or {},
+        "composition": row["composition"],
+        "historical_participant_refs": _json_or_none(
+            row["historical_participant_refs_json"]
+        )
+        or [],
+        "compiled_prompt": row["compiled_prompt"],
+        "negative_prompt": row["negative_prompt"],
+        "provider": row["provider"],
+        "provider_model": row["provider_model"],
+        "provider_request_id": row["provider_request_id"],
+        "generation_seed": row["generation_seed"],
+        "quarantined_image_url": row["quarantined_image_url"],
+        "image_url": row["image_url"],
+        "guardian_report": _json_or_none(row["guardian_report_json"]),
+        "failure_reason": row["failure_reason"],
+        "retry_count": row["retry_count"],
+        "created_at": row["created_at"],
+        "reviewed_at": row["reviewed_at"],
+        "approved_at": row["approved_at"],
+    }
+
+
+def _map_guardian_report_row(row: sqlite3.Row) -> Dict[str, Any]:
+    return {
+        "report_id": row["report_id"],
+        "painting_id": row["painting_id"],
+        "status": row["status"],
+        "confidence": row["confidence"],
+        "violations": _json_or_none(row["violations_json"]) or [],
+        "correction_instructions": _json_or_none(row["correction_instructions_json"])
+        or [],
+        "inspected_at": row["inspected_at"],
+    }
+
+
+def create_chronicle_painting_record(
+    *,
+    memory_object_id: str,
+    generation_type: str,
+    compiled_prompt: str,
+    scene_spec: Dict[str, Any],
+    composition: str,
+    historical_participant_refs: List[Dict[str, Any]],
+    negative_prompt: Optional[str] = None,
+    source_painting_id: Optional[str] = None,
+    retry_count: int = 0,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    painting_id = f"pnt_{str(uuid.uuid4())[:8]}"
+
+    cursor.execute(
+        """
+        INSERT INTO chronicle_paintings (
+            painting_id, memory_object_id, source_painting_id, generation_type,
+            status, guardian_status, compiler_version, scene_spec_json, composition,
+            historical_participant_refs_json, compiled_prompt, negative_prompt,
+            retry_count
+        ) VALUES (?, ?, ?, ?, 'candidate', 'pending', '1.0.0', ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            painting_id,
+            memory_object_id,
+            source_painting_id,
+            generation_type,
+            json.dumps(scene_spec),
+            composition,
+            json.dumps(historical_participant_refs),
+            compiled_prompt,
+            negative_prompt,
+            retry_count,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_chronicle_painting_row(row)
+
+
+def update_chronicle_painting_generation(
+    painting_id: str,
+    *,
+    guardian_status: str,
+    status: Optional[str] = None,
+    quarantined_image_url: Optional[str] = None,
+    provider: Optional[str] = None,
+    provider_model: Optional[str] = None,
+    provider_request_id: Optional[str] = None,
+    generation_seed: Optional[int] = None,
+    failure_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE chronicle_paintings
+        SET guardian_status = ?,
+            status = COALESCE(?, status),
+            quarantined_image_url = COALESCE(?, quarantined_image_url),
+            provider = COALESCE(?, provider),
+            provider_model = COALESCE(?, provider_model),
+            provider_request_id = COALESCE(?, provider_request_id),
+            generation_seed = COALESCE(?, generation_seed),
+            failure_reason = ?,
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE painting_id = ?
+    """,
+        (
+            guardian_status,
+            status,
+            quarantined_image_url,
+            provider,
+            provider_model,
+            provider_request_id,
+            generation_seed,
+            failure_reason,
+            painting_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise ValueError(f"Painting '{painting_id}' not found")
+    return _map_chronicle_painting_row(row)
+
+
+def update_chronicle_painting_promotion(
+    painting_id: str,
+    *,
+    image_url: str,
+    guardian_report: Dict[str, Any],
+    status: str = "candidate",
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE chronicle_paintings
+        SET image_url = ?,
+            guardian_report_json = ?,
+            guardian_status = 'passed',
+            status = ?,
+            failure_reason = NULL,
+            reviewed_at = CURRENT_TIMESTAMP
+        WHERE painting_id = ?
+    """,
+        (image_url, json.dumps(guardian_report), status, painting_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise ValueError(f"Painting '{painting_id}' not found")
+    return _map_chronicle_painting_row(row)
+
+
+def record_chronicle_painting_guardian_report(
+    painting_id: str, report: Dict[str, Any]
+) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    report_id = f"vgr_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO chronicle_painting_guardian_reports (
+            report_id, painting_id, status, confidence, violations_json,
+            correction_instructions_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            report_id,
+            painting_id,
+            report.get("status"),
+            report.get("confidence", 0.0),
+            json.dumps(report.get("violations") or []),
+            json.dumps(report.get("correction_instructions") or []),
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM chronicle_painting_guardian_reports WHERE report_id = ?",
+        (report_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_guardian_report_row(row)
+
+
+def get_chronicle_painting_guardian_reports(
+    painting_id: str,
+) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM chronicle_painting_guardian_reports WHERE painting_id = ? "
+        "ORDER BY inspected_at ASC",
+        (painting_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_guardian_report_row(r) for r in rows]
+
+
+def get_chronicle_painting_record(painting_id: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_chronicle_painting_row(row) if row else None
+
+
+def get_chronicle_paintings_records(
+    memory_object_id: str,
+) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE memory_object_id = ? "
+        "ORDER BY created_at ASC",
+        (memory_object_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_chronicle_painting_row(r) for r in rows]
+
+
+def get_approved_chronicle_paintings_records() -> List[Dict[str, Any]]:
+    """
+    Gallery-ready query: only approved paintings with a promoted SoulSmith-owned
+    image URL are returned, joined with useful memory metadata.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT p.*, m.event_id AS memory_event_id, m.event_title AS memory_event_title
+        FROM chronicle_paintings p
+        JOIN memory_objects m ON m.id = p.memory_object_id
+        WHERE p.status = 'approved' AND p.image_url IS NOT NULL
+          AND m.privacy_consent_scope = 'public_canon'
+        ORDER BY p.approved_at DESC
+        """
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        painting = _map_chronicle_painting_row(r)
+        painting["memory_event_id"] = r["memory_event_id"]
+        painting["memory_event_title"] = r["memory_event_title"]
+        results.append(painting)
+    return results
+
+
+def approve_chronicle_painting_transaction(
+    painting_id: str,
+) -> Dict[str, Any]:
+    """
+    Approve a Guardian-passed candidate as the preferred artistic interpretation
+    of its Memory Object. Approving a replacement supersedes the previous
+    approved painting without deleting historical candidates. Idempotent.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Painting '{painting_id}' not found")
+
+        if row["status"] == "approved":
+            conn.close()
+            return _map_chronicle_painting_row(row)
+
+        if row["status"] != "candidate":
+            conn.close()
+            raise ValueError(
+                f"Cannot approve painting '{painting_id}' in status "
+                f"'{row['status']}'. Must be a Guardian-passed candidate."
+            )
+        if not row["image_url"]:
+            conn.close()
+            raise ValueError(f"Painting '{painting_id}' has no promoted image URL.")
+        if row["guardian_status"] != "passed":
+            conn.close()
+            raise ValueError(
+                f"Painting '{painting_id}' has not passed the Visual Canon Guardian."
+            )
+
+        memory_object_id = row["memory_object_id"]
+
+        # Supersede any previously approved painting for this memory object.
+        cursor.execute(
+            """
+            UPDATE chronicle_paintings
+            SET status = 'superseded'
+            WHERE memory_object_id = ? AND status = 'approved'
+        """,
+            (memory_object_id,),
+        )
+
+        cursor.execute(
+            """
+            UPDATE chronicle_paintings
+            SET status = 'approved', approved_at = CURRENT_TIMESTAMP
+            WHERE painting_id = ?
+        """,
+            (painting_id,),
+        )
+
+        # Point the Memory Object at the newly approved artistic interpretation.
+        cursor.execute(
+            """
+            UPDATE memory_objects
+            SET visual_generation_status = 'painting_approved',
+                painting_image_url = ?
+            WHERE id = ?
+        """,
+            (row["image_url"], memory_object_id),
+        )
+
+        conn.commit()
+
+        cursor.execute(
+            "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+        )
+        approved_row = cursor.fetchone()
+        conn.close()
+        return _map_chronicle_painting_row(approved_row)
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+
+def reject_chronicle_painting_record(painting_id: str) -> Dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Painting '{painting_id}' not found")
+    if row["status"] == "approved":
+        conn.close()
+        raise ValueError(
+            f"Painting '{painting_id}' has already been approved and cannot be rejected."
+        )
+    cursor.execute(
+        """
+        UPDATE chronicle_paintings
+        SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP
+        WHERE painting_id = ?
+    """,
+        (painting_id,),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM chronicle_paintings WHERE painting_id = ?", (painting_id,)
+    )
+    updated = cursor.fetchone()
+    conn.close()
+    return _map_chronicle_painting_row(updated)

@@ -98,6 +98,11 @@ from app.db import (
     get_world_visual_candidates_records,
     reject_world_visual_candidate_record,
     update_world_visual_candidate_result,
+    approve_chronicle_painting_transaction,
+    get_approved_chronicle_paintings_records,
+    get_chronicle_painting_record,
+    get_chronicle_paintings_records,
+    reject_chronicle_painting_record,
 )
 from app.visual_memory import (
     AddStoryMarkRequest,
@@ -134,6 +139,21 @@ from app.visual_world import (
 from app.world_visual_provider import (
     get_world_visual_provider,
     WorldVisualGenerationRequest,
+)
+from app.chronicle_paintings import (
+    ChroniclePaintingModel,
+    CreateChroniclePaintingRequest,
+    GenerateChroniclePaintingRequest,
+)
+from app.painting_compiler import compile_chronicle_painting_scene
+from app.painting_pipeline import (
+    create_painting_attempt,
+    generate_chronicle_painting,
+)
+from app.painting_provider import get_painting_provider
+from app.painting_reference import (
+    ParticipantResolutionError,
+    resolve_historical_participants,
 )
 from app.comfyui.workflow_roles import select_world_workflow_role
 from app.reflection import (
@@ -1306,6 +1326,133 @@ def list_visual_entity_versions_endpoint(entity_type: str, entity_id: str):
 def list_world_visual_candidates_endpoint(entity_type: str, entity_id: str):
     records = get_world_visual_candidates_records(entity_type, entity_id)
     return {"candidates": [WorldVisualCandidateModel(**r) for r in records]}
+
+
+# Phase 12: Chronicle Paintings + Visual Canon Guardian
+
+
+def _resolve_memory_for_painting(memory_object_id: str) -> MemoryObjectModel:
+    record = get_memory_object_record(memory_object_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{memory_object_id}' not found",
+        )
+    return MemoryObjectModel(**record)
+
+
+@app.post("/api/v1/chronicle-paintings")
+def create_chronicle_painting_endpoint(req: CreateChroniclePaintingRequest):
+    memory_object = _resolve_memory_for_painting(req.memory_object_id)
+
+    try:
+        participants = resolve_historical_participants(memory_object)
+    except ParticipantResolutionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    scene_spec = compile_chronicle_painting_scene(
+        memory_object=memory_object,
+        participants=participants,
+        composition=req.composition,
+        style=req.style,
+    )
+    historical_refs = [
+        {
+            "soul_id": p.soul_id,
+            "character_name": p.character_name,
+            "portrait_version_id": p.portrait_version_id,
+            "identity_strategy": p.identity_strategy,
+            "portrait_image_url": p.portrait_image_url,
+        }
+        for p in participants
+    ]
+
+    painting = create_painting_attempt(
+        memory_object=memory_object,
+        scene_spec=scene_spec,
+        historical_participant_refs=historical_refs,
+        generation_type=req.generation_type,
+        composition=scene_spec.composition,
+        source_painting_id=req.source_painting_id,
+    )
+    return {"painting": painting}
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/generate")
+def generate_chronicle_painting_endpoint(
+    painting_id: str, req: Optional[GenerateChroniclePaintingRequest] = None
+):
+    painting_record = get_chronicle_painting_record(painting_id)
+    if not painting_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Painting '{painting_id}' not found",
+        )
+    memory_object = _resolve_memory_for_painting(painting_record["memory_object_id"])
+
+    result = generate_chronicle_painting(
+        painting_id,
+        memory_object,
+        provider_type=(req and req.provider_type) or None,
+        seed=(req and req.seed) or None,
+    )
+    return {"painting": result}
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/approve")
+def approve_chronicle_painting_endpoint(painting_id: str):
+    try:
+        approved = approve_chronicle_painting_transaction(painting_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "painting": ChroniclePaintingModel(**approved),
+        "message": "Painting approved as the preferred artistic interpretation.",
+    }
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/reject")
+def reject_chronicle_painting_endpoint(painting_id: str):
+    try:
+        rejected = reject_chronicle_painting_record(painting_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "painting": ChroniclePaintingModel(**rejected),
+        "message": "Painting rejected. Canonical memory was untouched.",
+    }
+
+
+@app.get("/api/v1/chronicle-paintings/gallery")
+def list_approved_chronicle_paintings_endpoint():
+    records = get_approved_chronicle_paintings_records()
+    return {"paintings": records}
+
+
+@app.get("/api/v1/chronicle-paintings/providers/capabilities")
+def chronicle_painting_provider_capabilities_endpoint():
+    provider = get_painting_provider(None)
+    return {"capabilities": provider.capabilities()}
+
+
+@app.get("/api/v1/chronicle-paintings/{painting_id}")
+def get_chronicle_painting_endpoint(painting_id: str):
+    record = get_chronicle_painting_record(painting_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Painting '{painting_id}' not found",
+        )
+    return {"painting": ChroniclePaintingModel(**record)}
+
+
+@app.get("/api/v1/chronicle-paintings")
+def list_chronicle_paintings_endpoint(memory_object_id: Optional[str] = None):
+    if memory_object_id:
+        records = get_chronicle_paintings_records(memory_object_id)
+    else:
+        records = get_approved_chronicle_paintings_records()
+    return {"paintings": [ChroniclePaintingModel(**r) for r in records]}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

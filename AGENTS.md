@@ -86,6 +86,13 @@ npm run build       # tsc -b && vite build
 | `visual_world.py` | Phase 4 Worldsmith models (`VisualEntityVersionModel`, `WorldVisualCandidateModel`, request schemas). |
 | `visual_compilers.py` | Deterministic world visual compilers (`location`/`relic`/`phenomenon`) + `compile_canonical_delta`. |
 | `world_visual_provider.py` | Provider abstraction for world-entity generation (mock + ComfyUI environment/object roles). |
+| `chronicle_paintings.py` | Phase 12 models: paintings, statuses, scene spec, Guardian reports, provider capabilities. |
+| `painting_compiler.py` | Deterministic Chronicle Painting compiler (structured `SceneSpec` + sectioned provider prompt). |
+| `composition_selector.py` | Deterministic composition mode selector for Chronicle Paintings. |
+| `painting_reference.py` | Historical participant portrait locking + non-identifying degradation. |
+| `painting_provider.py` | Chronicle Painting provider abstraction (mock + ComfyUI) with capability reporting. |
+| `visual_canon_guardian.py` | Vision-based Guardian abstraction + deterministic mock (PASS/RETRY/BLOCK). |
+| `painting_pipeline.py` | Orchestrates generate → quarantine → inspect → pass/retry/block. |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -148,7 +155,7 @@ This is the single most important rule in the codebase:
 
 5. **No migration framework.** Schema changes go in `db.py` `_run_init_schema` / `_add_column_if_missing`. Historical columns are appended lazily (e.g. `scene_events.raw_roll_json`, `grammar_version`, `player_intent`, `chosen_approach`, etc.).
 
-6. **Environment variables** (backend): `SOULSMITH_DB_FILE`, `SOULSMITH_JWT_SECRET` (default is a hardcoded dev value — override in production), `SOULSMITH_IMAGE_PROVIDER` (`mock`/`external`/`comfyui`), `SOULSMITH_IMAGE_PROVIDER_API_KEY`, plus the ComfyUI set — `COMFYUI_SERVER_URL`, `COMFYUI_PORTRAIT_INITIAL_WORKFLOW` (text-to-image), `COMFYUI_PORTRAIT_REFERENCE_WORKFLOW` (img2img continuity), `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` (0..1, maps to `denoise = 1 - strength`), `COMFYUI_TIMEOUT_SECONDS`, `COMFYUI_POLL_INTERVAL_SECONDS`, `SOULSMITH_ASSET_ROOT`. Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`).
+6. **Environment variables** (backend): `SOULSMITH_DB_FILE`, `SOULSMITH_JWT_SECRET` (default is a hardcoded dev value — override in production), `SOULSMITH_IMAGE_PROVIDER` (`mock`/`external`/`comfyui`), `SOULSMITH_IMAGE_PROVIDER_API_KEY`, plus the ComfyUI set — `COMFYUI_SERVER_URL`, `COMFYUI_PORTRAIT_INITIAL_WORKFLOW` (text-to-image), `COMFYUI_PORTRAIT_REFERENCE_WORKFLOW` (img2img continuity), `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` (0..1, maps to `denoise = 1 - strength`), `COMFYUI_CHRONICLE_PAINTING_WORKFLOW` (text-to-image Chronicle scenes), `COMFYUI_TIMEOUT_SECONDS`, `COMFYUI_POLL_INTERVAL_SECONDS`, `SOULSMITH_ASSET_ROOT`. Chronicle Paintings also use `SOULSMITH_MOCK_GUARDIAN_VERDICT` (`pass`/`retry`/`block`) and `SOULSMITH_CHRONICLE_MAX_RETRIES` (default 2). Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`).
 
 7. **CORS is wide open** (`allow_origins=["*"]` in `main.py`). This is intentional for local dev but relevant if you touch deployment.
 
@@ -165,6 +172,8 @@ This is the single most important rule in the codebase:
 13. **ComfyUI diagnostics** live at `GET /api/v1/visual-memory/providers/comfyui/status` (reachability, initial/reference workflow availability, output-storage writability).
 
 14. **World entities have visual history too.** Phase 4 (`visual_world.py`, `visual_compilers.py`, `world_visual_provider.py`) gives locations, relics, and phenomena immutable `VisualEntityVersion`s and a candidate/review flow mirroring portraits, under `/api/v1/visual-world/*`. Workflow roles come from `comfyui/workflow_roles.py`: locations/phenomena → `environment_{initial,reference}`, relics → `object_{initial,reference}`. Approving a world candidate creates a *new* immutable version (`approve_world_visual_candidate_transaction` is idempotent) and never mutates older ones, so Chronicle scenes can reference the version that actually existed at event time. NPCs reuse the portrait pipeline; `world_event`/Chronicle painting visuals are deferred to a later phase.
+
+15. **Chronicle Paintings are art, not canon.** Phase 12 (`chronicle_paintings.py`, `painting_compiler.py`, `painting_pipeline.py`, `visual_canon_guardian.py`) enforces `CANON -> SCENE SPEC -> IMAGE GENERATION -> VISUAL CANON GUARDIAN -> PLAYER-VISIBLE CANDIDATE`. Raw generated output lands in `backend/assets/chronicle/quarantine/` and is copied into `chronicle/paintings/` only after the Guardian passes. The deterministic mock Guardian can be forced with `SOULSMITH_MOCK_GUARDIAN_VERDICT=pass|retry|block`; retry budget is `SOULSMITH_CHRONICLE_MAX_RETRIES` (default 2). Approving a replacement painting supersedes (never deletes) the prior approved one, and the gallery query returns only approved `public_canon` paintings.
 
 ---
 

@@ -405,6 +405,79 @@ export interface WorldVisualCandidate {
   reviewed_at?: string;
 }
 
+// Phase 12: Chronicle Paintings + Visual Canon Guardian
+export type PaintingStatus = 'candidate' | 'approved' | 'rejected' | 'superseded' | 'failed';
+export type GuardianStatus = 'pending' | 'generating' | 'reviewing' | 'passed' | 'retry' | 'blocked' | 'failed';
+export type PaintingGenerationType = 'initial' | 'retry' | 'composition_change' | 'style_change' | 'reference_upgrade' | 'manual_regeneration';
+export type GuardianVerdict = 'pass' | 'retry' | 'block';
+export type ViolationSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface GuardianViolation {
+  type: string;
+  severity: ViolationSeverity;
+  description: string;
+  canonical_expected: string;
+  observed: string;
+}
+
+export interface GuardianReport {
+  status: GuardianVerdict;
+  confidence: number;
+  violations: GuardianViolation[];
+  correction_instructions: string[];
+}
+
+export interface ProviderCapabilities {
+  provider: string;
+  text_to_image: boolean;
+  single_reference: boolean;
+  multiple_references: boolean;
+  identity_conditioning: boolean;
+  regional_conditioning: boolean;
+  deterministic_seed: boolean;
+  aspect_ratio_control: boolean;
+}
+
+export interface ParticipantAppearance {
+  soul_id: string;
+  character_name: string;
+  role_in_event: string;
+  portrait_version_id?: string;
+  identity_strategy: string;
+  portrait_image_url?: string;
+  story_marks: StoryMark[];
+  equipment?: EquipmentAppearance;
+}
+
+export interface ChroniclePainting {
+  painting_id: string;
+  memory_object_id: string;
+  source_painting_id?: string;
+  generation_type: PaintingGenerationType;
+  status: PaintingStatus;
+  guardian_status: GuardianStatus;
+  compiler_version: string;
+  scene_spec: Record<string, any>;
+  composition: string;
+  historical_participant_refs: Record<string, any>[];
+  compiled_prompt: string;
+  negative_prompt?: string;
+  provider: string;
+  provider_model?: string;
+  provider_request_id?: string;
+  generation_seed?: number;
+  quarantined_image_url?: string;
+  image_url?: string;
+  guardian_report?: GuardianReport;
+  failure_reason?: string;
+  retry_count: number;
+  created_at?: string;
+  reviewed_at?: string;
+  approved_at?: string;
+  memory_event_id?: string;
+  memory_event_title?: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

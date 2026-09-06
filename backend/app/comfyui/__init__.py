@@ -11,6 +11,7 @@ filename) into ComfyUI API-format workflow nodes.
 from app.comfyui.client import ComfyUIClient, extract_output_images
 from app.comfyui.storage import (
     CandidateImageStore,
+    ChronicleImageStore,
     get_asset_root,
     resolve_asset_path,
     sanitize_filename,
@@ -27,6 +28,7 @@ from app.comfyui.workflow_loader import (
     validate_workflow,
 )
 from app.comfyui.workflow_roles import (
+    CHRONICLE_PAINTING_ROLE,
     ENVIRONMENT_INITIAL_ROLE,
     ENVIRONMENT_REFERENCE_ROLE,
     INITIAL_ROLE,
@@ -43,6 +45,7 @@ __all__ = [
     "ComfyUIClient",
     "extract_output_images",
     "CandidateImageStore",
+    "ChronicleImageStore",
     "get_asset_root",
     "resolve_asset_path",
     "sanitize_filename",
@@ -57,6 +60,7 @@ __all__ = [
     "REFERENCE_ROLE",
     "requires_reference",
     "select_workflow_role",
+    "CHRONICLE_PAINTING_ROLE",
     "ENVIRONMENT_INITIAL_ROLE",
     "ENVIRONMENT_REFERENCE_ROLE",
     "OBJECT_INITIAL_ROLE",

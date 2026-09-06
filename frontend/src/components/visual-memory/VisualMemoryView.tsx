@@ -8,6 +8,7 @@ import { PortraitCandidateGallery } from './PortraitCandidateGallery';
 import { PortraitTimeline } from './PortraitTimeline';
 import { MemoryObjectCard } from './MemoryObjectCard';
 import { ConsentControls } from './ConsentControls';
+import { ChroniclePaintingSection } from './ChroniclePaintingSection';
 import { Camera, Sparkles, Shield, History, Tag, Layers, RefreshCw } from 'lucide-react';
 
 interface VisualMemoryViewProps {
@@ -234,7 +235,10 @@ export const VisualMemoryView: React.FC<VisualMemoryViewProps> = ({ soulName }) 
             </div>
           ) : (
             memoryObjects.map((memObj) => (
-              <MemoryObjectCard key={memObj.id} memoryObject={memObj} />
+              <div key={memObj.id} className="space-y-3">
+                <MemoryObjectCard memoryObject={memObj} />
+                <ChroniclePaintingSection memoryObject={memObj} />
+              </div>
             ))
           )}
         </div>
