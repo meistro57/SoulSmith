@@ -478,6 +478,80 @@ export interface ChroniclePainting {
   memory_event_title?: string;
 }
 
+// Phase 13: Group Memories & Tags
+export type GroupTagType = 'person' | 'location' | 'relic' | 'phenomenon' | 'faction' | 'relationship' | 'emotional_theme' | 'event_type' | 'recurring_motif' | 'consequence' | 'thread';
+export type GroupAnchorType = 'portrait' | 'location' | 'relic' | 'phenomenon' | 'chronicle_painting';
+export type GroupSignificanceTier = 'personal' | 'relationship' | 'community' | 'world' | 'legendary';
+
+export interface GroupMemoryMember {
+  memory_object_id: string;
+  soul_id: string;
+  role_in_event?: string;
+  portrait_version_id?: string;
+}
+
+export interface GroupMemoryTag {
+  tag_id: string;
+  tag_type: GroupTagType;
+  value: string;
+  anchor_kind?: GroupAnchorType;
+  anchor_id?: string;
+  is_descriptor: boolean;
+}
+
+export interface GroupMemoryAnchor {
+  anchor_type: GroupAnchorType;
+  anchor_ref: string;
+  entity_id?: string;
+  entity_type?: string;
+  label: string;
+}
+
+export interface GroupMemory {
+  group_id: string;
+  event_id: string;
+  title: string;
+  summary: string;
+  visibility: string;
+  group_significance: GroupSignificanceTier;
+  group_significance_score: number;
+  group_significance_rationale?: string;
+  members: GroupMemoryMember[];
+  tags: GroupMemoryTag[];
+  anchors: GroupMemoryAnchor[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ParticipantPerspective {
+  soul_id: string;
+  character_name: string;
+  role_in_event?: string;
+  memory_object_id: string;
+  event_title: string;
+  location_environment: string;
+  emotional_tone?: string;
+  action_composition?: string;
+  lasting_consequence?: string;
+  is_self: boolean;
+  is_public: boolean;
+}
+
+export interface PerspectiveComparison {
+  group_id: string;
+  event_id: string;
+  perspectives: ParticipantPerspective[];
+  shared_facts: string[];
+  disagreements: Record<string, any>[];
+}
+
+export interface RelatedMemorySuggestion {
+  memory_object_id: string;
+  event_id: string;
+  reason: string;
+  canonical: boolean;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

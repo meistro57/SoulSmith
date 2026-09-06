@@ -56,6 +56,9 @@ from app.curiosity import (
 )
 from app.db import (
     add_gathering_contribution,
+    add_group_memory_anchor_record,
+    add_group_memory_member_record,
+    add_group_memory_tag_record,
     add_story_mark_record,
     approve_chronicle_painting_transaction,
     approve_portrait_candidate_transaction,
@@ -64,6 +67,7 @@ from app.db import (
     create_aspect_record,
     create_community_symbol_record,
     create_cross_aspect_bond_record,
+    create_group_memory_record,
     create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
@@ -79,7 +83,14 @@ from app.db import (
     get_chronicle_painting_record,
     get_chronicle_paintings_records,
     get_community_symbols_records,
+    get_db_connection,
+    get_group_memory_anchors_records,
+    get_group_memory_by_event_record,
+    get_group_memory_members_records,
+    get_group_memory_record,
+    get_group_memory_tags_records,
     get_memory_object_record,
+    get_memory_objects_by_event_record,
     get_memory_objects_records,
     get_or_create_avatar_identity_record,
     get_or_create_equipment_appearance_record,
@@ -104,15 +115,19 @@ from app.db import (
     get_world_visual_candidate_record,
     get_world_visual_candidates_records,
     init_database,
+    list_group_memory_records,
     log_canonical_event,
     log_probable_path_record,
     plant_or_echo_seed,
     reject_chronicle_painting_record,
     reject_portrait_candidate_record,
     reject_world_visual_candidate_record,
+    remove_group_memory_member_record,
+    remove_group_memory_tag_record,
     resolve_open_question,
     update_awakening_stage_record,
     update_candidate_generation_result,
+    update_group_memory_significance_record,
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
@@ -131,6 +146,19 @@ from app.grammar import (
     get_available_versions,
     get_versioned_grammar,
     interpret_numeric_roll,
+)
+from app.group_memories import (
+    AddGroupAnchorRequest,
+    AddGroupTagRequest,
+    AttachMemoryObjectRequest,
+    CreateGroupMemoryRequest,
+    GroupMemoryModel,
+    build_perspective_comparison,
+    derive_group_significance,
+    derive_members_from_memory_objects,
+    derive_title_summary,
+    project_group_for_viewer,
+    suggest_related_by_similarity,
 )
 from app.painting_compiler import compile_chronicle_painting_scene
 from app.painting_pipeline import (
@@ -1454,6 +1482,364 @@ def list_chronicle_paintings_endpoint(memory_object_id: str | None = None):
     else:
         records = get_approved_chronicle_paintings_records()
     return {"paintings": [ChroniclePaintingModel(**r) for r in records]}
+
+
+# Phase 13: Group Memories & Tags
+
+
+def _resolve_group_memory(group_id: str) -> dict:
+    group = get_group_memory_record(group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group memory '{group_id}' not found",
+        )
+    return group
+
+
+def _project_group(group_id: str, viewer_soul_id: str | None) -> GroupMemoryModel:
+    group = _resolve_group_memory(group_id)
+    members = get_group_memory_members_records(group_id)
+    tags = get_group_memory_tags_records(group_id)
+    anchors = get_group_memory_anchors_records(group_id)
+    return project_group_for_viewer(
+        group=group,
+        members=members,
+        tags=tags,
+        anchors=anchors,
+        viewer_soul_id=viewer_soul_id,
+    )
+
+
+def _refresh_group_derived_fields(group_id: str) -> None:
+    members = get_group_memory_members_records(group_id)
+    memory_objects = []
+    for member in members:
+        record = get_memory_object_record(member["memory_object_id"])
+        if record:
+            memory_objects.append(record)
+
+    significance, score, rationale = derive_group_significance(memory_objects)
+    update_group_memory_significance_record(
+        group_id,
+        significance=significance,
+        score=score,
+        rationale=rationale,
+    )
+
+
+@app.post("/api/v1/group-memories")
+def create_group_memory_endpoint(req: CreateGroupMemoryRequest):
+    existing = get_group_memory_by_event_record(req.event_id)
+    if existing:
+        return {"group_memory": _project_group(existing["group_id"], None)}
+
+    title, summary = derive_title_summary([])
+    group = create_group_memory_record(
+        event_id=req.event_id,
+        visibility=req.visibility,
+        title=title,
+        summary=summary,
+    )
+
+    for memory_object_id in req.memory_object_ids:
+        record = get_memory_object_record(memory_object_id)
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Memory object '{memory_object_id}' not found",
+            )
+        if record["event_id"] != req.event_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Memory object '{memory_object_id}' belongs to event "
+                    f"'{record['event_id']}', not '{req.event_id}'"
+                ),
+            )
+        members = derive_members_from_memory_objects([record])
+        if members:
+            add_group_memory_member_record(
+                group_id=group["group_id"],
+                memory_object_id=memory_object_id,
+                soul_id=members[0]["soul_id"],
+                role_in_event=members[0]["role_in_event"],
+                portrait_version_id=members[0]["portrait_version_id"],
+            )
+
+    _refresh_group_derived_fields(group["group_id"])
+    return {"group_memory": _project_group(group["group_id"], None)}
+
+
+@app.post("/api/v1/group-memories/auto-group")
+def auto_group_memories_endpoint(event_id: str):
+    """
+    Deterministically group Memory Objects by exact shared event ID. Never by
+    name, tag, date, or semantic similarity.
+    """
+    memory_objects = get_memory_objects_by_event_record(event_id)
+    if not memory_objects:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No memory objects found for event '{event_id}'",
+        )
+
+    existing = get_group_memory_by_event_record(event_id)
+    if existing:
+        return {
+            "group_memory": _project_group(existing["group_id"], None),
+            "grouped": False,
+            "message": "Group memory already exists for this event.",
+        }
+
+    title, summary = derive_title_summary(memory_objects)
+    group = create_group_memory_record(event_id=event_id, title=title, summary=summary)
+    members = derive_members_from_memory_objects(memory_objects)
+    for member in members:
+        add_group_memory_member_record(
+            group_id=group["group_id"],
+            memory_object_id=member["memory_object_id"],
+            soul_id=member["soul_id"],
+            role_in_event=member["role_in_event"],
+            portrait_version_id=member["portrait_version_id"],
+        )
+
+    _refresh_group_derived_fields(group["group_id"])
+    return {
+        "group_memory": _project_group(group["group_id"], None),
+        "grouped": True,
+        "message": f"Grouped {len(members)} memory object(s) by exact event ID.",
+    }
+
+
+@app.get("/api/v1/group-memories")
+def list_group_memories_endpoint(viewer_soul_id: str | None = None):
+    records = list_group_memory_records()
+    projected = []
+    for record in records:
+        view = _project_group(record["group_id"], viewer_soul_id)
+        # Only surface group memories with at least one visible member.
+        if view.members:
+            projected.append(view)
+    return {"group_memories": [g.model_dump() for g in projected]}
+
+
+@app.get("/api/v1/group-memories/by-event/{event_id}")
+def get_group_memory_by_event_endpoint(
+    event_id: str, viewer_soul_id: str | None = None
+):
+    group = get_group_memory_by_event_record(event_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No group memory found for event '{event_id}'",
+        )
+    return {"group_memory": _project_group(group["group_id"], viewer_soul_id)}
+
+
+@app.get("/api/v1/group-memories/related")
+def find_related_group_memories_endpoint(
+    anchor_type: str | None = None,
+    anchor_ref: str | None = None,
+    tag_type: str | None = None,
+    tag_value: str | None = None,
+    viewer_soul_id: str | None = None,
+):
+    results: set[str] = set()
+    if anchor_type and anchor_ref:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT group_id FROM group_memory_anchors "
+            "WHERE anchor_type = ? AND anchor_ref = ?",
+            (anchor_type, anchor_ref),
+        )
+        results.update(row["group_id"] for row in cursor.fetchall())
+        conn.close()
+    if tag_type or tag_value:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT group_id FROM group_memory_tags WHERE 1=1"
+        params: list[str] = []
+        if tag_type:
+            query += " AND tag_type = ?"
+            params.append(tag_type)
+        if tag_value:
+            query += " AND value = ?"
+            params.append(tag_value)
+        cursor.execute(query, params)
+        results.update(row["group_id"] for row in cursor.fetchall())
+        conn.close()
+
+    projected = []
+    for group_id in sorted(results):
+        projected.append(_project_group(group_id, viewer_soul_id))
+    return {"group_memories": [g.model_dump() for g in projected]}
+
+
+@app.get("/api/v1/group-memories/{group_id}")
+def get_group_memory_endpoint(group_id: str, viewer_soul_id: str | None = None):
+    return {"group_memory": _project_group(group_id, viewer_soul_id)}
+
+
+@app.post("/api/v1/group-memories/{group_id}/members")
+def attach_memory_object_endpoint(group_id: str, req: AttachMemoryObjectRequest):
+    group = _resolve_group_memory(group_id)
+    record = get_memory_object_record(req.memory_object_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{req.memory_object_id}' not found",
+        )
+    if record["event_id"] != group["event_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Memory object '{req.memory_object_id}' belongs to event "
+                f"'{record['event_id']}', not '{group['event_id']}'"
+            ),
+        )
+
+    add_group_memory_member_record(
+        group_id=group_id,
+        memory_object_id=req.memory_object_id,
+        soul_id=req.soul_id,
+        role_in_event=req.role_in_event,
+        portrait_version_id=req.portrait_version_id,
+    )
+    _refresh_group_derived_fields(group_id)
+    return {"group_memory": _project_group(group_id, None)}
+
+
+@app.delete("/api/v1/group-memories/{group_id}/members/{memory_object_id}")
+def detach_memory_object_endpoint(group_id: str, memory_object_id: str):
+    _resolve_group_memory(group_id)
+    removed = remove_group_memory_member_record(group_id, memory_object_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{memory_object_id}' is not a member of '{group_id}'",
+        )
+    _refresh_group_derived_fields(group_id)
+    # The Memory Object itself is never deleted.
+    record = get_memory_object_record(memory_object_id)
+    return {
+        "group_memory": _project_group(group_id, None),
+        "memory_object_still_exists": record is not None,
+    }
+
+
+@app.post("/api/v1/group-memories/{group_id}/tags")
+def add_group_tag_endpoint(group_id: str, req: AddGroupTagRequest):
+    _resolve_group_memory(group_id)
+    tag = add_group_memory_tag_record(
+        group_id=group_id,
+        tag_type=req.tag_type,
+        value=req.value,
+        anchor_kind=req.anchor_kind,
+        anchor_id=req.anchor_id,
+        is_descriptor=req.is_descriptor,
+    )
+    return {"tag": tag}
+
+
+@app.delete("/api/v1/group-memories/{group_id}/tags/{tag_id}")
+def remove_group_tag_endpoint(group_id: str, tag_id: str):
+    _resolve_group_memory(group_id)
+    removed = remove_group_memory_tag_record(group_id, tag_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tag '{tag_id}' not found in group '{group_id}'",
+        )
+    return {"removed": True}
+
+
+@app.post("/api/v1/group-memories/{group_id}/anchors")
+def add_group_anchor_endpoint(group_id: str, req: AddGroupAnchorRequest):
+    _resolve_group_memory(group_id)
+    label = req.label
+    entity_id = None
+    entity_type = None
+
+    if req.anchor_type == "portrait":
+        portrait = get_portrait_version_record(req.anchor_ref)
+        if not portrait:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Portrait version '{req.anchor_ref}' not found",
+            )
+        entity_id = portrait["soul_id"]
+        entity_type = "portrait"
+        label = label or portrait.get("label", req.anchor_ref)
+    elif req.anchor_type in ("location", "relic", "phenomenon"):
+        version = get_visual_entity_version_record(req.anchor_ref)
+        if not version:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Visual entity version '{req.anchor_ref}' not found",
+            )
+        if version["entity_type"] != req.anchor_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Visual version '{req.anchor_ref}' is type "
+                    f"'{version['entity_type']}', not '{req.anchor_type}'"
+                ),
+            )
+        entity_id = version["entity_id"]
+        entity_type = version["entity_type"]
+        label = label or version.get("label", req.anchor_ref)
+    elif req.anchor_type == "chronicle_painting":
+        painting = get_chronicle_painting_record(req.anchor_ref)
+        if not painting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Chronicle painting '{req.anchor_ref}' not found",
+            )
+        entity_id = painting["memory_object_id"]
+        entity_type = "chronicle_painting"
+        label = label or painting.get("composition", req.anchor_ref)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported anchor type '{req.anchor_type}'",
+        )
+
+    anchor = add_group_memory_anchor_record(
+        group_id=group_id,
+        anchor_type=req.anchor_type,
+        anchor_ref=req.anchor_ref,
+        entity_id=entity_id,
+        entity_type=entity_type,
+        label=label,
+    )
+    return {"anchor": anchor}
+
+
+@app.get("/api/v1/group-memories/{group_id}/anchors")
+def get_group_anchors_endpoint(group_id: str):
+    _resolve_group_memory(group_id)
+    return {"anchors": get_group_memory_anchors_records(group_id)}
+
+
+@app.get("/api/v1/group-memories/{group_id}/perspectives")
+def get_group_perspectives_endpoint(group_id: str, viewer_soul_id: str | None = None):
+    group = _resolve_group_memory(group_id)
+    members = get_group_memory_members_records(group_id)
+    comparison = build_perspective_comparison(
+        group_id=group_id,
+        event_id=group["event_id"],
+        members=members,
+        viewer_soul_id=viewer_soul_id,
+    )
+    return comparison
+
+
+@app.get("/api/v1/group-memories/suggestions/{memory_object_id}")
+def suggest_related_memories_endpoint(memory_object_id: str):
+    suggestions = suggest_related_by_similarity(memory_object_id=memory_object_id)
+    return {"suggestions": [s.model_dump() for s in suggestions]}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

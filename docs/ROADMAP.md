@@ -582,18 +582,37 @@ Connect `MemoryObject` schemas to the event painting pipeline.
 - Regeneration creates candidate versions without replacing approved history.
 - No generated image reaches the player before the Visual Canon Guardian passes.
 
-### Phase 13: Group Memories, Tags, and Recognition `[Status: Designed]`
+### Phase 13: Group Memories & Tags `[Status: Integrated]`
 
-Implement distinct in-world character tags vs optional real-person profile tags.
+Let SoulSmith recognize that multiple souls can participate in the same
+canonical event while remembering it differently.
 
-- In-World Character Tags (Avatar name, title, role, biography link).
-- Real-Person Group Tags (Profile photo, display name, optional group tagging).
-- World separation: Real photos never become source material for fantasy art unless explicitly opted-in.
+> **SHARED EVENT DOES NOT MEAN SHARED MEMORY.**
+
+- Relational `GroupMemory` model linking participant-specific Memory Objects to
+  a shared event without rewriting or reconciling them into a fabricated
+  consensus.
+- Deterministic grouping by exact shared event ID only; semantic similarity
+  produces *suggestions*, never canonical equivalence.
+- Typed, ID-anchored tags (person, location, relic, phenomenon, faction,
+  relationship, emotional theme, event type, recurring motif, consequence,
+  thread) plus shared canonical anchors locked to historical visual versions.
+- Participant-specific consent filtering that never leaks private identity,
+  StoryMarks, or emotional interpretation through tags, summaries, counts, or
+  APIs.
+- Group-level significance derived from canonical event/participant information
+  without overwriting individual significance.
+- Chronicle Painting integration stays behind the mandatory Visual Canon
+  Guardian; artwork remains interpretation, never canon.
 
 **Exit criteria**
-- Participants approve tagging before publication.
-- Players can hide real photos while retaining character tags.
-- Group event privacy operates independently for text, generated art, and profile photos.
+- Two or more participants can hold separate canonical Memory Objects for the
+  same event and be presented as a Group Memory without merging perspectives.
+- Players can browse permitted perspectives, shared anchors, tags, agreements,
+  and disagreements while private information stays private.
+- Related-memory queries work through typed canonical anchors.
+
+See [`docs/GROUP_MEMORIES.md`](GROUP_MEMORIES.md).
 
 ### Phase 14: Living Biography and Portrait Timeline `[Status: Designed]`
 

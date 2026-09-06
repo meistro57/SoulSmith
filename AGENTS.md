@@ -93,6 +93,7 @@ npm run build       # tsc -b && vite build
 | `painting_provider.py` | Chronicle Painting provider abstraction (mock + ComfyUI) with capability reporting. |
 | `visual_canon_guardian.py` | Vision-based Guardian abstraction + deterministic mock (PASS/RETRY/BLOCK). |
 | `painting_pipeline.py` | Orchestrates generate → quarantine → inspect → pass/retry/block. |
+| `group_memories.py` | Phase 13 Group Memories & Tags: models, perspective preservation, consent projections, deterministic exact-event grouping, typed ID-anchored tags/anchors. |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -174,6 +175,8 @@ This is the single most important rule in the codebase:
 14. **World entities have visual history too.** Phase 4 (`visual_world.py`, `visual_compilers.py`, `world_visual_provider.py`) gives locations, relics, and phenomena immutable `VisualEntityVersion`s and a candidate/review flow mirroring portraits, under `/api/v1/visual-world/*`. Workflow roles come from `comfyui/workflow_roles.py`: locations/phenomena → `environment_{initial,reference}`, relics → `object_{initial,reference}`. Approving a world candidate creates a *new* immutable version (`approve_world_visual_candidate_transaction` is idempotent) and never mutates older ones, so Chronicle scenes can reference the version that actually existed at event time. NPCs reuse the portrait pipeline; `world_event`/Chronicle painting visuals are deferred to a later phase.
 
 15. **Chronicle Paintings are art, not canon.** Phase 12 (`chronicle_paintings.py`, `painting_compiler.py`, `painting_pipeline.py`, `visual_canon_guardian.py`) enforces `CANON -> SCENE SPEC -> IMAGE GENERATION -> VISUAL CANON GUARDIAN -> PLAYER-VISIBLE CANDIDATE`. Raw generated output lands in `backend/assets/chronicle/quarantine/` and is copied into `chronicle/paintings/` only after the Guardian passes. The deterministic mock Guardian can be forced with `SOULSMITH_MOCK_GUARDIAN_VERDICT=pass|retry|block`; retry budget is `SOULSMITH_CHRONICLE_MAX_RETRIES` (default 2). Approving a replacement painting supersedes (never deletes) the prior approved one, and the gallery query returns only approved `public_canon` paintings.
+
+16. **Group Memories link memories without rewriting them.** Phase 13 (`group_memories.py`) enforces `SHARED EVENT != SHARED MEMORY`: canonical grouping is keyed by exact `event_id` only (never semantic similarity — that yields `suggestions`, not members), and every response goes through `project_group_for_viewer` for participant-specific consent filtering. Private participants are omitted (not counted) from public projections; title/summary are re-derived from public facts only. See `docs/GROUP_MEMORIES.md`.
 
 ---
 

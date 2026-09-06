@@ -516,6 +516,57 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             inspected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_memories (
+            group_id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            group_significance TEXT NOT NULL DEFAULT 'personal',
+            group_significance_score INTEGER NOT NULL DEFAULT 5,
+            group_significance_rationale TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_memory_members (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            memory_object_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            role_in_event TEXT,
+            portrait_version_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, memory_object_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_memory_tags (
+            tag_id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            tag_type TEXT NOT NULL,
+            value TEXT NOT NULL,
+            anchor_kind TEXT,
+            anchor_id TEXT,
+            is_descriptor INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_memory_anchors (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            anchor_type TEXT NOT NULL,
+            anchor_ref TEXT NOT NULL,
+            entity_id TEXT,
+            entity_type TEXT,
+            label TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(group_id, anchor_type, anchor_ref)
+        )
+    """)
 
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
@@ -2637,18 +2688,10 @@ def get_memory_objects_records() -> list[dict[str, Any]]:
             "action_composition": r["action_composition"],
             "lasting_consequence": r["lasting_consequence"],
             "privacy_consent_scope": r["privacy_consent_scope"],
-            "importance_tier": r["importance_tier"]  # noqa: SIM401
-            if "importance_tier" in r
-            else "personal",
-            "importance_score": r["importance_score"]  # noqa: SIM401
-            if "importance_score" in r
-            else 5,
-            "is_painting_eligible": bool(r["is_painting_eligible"])
-            if "is_painting_eligible" in r
-            else True,
-            "importance_rationale": r["importance_rationale"]  # noqa: SIM401
-            if "importance_rationale" in r
-            else None,
+            "importance_tier": r["importance_tier"],
+            "importance_score": r["importance_score"],
+            "is_painting_eligible": bool(r["is_painting_eligible"]),
+            "importance_rationale": r["importance_rationale"],
             "visual_generation_status": r["visual_generation_status"],
             "painting_image_url": r["painting_image_url"],
             "created_at": r["created_at"],
@@ -2676,18 +2719,10 @@ def get_memory_object_record(mem_id: str) -> dict[str, Any] | None:
         "action_composition": r["action_composition"],
         "lasting_consequence": r["lasting_consequence"],
         "privacy_consent_scope": r["privacy_consent_scope"],
-        "importance_tier": r["importance_tier"]  # noqa: SIM401
-        if "importance_tier" in r
-        else "personal",
-        "importance_score": r["importance_score"]  # noqa: SIM401
-        if "importance_score" in r
-        else 5,
-        "is_painting_eligible": bool(r["is_painting_eligible"])
-        if "is_painting_eligible" in r
-        else True,
-        "importance_rationale": r["importance_rationale"]  # noqa: SIM401
-        if "importance_rationale" in r
-        else None,
+        "importance_tier": r["importance_tier"],
+        "importance_score": r["importance_score"],
+        "is_painting_eligible": bool(r["is_painting_eligible"]),
+        "importance_rationale": r["importance_rationale"],
         "visual_generation_status": r["visual_generation_status"],
         "painting_image_url": r["painting_image_url"],
         "created_at": r["created_at"],
@@ -3759,3 +3794,336 @@ def reject_chronicle_painting_record(painting_id: str) -> dict[str, Any]:
     updated = cursor.fetchone()
     conn.close()
     return _map_chronicle_painting_row(updated)
+
+
+# Phase 13: Group Memories & Tags DB Helpers
+
+
+def _map_group_memory_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "group_id": row["group_id"],
+        "event_id": row["event_id"],
+        "title": row["title"],
+        "summary": row["summary"],
+        "visibility": row["visibility"],
+        "group_significance": row["group_significance"],
+        "group_significance_score": row["group_significance_score"],
+        "group_significance_rationale": row["group_significance_rationale"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_group_member_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "group_id": row["group_id"],
+        "memory_object_id": row["memory_object_id"],
+        "soul_id": row["soul_id"],
+        "role_in_event": row["role_in_event"],
+        "portrait_version_id": row["portrait_version_id"],
+        "created_at": row["created_at"],
+    }
+
+
+def _map_group_tag_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "tag_id": row["tag_id"],
+        "group_id": row["group_id"],
+        "tag_type": row["tag_type"],
+        "value": row["value"],
+        "anchor_kind": row["anchor_kind"],
+        "anchor_id": row["anchor_id"],
+        "is_descriptor": bool(row["is_descriptor"]),
+        "created_at": row["created_at"],
+    }
+
+
+def _map_group_anchor_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "anchor_type": row["anchor_type"],
+        "anchor_ref": row["anchor_ref"],
+        "entity_id": row["entity_id"],
+        "entity_type": row["entity_type"],
+        "label": row["label"],
+        "created_at": row["created_at"],
+    }
+
+
+def create_group_memory_record(
+    *,
+    event_id: str,
+    visibility: str = "public_canon",
+    title: str = "A Shared Event",
+    summary: str = "The details of this shared event remain private.",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    group_id = f"grp_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO group_memories (
+            group_id, event_id, title, summary, visibility
+        ) VALUES (?, ?, ?, ?, ?)
+    """,
+        (group_id, event_id, title, summary, visibility),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM group_memories WHERE group_id = ?", (group_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_memory_row(row)
+
+
+def update_group_memory_significance_record(
+    group_id: str,
+    *,
+    significance: str,
+    score: int,
+    rationale: str | None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE group_memories
+        SET group_significance = ?,
+            group_significance_score = ?,
+            group_significance_rationale = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE group_id = ?
+    """,
+        (significance, score, rationale, group_id),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM group_memories WHERE group_id = ?", (group_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise ValueError(f"Group memory '{group_id}' not found")
+    return _map_group_memory_row(row)
+
+
+def get_group_memory_record(group_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM group_memories WHERE group_id = ?", (group_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_memory_row(row) if row else None
+
+
+def get_group_memory_by_event_record(event_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM group_memories WHERE event_id = ? ORDER BY created_at DESC "
+        "LIMIT 1",
+        (event_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_memory_row(row) if row else None
+
+
+def list_group_memory_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM group_memories ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_group_memory_row(r) for r in rows]
+
+
+def add_group_memory_member_record(
+    *,
+    group_id: str,
+    memory_object_id: str,
+    soul_id: str,
+    role_in_event: str | None = None,
+    portrait_version_id: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    member_id = f"gmm_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO group_memory_members (
+            id, group_id, memory_object_id, soul_id, role_in_event, portrait_version_id
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            member_id,
+            group_id,
+            memory_object_id,
+            soul_id,
+            role_in_event,
+            portrait_version_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM group_memory_members WHERE id = ?", (member_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_member_row(row)
+
+
+def remove_group_memory_member_record(group_id: str, memory_object_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM group_memory_members WHERE group_id = ? AND memory_object_id = ?",
+        (group_id, memory_object_id),
+    )
+    conn.commit()
+    count = cursor.rowcount
+    conn.close()
+    return count > 0
+
+
+def get_group_memory_members_records(group_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM group_memory_members WHERE group_id = ? ORDER BY created_at ASC",
+        (group_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_group_member_row(r) for r in rows]
+
+
+def add_group_memory_tag_record(
+    *,
+    group_id: str,
+    tag_type: str,
+    value: str,
+    anchor_kind: str | None = None,
+    anchor_id: str | None = None,
+    is_descriptor: bool = False,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    tag_id = f"tag_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO group_memory_tags (
+            tag_id, group_id, tag_type, value, anchor_kind, anchor_id, is_descriptor
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            tag_id,
+            group_id,
+            tag_type,
+            value,
+            anchor_kind,
+            anchor_id,
+            1 if is_descriptor else 0,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM group_memory_tags WHERE tag_id = ?", (tag_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_tag_row(row)
+
+
+def remove_group_memory_tag_record(group_id: str, tag_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM group_memory_tags WHERE group_id = ? AND tag_id = ?",
+        (group_id, tag_id),
+    )
+    conn.commit()
+    count = cursor.rowcount
+    conn.close()
+    return count > 0
+
+
+def get_group_memory_tags_records(group_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM group_memory_tags WHERE group_id = ? ORDER BY created_at ASC",
+        (group_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_group_tag_row(r) for r in rows]
+
+
+def add_group_memory_anchor_record(
+    *,
+    group_id: str,
+    anchor_type: str,
+    anchor_ref: str,
+    entity_id: str | None = None,
+    entity_type: str | None = None,
+    label: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    anchor_row_id = f"gma_{str(uuid.uuid4())[:8]}"
+    cursor.execute(
+        """
+        INSERT INTO group_memory_anchors (
+            id, group_id, anchor_type, anchor_ref, entity_id, entity_type, label
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            anchor_row_id,
+            group_id,
+            anchor_type,
+            anchor_ref,
+            entity_id,
+            entity_type,
+            label,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM group_memory_anchors WHERE id = ?", (anchor_row_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_group_anchor_row(row)
+
+
+def get_group_memory_anchors_records(group_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM group_memory_anchors WHERE group_id = ? ORDER BY created_at ASC",
+        (group_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_group_anchor_row(r) for r in rows]
+
+
+def get_memory_objects_by_event_record(event_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM memory_objects WHERE event_id = ? ORDER BY created_at ASC",
+        (event_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        record = {
+            "id": r["id"],
+            "event_id": r["event_id"],
+            "event_title": r["event_title"],
+            "participants": _json_or_none(r["participants_json"]) or [],
+            "location_environment": r["location_environment"],
+            "relics_involved": _json_or_none(r["relics_involved_json"]) or [],
+            "emotional_tone": r["emotional_tone"],
+            "action_composition": r["action_composition"],
+            "lasting_consequence": r["lasting_consequence"],
+            "privacy_consent_scope": r["privacy_consent_scope"],
+            "importance_tier": r["importance_tier"],
+            "importance_score": r["importance_score"],
+        }
+        results.append(record)
+    return results
