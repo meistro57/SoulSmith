@@ -614,17 +614,37 @@ canonical event while remembering it differently.
 
 See [`docs/GROUP_MEMORIES.md`](GROUP_MEMORIES.md).
 
-### Phase 14: Living Biography and Portrait Timeline `[Status: Designed]`
+### Phase 14: Living Biography `[Status: Integrated]`
 
-Assemble character history into a chronological portrait timeline.
+Assemble the Chronicle into a coherent, evolving life story while preserving
+provenance, uncertainty, privacy, and individual perspective.
 
-- Portrait timeline displaying original avatar, appearance milestones, scars with event links, title changes, relic awakenings, and current appearance.
-- Historical event views display historical portraits; current profiles display current portraits.
+> **THE BIOGRAPHY IS DERIVED FROM THE CHRONICLE. IT DOES NOT REWRITE IT.**
+
+- Immutable, auditable `BiographyVersion`s with sections and normalized
+  per-section provenance links back to Memory Objects, Group Memories, historical
+  PortraitVersions, VisualEntityVersions, Chronicle Paintings, StoryMarks,
+  relics, and probable paths.
+- Deterministic structured compiler (chronology, recurring threads, consent-safe
+  projection) that produces an inspectable spec before prose generation.
+- Fact vs perspective vs interpretation classification, so themes and participant
+  recollections never silently become objective fact.
+- Deterministic narrative provider (mock) and a Biography Guardian that rejects
+  unknown sources, unsupported claims, invented dates, perspective-as-fact, and
+  unapproved visual references.
+- Draft/current/version lifecycle, player review, and consent-aware public/private
+  publication.
 
 **Exit criteria**
-- Players can navigate a chronological portrait timeline.
-- Every visible change links directly to its originating event.
-- Reinterpreting appearance changes preserves prior historical records.
+- A soul with a meaningful Chronicle can read a coherent life-to-date assembled
+  from canonical records, shared events, relationships, StoryMarks, places,
+  relics, consequences, and approved artwork.
+- Every meaningful claim remains traceable to its source; different perspectives
+  remain different; missing chronology is not fabricated; private information
+  remains private; regeneration creates a new version rather than rewriting
+  history.
+
+See [`docs/LIVING_BIOGRAPHY.md`](LIVING_BIOGRAPHY.md).
 
 ### Phase 15: Art Director and World Gallery `[Status: Designed]`
 

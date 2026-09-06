@@ -28,6 +28,13 @@ from app.auth import (
     hash_password,
     verify_password,
 )
+from app.biography import (
+    BiographyModel,
+    CompileBiographyRequest,
+    project_biography_for_viewer,
+    source_visible_to,
+)
+from app.biography_compiler import BiographyCompilationError, compile_biography
 from app.chronicle_paintings import (
     ChroniclePaintingModel,
     CreateChroniclePaintingRequest,
@@ -60,6 +67,7 @@ from app.db import (
     add_group_memory_member_record,
     add_group_memory_tag_record,
     add_story_mark_record,
+    approve_biography_transaction,
     approve_chronicle_painting_transaction,
     approve_portrait_candidate_transaction,
     approve_world_visual_candidate_transaction,
@@ -80,9 +88,11 @@ from app.db import (
     get_all_open_questions,
     get_all_seeds,
     get_approved_chronicle_paintings_records,
+    get_biography_record,
     get_chronicle_painting_record,
     get_chronicle_paintings_records,
     get_community_symbols_records,
+    get_current_biography_record,
     get_db_connection,
     get_group_memory_anchors_records,
     get_group_memory_by_event_record,
@@ -115,10 +125,12 @@ from app.db import (
     get_world_visual_candidate_record,
     get_world_visual_candidates_records,
     init_database,
+    list_biography_records,
     list_group_memory_records,
     log_canonical_event,
     log_probable_path_record,
     plant_or_echo_seed,
+    reject_biography_record,
     reject_chronicle_painting_record,
     reject_portrait_candidate_record,
     reject_world_visual_candidate_record,
@@ -1840,6 +1852,121 @@ def get_group_perspectives_endpoint(group_id: str, viewer_soul_id: str | None = 
 def suggest_related_memories_endpoint(memory_object_id: str):
     suggestions = suggest_related_by_similarity(memory_object_id=memory_object_id)
     return {"suggestions": [s.model_dump() for s in suggestions]}
+
+
+# Phase 14: Living Biography
+
+
+def _project_biography(biography: dict, viewer_soul_id: str | None) -> BiographyModel:
+    projected = project_biography_for_viewer(biography, viewer_soul_id)
+    return BiographyModel(**projected)
+
+
+@app.post("/api/v1/biographies/compile")
+def compile_biography_endpoint(req: CompileBiographyRequest):
+    try:
+        result = compile_biography(
+            soul_id=req.soul_id,
+            viewer_soul_id=req.viewer_soul_id,
+            visibility=req.visibility,
+            scope_type=req.scope_type,
+            scope_ref=req.scope_ref,
+        )
+    except BiographyCompilationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    biography = _project_biography(result["biography"], req.viewer_soul_id)
+    return {
+        "biography": biography.model_dump(),
+        "guardian_report": result["guardian_report"],
+    }
+
+
+@app.get("/api/v1/biographies/current")
+def get_current_biography_endpoint(
+    soul_id: str = "Kaelen the Star-Watcher",
+    viewer_soul_id: str | None = None,
+):
+    biography = get_current_biography_record(soul_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No current biography found for soul '{soul_id}'.",
+        )
+    return {"biography": _project_biography(biography, viewer_soul_id).model_dump()}
+
+
+@app.get("/api/v1/biographies/history")
+def list_biography_history_endpoint(soul_id: str = "Kaelen the Star-Watcher"):
+    records = list_biography_records(soul_id)
+    return {"biographies": records}
+
+
+@app.get("/api/v1/biographies/{biography_id}")
+def get_biography_endpoint(biography_id: str, viewer_soul_id: str | None = None):
+    biography = get_biography_record(biography_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Biography '{biography_id}' not found",
+        )
+    return {"biography": _project_biography(biography, viewer_soul_id).model_dump()}
+
+
+@app.post("/api/v1/biographies/{biography_id}/approve")
+def approve_biography_endpoint(
+    biography_id: str, soul_id: str = "Kaelen the Star-Watcher"
+):
+    try:
+        biography = approve_biography_transaction(biography_id, soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "biography": _project_biography(biography, soul_id).model_dump(),
+        "message": "Biography approved as current.",
+    }
+
+
+@app.post("/api/v1/biographies/{biography_id}/reject")
+def reject_biography_endpoint(
+    biography_id: str, soul_id: str = "Kaelen the Star-Watcher"
+):
+    try:
+        biography = reject_biography_record(biography_id, soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "biography": _project_biography(biography, soul_id).model_dump(),
+        "message": "Biography rejected. Canonical Chronicle was untouched.",
+    }
+
+
+@app.get("/api/v1/biographies/{biography_id}/sections/{section_id}/provenance")
+def get_biography_section_provenance_endpoint(
+    biography_id: str,
+    section_id: str,
+    viewer_soul_id: str | None = None,
+):
+    biography = get_biography_record(biography_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Biography '{biography_id}' not found",
+        )
+    section = next(
+        (s for s in biography["sections"] if s["section_id"] == section_id), None
+    )
+    if not section:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Section '{section_id}' not found in biography '{biography_id}'",
+        )
+    visible = [
+        ref
+        for ref in section["provenance"]
+        if source_visible_to(ref["source_type"], ref["source_id"], viewer_soul_id)
+    ]
+    return {"provenance": visible, "section": section}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

@@ -18,12 +18,13 @@ import { RelicLedgerView } from './components/RelicLedgerView';
 import { ReflectionAccessibilityView } from './components/ReflectionAccessibilityView';
 import { VisualMemoryView } from './components/visual-memory/VisualMemoryView';
 import { WorldAtlasView } from './components/WorldAtlasView';
+import { BiographyView } from './components/BiographyView';
 import { AuthModal } from './components/AuthModal';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe } from 'lucide-react';
+import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'art'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -241,6 +242,7 @@ export function App() {
               { id: 'paths', label: 'Probable Paths', icon: GitBranch },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
+              { id: 'biography', label: 'Biography', icon: BookOpen },
               { id: 'convergence', label: 'Convergence', icon: Radio },
               { id: 'reflection', label: 'Reflection', icon: HeartHandshake },
               { id: 'visual_memory', label: 'Visual Memory', icon: Layers },
@@ -488,6 +490,8 @@ export function App() {
         {activeTab === 'chronicle' && (
           <ChronicleView history={chronicleHistory} worldFacts={worldFacts} />
         )}
+
+        {activeTab === 'biography' && <BiographyView soulName={soulSheet.name} />}
 
         {activeTab === 'convergence' && (
           <ConvergenceView currentRead={currentRead} soulName={soulSheet.name} />

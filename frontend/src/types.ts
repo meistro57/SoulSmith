@@ -552,6 +552,62 @@ export interface RelatedMemorySuggestion {
   canonical: boolean;
 }
 
+// Phase 14: Living Biography
+export type BiographyStatus = 'draft' | 'current' | 'superseded' | 'rejected' | 'failed';
+export type BiographyGuardianStatus = 'pending' | 'passed' | 'failed';
+export type BiographyClaimKind = 'canonical_fact' | 'participant_perspective' | 'shared_perspective' | 'inferred_theme' | 'narrative_connective' | 'unresolved';
+export type BiographySectionType = 'origins' | 'formative_moments' | 'bonds' | 'discoveries' | 'trials' | 'relics' | 'story_marks' | 'places' | 'phenomena' | 'shared_memories' | 'consequences' | 'unresolved_threads' | 'current_chapter';
+export type BiographySourceType = 'memory_object' | 'group_memory' | 'portrait_version' | 'visual_entity_version' | 'chronicle_painting' | 'story_mark' | 'relic' | 'probable_path';
+
+export interface BiographySourceRef {
+  source_type: BiographySourceType;
+  source_id: string;
+  claim_kind: BiographyClaimKind;
+  note?: string;
+}
+
+export interface BiographySection {
+  section_id: string;
+  biography_id: string;
+  section_type: BiographySectionType;
+  position: number;
+  title: string;
+  narrative: string;
+  claim_kind: BiographyClaimKind;
+  perspective_of?: string;
+  visual_reference?: string;
+  provenance: BiographySourceRef[];
+  created_at?: string;
+}
+
+export interface BiographyGuardianReport {
+  status: 'pass' | 'fail';
+  confidence: number;
+  violations: Array<{ type: string; severity: string; description: string; canonical_expected: string; observed: string }>;
+  correction_instructions: string[];
+}
+
+export interface Biography {
+  biography_id: string;
+  soul_id: string;
+  version_number: number;
+  status: BiographyStatus;
+  title: string;
+  current_chapter?: string;
+  scope_type: string;
+  scope_ref?: string;
+  visibility: string;
+  source_snapshot: Record<string, any>;
+  provider: string;
+  provider_model?: string;
+  compiler_version: string;
+  guardian_status: BiographyGuardianStatus;
+  guardian_report?: BiographyGuardianReport;
+  sections: BiographySection[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
 
 export const DIE_LIMITS = { d20: 20, d12: 12, d10: 10, percentile: 100, d8: 8, d6: 6, d4: 4 } as const;

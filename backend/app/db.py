@@ -568,6 +568,53 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS biography_versions (
+            biography_id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft',
+            title TEXT NOT NULL,
+            current_chapter TEXT,
+            scope_type TEXT NOT NULL DEFAULT 'full_life',
+            scope_ref TEXT,
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            source_snapshot_json TEXT NOT NULL DEFAULT '{}',
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT,
+            compiler_version TEXT NOT NULL DEFAULT '1.0.0',
+            guardian_status TEXT NOT NULL DEFAULT 'pending',
+            guardian_report_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS biography_sections (
+            section_id TEXT PRIMARY KEY,
+            biography_id TEXT NOT NULL,
+            section_type TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            narrative TEXT NOT NULL,
+            claim_kind TEXT NOT NULL DEFAULT 'narrative_connective',
+            perspective_of TEXT,
+            visual_reference TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS biography_provenance (
+            provenance_id TEXT PRIMARY KEY,
+            section_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            claim_kind TEXT NOT NULL,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
         cursor.execute(
@@ -4127,3 +4174,380 @@ def get_memory_objects_by_event_record(event_id: str) -> list[dict[str, Any]]:
         }
         results.append(record)
     return results
+
+
+# Phase 14: Living Biography DB Helpers
+
+
+def _map_biography_version_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "biography_id": row["biography_id"],
+        "soul_id": row["soul_id"],
+        "version_number": row["version_number"],
+        "status": row["status"],
+        "title": row["title"],
+        "current_chapter": row["current_chapter"],
+        "scope_type": row["scope_type"],
+        "scope_ref": row["scope_ref"],
+        "visibility": row["visibility"],
+        "source_snapshot": _json_or_none(row["source_snapshot_json"]) or {},
+        "provider": row["provider"],
+        "provider_model": row["provider_model"],
+        "compiler_version": row["compiler_version"],
+        "guardian_status": row["guardian_status"],
+        "guardian_report": _json_or_none(row["guardian_report_json"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _map_biography_section_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "section_id": row["section_id"],
+        "biography_id": row["biography_id"],
+        "section_type": row["section_type"],
+        "position": row["position"],
+        "title": row["title"],
+        "narrative": row["narrative"],
+        "claim_kind": row["claim_kind"],
+        "perspective_of": row["perspective_of"],
+        "visual_reference": row["visual_reference"],
+        "created_at": row["created_at"],
+    }
+
+
+def _map_biography_provenance_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "provenance_id": row["provenance_id"],
+        "section_id": row["section_id"],
+        "source_type": row["source_type"],
+        "source_id": row["source_id"],
+        "claim_kind": row["claim_kind"],
+        "note": row["note"],
+        "created_at": row["created_at"],
+    }
+
+
+def create_biography_version_transaction(
+    *,
+    soul_id: str,
+    status: str,
+    title: str,
+    current_chapter: str | None,
+    scope_type: str,
+    scope_ref: str | None,
+    visibility: str,
+    source_snapshot: dict[str, Any],
+    provider: str,
+    provider_model: str | None,
+    compiler_version: str,
+    guardian_status: str,
+    guardian_report: dict[str, Any],
+    sections: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Atomically create an immutable biography version with its sections and
+    provenance links. Regeneration always inserts a new version.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) as count FROM biography_versions WHERE soul_id = ?",
+            (soul_id,),
+        )
+        version_number = (cursor.fetchone()["count"] or 0) + 1
+        biography_id = f"bio_{version_number}_{str(uuid.uuid4())[:8]}"
+
+        cursor.execute(
+            """
+            INSERT INTO biography_versions (
+                biography_id, soul_id, version_number, status, title, current_chapter,
+                scope_type, scope_ref, visibility, source_snapshot_json, provider,
+                provider_model, compiler_version, guardian_status, guardian_report_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                biography_id,
+                soul_id,
+                version_number,
+                status,
+                title,
+                current_chapter,
+                scope_type,
+                scope_ref,
+                visibility,
+                json.dumps(source_snapshot),
+                provider,
+                provider_model,
+                compiler_version,
+                guardian_status,
+                json.dumps(guardian_report),
+            ),
+        )
+
+        for position, section in enumerate(sections):
+            section_id = f"sec_{position}_{str(uuid.uuid4())[:8]}"
+            cursor.execute(
+                """
+                INSERT INTO biography_sections (
+                    section_id, biography_id, section_type, position, title,
+                    narrative, claim_kind, perspective_of, visual_reference
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    section_id,
+                    biography_id,
+                    section["section_type"],
+                    position,
+                    section["title"],
+                    section["narrative"],
+                    section.get("claim_kind", "narrative_connective"),
+                    section.get("perspective_of"),
+                    section.get("visual_reference"),
+                ),
+            )
+            for ref in section.get("provenance", []):
+                cursor.execute(
+                    """
+                    INSERT INTO biography_provenance (
+                        provenance_id, section_id, source_type, source_id, claim_kind, note
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        f"prov_{str(uuid.uuid4())[:8]}",
+                        section_id,
+                        ref["source_type"],
+                        ref["source_id"],
+                        ref.get("claim_kind", "canonical_fact"),
+                        ref.get("note"),
+                    ),
+                )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+    biography = get_biography_record(biography_id)
+    conn.close()
+    return biography
+
+
+def get_biography_record(biography_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_versions WHERE biography_id = ?", (biography_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    biography = _map_biography_version_row(row)
+    biography["sections"] = _load_biography_sections(conn, biography_id)
+    conn.close()
+    return biography
+
+
+def _load_biography_sections(
+    conn: sqlite3.Connection, biography_id: str
+) -> list[dict[str, Any]]:
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_sections WHERE biography_id = ? ORDER BY position ASC",
+        (biography_id,),
+    )
+    rows = cursor.fetchall()
+    sections: list[dict[str, Any]] = []
+    for row in rows:
+        section = _map_biography_section_row(row)
+        cursor.execute(
+            "SELECT * FROM biography_provenance WHERE section_id = ? ORDER BY created_at ASC",
+            (section["section_id"],),
+        )
+        section["provenance"] = [
+            {
+                "source_type": p["source_type"],
+                "source_id": p["source_id"],
+                "claim_kind": p["claim_kind"],
+                "note": p["note"],
+            }
+            for p in cursor.fetchall()
+        ]
+        sections.append(section)
+    return sections
+
+
+def list_biography_records(soul_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_versions WHERE soul_id = ? ORDER BY version_number DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_biography_version_row(r) for r in rows]
+
+
+def get_current_biography_record(soul_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_versions WHERE soul_id = ? AND status = 'current' "
+        "ORDER BY version_number DESC LIMIT 1",
+        (soul_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    biography = _map_biography_version_row(row)
+    biography["sections"] = _load_biography_sections(conn, row["biography_id"])
+    conn.close()
+    return biography
+
+
+def approve_biography_transaction(biography_id: str, soul_id: str) -> dict[str, Any]:
+    """Approve a Guardian-passed draft, superseding any previous current version."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT * FROM biography_versions WHERE biography_id = ?", (biography_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Biography '{biography_id}' not found")
+        if row["soul_id"] != soul_id:
+            conn.close()
+            raise ValueError(
+                f"Biography '{biography_id}' does not belong to soul '{soul_id}'"
+            )
+        if row["status"] == "current":
+            conn.close()
+            return get_biography_record(biography_id)
+        if row["status"] != "draft":
+            conn.close()
+            raise ValueError(
+                f"Cannot approve biography '{biography_id}' in status '{row['status']}'."
+            )
+        if row["guardian_status"] != "passed":
+            conn.close()
+            raise ValueError(
+                f"Biography '{biography_id}' has not passed the Biography Guardian."
+            )
+
+        cursor.execute(
+            """
+            UPDATE biography_versions SET status = 'superseded', updated_at = CURRENT_TIMESTAMP
+            WHERE soul_id = ? AND status = 'current'
+        """,
+            (soul_id,),
+        )
+        cursor.execute(
+            """
+            UPDATE biography_versions SET status = 'current', updated_at = CURRENT_TIMESTAMP
+            WHERE biography_id = ?
+        """,
+            (biography_id,),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+    biography = get_biography_record(biography_id)
+    conn.close()
+    return biography
+
+
+def reject_biography_record(biography_id: str, soul_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_versions WHERE biography_id = ?", (biography_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError(f"Biography '{biography_id}' not found")
+    if row["soul_id"] != soul_id:
+        conn.close()
+        raise ValueError(
+            f"Biography '{biography_id}' does not belong to soul '{soul_id}'"
+        )
+    if row["status"] == "current":
+        conn.close()
+        raise ValueError(
+            f"Biography '{biography_id}' is current and cannot be rejected."
+        )
+    cursor.execute(
+        """
+        UPDATE biography_versions SET status = 'rejected', updated_at = CURRENT_TIMESTAMP
+        WHERE biography_id = ?
+    """,
+        (biography_id,),
+    )
+    conn.commit()
+    conn.close()
+    return get_biography_record(biography_id)
+
+
+def get_biography_provenance_records(section_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM biography_provenance WHERE section_id = ? ORDER BY created_at ASC",
+        (section_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_biography_provenance_row(r) for r in rows]
+
+
+def get_story_mark_record(mark_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM story_marks WHERE id = ?", (mark_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "soul_id": row["soul_id"],
+        "mark_type": row["mark_type"],
+        "location": row["location"],
+        "origin_event_id": row["origin_event_id"],
+        "acquired_at": row["acquired_at"],
+        "visibility": row["visibility"],
+        "status": row["status"],
+    }
+
+
+def get_probable_path_record(path_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM probable_paths WHERE id = ?", (path_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "event_id": row["event_id"],
+        "soul_id": row["soul_id"],
+        "path_title": row["path_title"],
+        "chosen_path": row["chosen_path"],
+        "unchosen_approach": row["unchosen_approach"],
+        "potential_outcome_class": row["potential_outcome_class"],
+        "manifestation_type": row["manifestation_type"],
+        "status": row["status"],
+        "provenance_summary": row["provenance_summary"],
+        "created_at": row["created_at"],
+    }

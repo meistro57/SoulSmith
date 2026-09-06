@@ -94,6 +94,10 @@ npm run build       # tsc -b && vite build
 | `visual_canon_guardian.py` | Vision-based Guardian abstraction + deterministic mock (PASS/RETRY/BLOCK). |
 | `painting_pipeline.py` | Orchestrates generate → quarantine → inspect → pass/retry/block. |
 | `group_memories.py` | Phase 13 Group Memories & Tags: models, perspective preservation, consent projections, deterministic exact-event grouping, typed ID-anchored tags/anchors. |
+| `biography.py` | Phase 14 Living Biography: models (version/section/provenance), consent-safe projection, chronology, recurring-thread extraction, fact-vs-perspective classification. |
+| `biography_compiler.py` | Phase 14 deterministic biography compiler: gathers consent-filtered canonical records into an inspectable `BiographySpec` before prose. |
+| `biography_provider.py` | Phase 14 narrative provider abstraction (mock + future LLM scaffold). |
+| `biography_guardian.py` | Phase 14 Biography Guardian: deterministic validation of generated narrative against provenance (not the Visual Canon Guardian). |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -177,6 +181,8 @@ This is the single most important rule in the codebase:
 15. **Chronicle Paintings are art, not canon.** Phase 12 (`chronicle_paintings.py`, `painting_compiler.py`, `painting_pipeline.py`, `visual_canon_guardian.py`) enforces `CANON -> SCENE SPEC -> IMAGE GENERATION -> VISUAL CANON GUARDIAN -> PLAYER-VISIBLE CANDIDATE`. Raw generated output lands in `backend/assets/chronicle/quarantine/` and is copied into `chronicle/paintings/` only after the Guardian passes. The deterministic mock Guardian can be forced with `SOULSMITH_MOCK_GUARDIAN_VERDICT=pass|retry|block`; retry budget is `SOULSMITH_CHRONICLE_MAX_RETRIES` (default 2). Approving a replacement painting supersedes (never deletes) the prior approved one, and the gallery query returns only approved `public_canon` paintings.
 
 16. **Group Memories link memories without rewriting them.** Phase 13 (`group_memories.py`) enforces `SHARED EVENT != SHARED MEMORY`: canonical grouping is keyed by exact `event_id` only (never semantic similarity — that yields `suggestions`, not members), and every response goes through `project_group_for_viewer` for participant-specific consent filtering. Private participants are omitted (not counted) from public projections; title/summary are re-derived from public facts only. See `docs/GROUP_MEMORIES.md`.
+
+17. **The Biography is derived, never canonical.** Phase 14 (`biography*.py`) enforces `CANON -> SPEC -> NARRATIVE -> REVIEW`, never `BIOGRAPHY -> CANON`. Provenance is stored as normalized `biography_provenance` rows, not an opaque JSON graph; every read goes through `project_biography_for_viewer` for consent filtering. Regeneration always creates a new immutable `biography_versions` row (status `draft`/`current`/`superseded`/`rejected`/`failed`), and only Guardian-passed drafts may become `current`. See `docs/LIVING_BIOGRAPHY.md`.
 
 ---
 

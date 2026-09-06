@@ -426,8 +426,8 @@ def test_approved_chronicle_painting_relationship_remains_valid():
 
 
 def test_visual_canon_guardian_requirements_remain_intact(monkeypatch):
-    from app.visual_canon_guardian import MockVisualCanonGuardian
     from app.chronicle_paintings import SceneSpecModel
+    from app.visual_canon_guardian import MockVisualCanonGuardian
     from app.visual_memory import MemoryObjectModel
 
     monkeypatch.setenv("SOULSMITH_MOCK_GUARDIAN_VERDICT", "block")
