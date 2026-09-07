@@ -1024,6 +1024,126 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         "art_direction_profile_version_id TEXT",
     )
 
+    # Phase 20: multi-Aspect campaign sessions. A session is campaign-level;
+    # ``soul_id`` records the default/owner Aspect while ``active_soul_id``
+    # tracks the currently active playable Aspect (mutable via switching).
+    _add_column_if_missing(
+        cursor, "campaign_sessions", "active_soul_id", "active_soul_id TEXT"
+    )
+
+    # Phase 20: playable Aspects registered to a campaign. Each Aspect is an
+    # independent structured viewpoint; registration is idempotent per
+    # (campaign_id, soul_id).
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_aspects (
+            campaign_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            aspect_id TEXT,
+            display_name TEXT NOT NULL,
+            viewpoint_location TEXT,
+            is_active INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (campaign_id, soul_id)
+        )
+    """)
+
+    # Phase 20: Aspect-switch audit log. Bookkeeping only, never canonical
+    # history. Idempotent switches are recorded with ``idempotent = 1``.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS aspect_switches (
+            switch_id TEXT PRIMARY KEY,
+            campaign_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            from_soul_id TEXT NOT NULL,
+            to_soul_id TEXT NOT NULL,
+            idempotent INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phase 20: persistent place/location entities. Precise coordinates are
+    # stored separately and only with consent; public representation uses a
+    # reduced-precision region label.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS places (
+            place_id TEXT PRIMARY KEY,
+            place_name TEXT NOT NULL,
+            place_kind TEXT NOT NULL DEFAULT 'interpretive',
+            public_label TEXT,
+            region_id TEXT,
+            region_precision TEXT NOT NULL DEFAULT 'reduced',
+            coordinate_latitude REAL,
+            coordinate_longitude REAL,
+            coordinate_precision_m TEXT NOT NULL DEFAULT 'coarse',
+            consent_scope TEXT NOT NULL DEFAULT 'private',
+            safety_status TEXT NOT NULL DEFAULT 'unknown',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by_soul_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phase 20: a place accumulates history without owning it. Provenance links
+    # to canonical records; visibility is consent-filtered at read time.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS place_history (
+            history_id TEXT PRIMARY KEY,
+            place_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            event_id TEXT NOT NULL,
+            soul_id TEXT,
+            provenance_source_type TEXT NOT NULL,
+            provenance_source_id TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phase 20: location consent is opt-in and per-soul, with a purpose and a
+    # precision cap. No location sample is accepted without this grant.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS location_consent (
+            soul_id TEXT PRIMARY KEY,
+            location_access_granted INTEGER NOT NULL DEFAULT 0,
+            purpose TEXT NOT NULL DEFAULT '',
+            precision_level TEXT NOT NULL DEFAULT 'coarse',
+            retention_days INTEGER,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phase 20: authorized location samples. Stored precision is minimized and
+    # the raw sample is never exposed publicly.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS location_samples (
+            sample_id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            precision_m REAL NOT NULL,
+            purpose TEXT NOT NULL,
+            consent_scope TEXT NOT NULL DEFAULT 'private',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phase 20: wandering discoveries. A bounded deterministic record of what
+    # nearby eligible content was surfaced to an Aspect; hidden canonical
+    # details are never embedded here.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wandering_discoveries (
+            discovery_id TEXT PRIMARY KEY,
+            soul_id TEXT NOT NULL,
+            place_id TEXT,
+            opportunity_type TEXT NOT NULL,
+            opportunity_id TEXT,
+            hidden_details_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
         cursor.execute(
@@ -1103,25 +1223,42 @@ def get_all_canonical_events() -> list[dict[str, Any]]:
     cursor.execute("SELECT * FROM scene_events ORDER BY created_at DESC")
     rows = cursor.fetchall()
     conn.close()
-    return [
-        {
-            "id": row["id"],
-            "soul_name": row["soul_id"],
-            "outcome_class": row["outcome_class"],
-            "dice_read": _json_or_none(row["dice_read_json"]),
-            "raw_roll": _json_or_none(row["raw_roll_json"]),
-            "interpreted_roll": _json_or_none(row["interpreted_roll_json"]),
-            "grammar_version": row["grammar_version"],
-            "player_intent": row["player_intent"],
-            "chosen_approach": row["chosen_approach"],
-            "resource_investment": _json_or_none(row["resource_investment_json"]),
-            "deterministic_outcome": _json_or_none(row["deterministic_outcome_json"]),
-            "narration": _json_or_none(row["narration_json"]),
-            "canon_facts": _json_or_none(row["canon_facts_json"]) or [],
-            "created_at": row["created_at"],
-        }
-        for row in rows
-    ]
+    return [_map_canonical_event_row(row) for row in rows]
+
+
+def _map_canonical_event_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "soul_name": row["soul_id"],
+        "soul_id": row["soul_id"],
+        "outcome_class": row["outcome_class"],
+        "dice_read": _json_or_none(row["dice_read_json"]),
+        "raw_roll": _json_or_none(row["raw_roll_json"]),
+        "interpreted_roll": _json_or_none(row["interpreted_roll_json"]),
+        "grammar_version": row["grammar_version"],
+        "player_intent": row["player_intent"],
+        "chosen_approach": row["chosen_approach"],
+        "resource_investment": _json_or_none(row["resource_investment_json"]),
+        "deterministic_outcome": _json_or_none(row["deterministic_outcome_json"]),
+        "narration": _json_or_none(row["narration_json"]),
+        "canon_facts": _json_or_none(row["canon_facts_json"]) or [],
+        "created_at": row["created_at"],
+    }
+
+
+def get_canonical_events_for_soul(soul_id: str) -> list[dict[str, Any]]:
+    """Aspect-scoped Chronicle visibility. The campaign-level Chronicle is the
+    canonical truth; an Aspect only sees events they participated in. This is the
+    Phase 20 boundary between CANONICAL TRUTH and ASPECT KNOWLEDGE."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM scene_events WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_canonical_event_row(row) for row in rows]
 
 
 # Curiosity & Thread Database Helpers
@@ -1276,6 +1413,65 @@ def get_all_open_questions() -> list[dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM open_questions ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row["id"],
+            "seed_id": row["seed_id"],
+            "question_text": row["question_text"],
+            "stakes": row["stakes"],
+            "status": row["status"],
+            "evidence_event_ids": _json_or_none(row["evidence_event_ids_json"]) or [],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def get_seeds_for_soul(soul_id: str) -> list[dict[str, Any]]:
+    """Aspect-scoped Seeds. A Seed belongs to the Aspect that planted it; an
+    orphaned Seed (no soul_id) remains visible to every Aspect as legacy world
+    texture. This is the Phase 20 knowledge boundary for Curiosity state."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM seeds WHERE soul_id = ? OR soul_id IS NULL ORDER BY updated_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": row["id"],
+            "world_id": row["world_id"],
+            "soul_id": row["soul_id"],
+            "symbol": row["symbol"],
+            "thread_type": row["thread_type"],
+            "stage": row["stage"],
+            "echo_count": row["echo_count"],
+            "narrative_context": row["narrative_context"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+        for row in rows
+    ]
+
+
+def get_open_questions_for_soul(soul_id: str) -> list[dict[str, Any]]:
+    """Aspect-scoped open questions, joined through their owning Seed. A question
+    whose Seed has no owner is legacy/global and stays visible."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT q.* FROM open_questions q
+        LEFT JOIN seeds s ON s.id = q.seed_id
+        WHERE s.soul_id IS NULL OR s.soul_id = ?
+        ORDER BY q.created_at DESC
+    """,
+        (soul_id,),
+    )
     rows = cursor.fetchall()
     conn.close()
     return [
@@ -6072,6 +6268,9 @@ def _map_campaign_session_row(r: sqlite3.Row) -> dict[str, Any]:
         "session_id": r["session_id"],
         "campaign_id": r["campaign_id"],
         "soul_id": r["soul_id"],
+        "active_soul_id": r["active_soul_id"]
+        if "active_soul_id" in r.keys()
+        else r["soul_id"],
         "constellation_id": r["constellation_id"],
         "status": r["status"],
         "current_opportunity_id": r["current_opportunity_id"],
@@ -6132,17 +6331,22 @@ def _map_campaign_transition_row(r: sqlite3.Row) -> dict[str, Any]:
 
 
 def create_campaign_session_record(
-    *, campaign_id: str, soul_id: str, constellation_id: str | None = None
+    *,
+    campaign_id: str,
+    soul_id: str,
+    constellation_id: str | None = None,
+    active_soul_id: str | None = None,
 ) -> dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     session_id = str(uuid.uuid4())
+    active_soul_id = active_soul_id or soul_id
     cursor.execute(
         """
-        INSERT INTO campaign_sessions (session_id, campaign_id, soul_id, constellation_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO campaign_sessions (session_id, campaign_id, soul_id, constellation_id, active_soul_id)
+        VALUES (?, ?, ?, ?, ?)
     """,
-        (session_id, campaign_id, soul_id, constellation_id),
+        (session_id, campaign_id, soul_id, constellation_id, active_soul_id),
     )
     conn.commit()
     cursor.execute(
@@ -7212,3 +7416,618 @@ def promises_linked_to_entity(entity_type: str, entity_id: str) -> list[dict[str
             )
     conn.close()
     return records
+
+
+# ---------------------------------------------------------------------------
+# Phase 20: multi-Aspect campaign sessions, places, and Wandering persistence.
+# ---------------------------------------------------------------------------
+
+
+def _map_campaign_aspect_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "campaign_id": r["campaign_id"],
+        "soul_id": r["soul_id"],
+        "aspect_id": r["aspect_id"],
+        "display_name": r["display_name"],
+        "viewpoint_location": r["viewpoint_location"],
+        "is_active": bool(r["is_active"]),
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def ensure_campaign_aspect(
+    *,
+    campaign_id: str,
+    soul_id: str,
+    display_name: str | None = None,
+    aspect_id: str | None = None,
+    viewpoint_location: str | None = None,
+) -> dict[str, Any]:
+    """Idempotently register a playable Aspect in a campaign."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    display_name = display_name or soul_id
+    cursor.execute(
+        """
+        INSERT INTO campaign_aspects
+            (campaign_id, soul_id, aspect_id, display_name, viewpoint_location, is_active)
+        VALUES (?, ?, ?, ?, ?, 0)
+        ON CONFLICT(campaign_id, soul_id) DO UPDATE SET
+            display_name = excluded.display_name,
+            aspect_id = COALESCE(excluded.aspect_id, campaign_aspects.aspect_id),
+            viewpoint_location = COALESCE(excluded.viewpoint_location, campaign_aspects.viewpoint_location),
+            updated_at = CURRENT_TIMESTAMP
+    """,
+        (campaign_id, soul_id, aspect_id, display_name, viewpoint_location),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_aspects WHERE campaign_id = ? AND soul_id = ?",
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_aspect_row(row)
+
+
+def get_campaign_aspect_record(campaign_id: str, soul_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_aspects WHERE campaign_id = ? AND soul_id = ?",
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_aspect_row(row) if row else None
+
+
+def list_campaign_aspect_records(campaign_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_aspects WHERE campaign_id = ? ORDER BY created_at ASC",
+        (campaign_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_campaign_aspect_row(r) for r in rows]
+
+
+def set_campaign_aspect_active(campaign_id: str, soul_id: str) -> None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE campaign_aspects SET is_active = 0 WHERE campaign_id = ?",
+        (campaign_id,),
+    )
+    cursor.execute(
+        """
+        UPDATE campaign_aspects SET is_active = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE campaign_id = ? AND soul_id = ?
+    """,
+        (campaign_id, soul_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_campaign_aspect_viewpoint(
+    campaign_id: str, soul_id: str, viewpoint_location: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE campaign_aspects SET viewpoint_location = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE campaign_id = ? AND soul_id = ?
+    """,
+        (viewpoint_location, campaign_id, soul_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_aspects WHERE campaign_id = ? AND soul_id = ?",
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_aspect_row(row) if row else None
+
+
+def get_active_campaign_session_for_campaign(
+    campaign_id: str,
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM campaign_sessions
+        WHERE campaign_id = ? AND status = 'active'
+        ORDER BY created_at DESC LIMIT 1
+    """,
+        (campaign_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_session_row(row) if row else None
+
+
+def set_campaign_session_active_soul(session_id: str, soul_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE campaign_sessions SET active_soul_id = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE session_id = ?
+    """,
+        (soul_id, session_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_sessions WHERE session_id = ?", (session_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_session_row(row)
+
+
+def create_aspect_switch_record(
+    *,
+    campaign_id: str,
+    session_id: str,
+    from_soul_id: str,
+    to_soul_id: str,
+    idempotent: bool,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    switch_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO aspect_switches
+            (switch_id, campaign_id, session_id, from_soul_id, to_soul_id, idempotent)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            switch_id,
+            campaign_id,
+            session_id,
+            from_soul_id,
+            to_soul_id,
+            1 if idempotent else 0,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM aspect_switches WHERE switch_id = ?", (switch_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "switch_id": row["switch_id"],
+        "campaign_id": row["campaign_id"],
+        "session_id": row["session_id"],
+        "from_soul_id": row["from_soul_id"],
+        "to_soul_id": row["to_soul_id"],
+        "idempotent": bool(row["idempotent"]),
+        "created_at": row["created_at"],
+    }
+
+
+def get_last_aspect_switch_record(
+    session_id: str, to_soul_id: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM aspect_switches
+        WHERE session_id = ? AND to_soul_id = ?
+        ORDER BY created_at DESC LIMIT 1
+    """,
+        (session_id, to_soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "switch_id": row["switch_id"],
+        "campaign_id": row["campaign_id"],
+        "session_id": row["session_id"],
+        "from_soul_id": row["from_soul_id"],
+        "to_soul_id": row["to_soul_id"],
+        "idempotent": bool(row["idempotent"]),
+        "created_at": row["created_at"],
+    }
+
+
+def _map_place_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "place_id": r["place_id"],
+        "place_name": r["place_name"],
+        "place_kind": r["place_kind"],
+        "public_label": r["public_label"],
+        "region_id": r["region_id"],
+        "region_precision": r["region_precision"],
+        "coordinate_latitude": r["coordinate_latitude"],
+        "coordinate_longitude": r["coordinate_longitude"],
+        "coordinate_precision_m": r["coordinate_precision_m"],
+        "consent_scope": r["consent_scope"],
+        "safety_status": r["safety_status"],
+        "is_active": bool(r["is_active"]),
+        "created_by_soul_id": r["created_by_soul_id"],
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def create_place_record(
+    *,
+    place_name: str,
+    place_kind: str = "interpretive",
+    public_label: str | None = None,
+    region_id: str | None = None,
+    region_precision: str = "reduced",
+    coordinate_latitude: float | None = None,
+    coordinate_longitude: float | None = None,
+    coordinate_precision_m: str = "coarse",
+    consent_scope: str = "private",
+    safety_status: str = "unknown",
+    created_by_soul_id: str | None = None,
+    place_id: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    place_id = place_id or str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO places (
+            place_id, place_name, place_kind, public_label, region_id,
+            region_precision, coordinate_latitude, coordinate_longitude,
+            coordinate_precision_m, consent_scope, safety_status, created_by_soul_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            place_id,
+            place_name,
+            place_kind,
+            public_label,
+            region_id,
+            region_precision,
+            coordinate_latitude,
+            coordinate_longitude,
+            coordinate_precision_m,
+            consent_scope,
+            safety_status,
+            created_by_soul_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM places WHERE place_id = ?", (place_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_place_row(row)
+
+
+def get_place_record(place_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM places WHERE place_id = ?", (place_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_place_row(row) if row else None
+
+
+def list_place_records(
+    *, active_only: bool = True, consent_scope: str | None = None
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "SELECT * FROM places"
+    clauses: list[str] = []
+    params: list[Any] = []
+    if active_only:
+        clauses.append("is_active = 1")
+    if consent_scope:
+        clauses.append("consent_scope = ?")
+        params.append(consent_scope)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY created_at ASC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_place_row(r) for r in rows]
+
+
+def update_place_safety_status(place_id: str, safety_status: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE places SET safety_status = ?, is_active = CASE
+            WHEN ? = 'retired' THEN 0 ELSE is_active END, updated_at = CURRENT_TIMESTAMP
+        WHERE place_id = ?
+    """,
+        (safety_status, safety_status, place_id),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM places WHERE place_id = ?", (place_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_place_row(row) if row else None
+
+
+def add_place_history_record(
+    *,
+    place_id: str,
+    event_type: str,
+    event_id: str,
+    soul_id: str | None,
+    provenance_source_type: str,
+    provenance_source_id: str,
+    visibility: str = "public_canon",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    history_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO place_history (
+            history_id, place_id, event_type, event_id, soul_id,
+            provenance_source_type, provenance_source_id, visibility
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            history_id,
+            place_id,
+            event_type,
+            event_id,
+            soul_id,
+            provenance_source_type,
+            provenance_source_id,
+            visibility,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM place_history WHERE history_id = ?", (history_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_place_history_row(row)
+
+
+def _map_place_history_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "history_id": r["history_id"],
+        "place_id": r["place_id"],
+        "event_type": r["event_type"],
+        "event_id": r["event_id"],
+        "soul_id": r["soul_id"],
+        "provenance_source_type": r["provenance_source_type"],
+        "provenance_source_id": r["provenance_source_id"],
+        "visibility": r["visibility"],
+        "created_at": r["created_at"],
+    }
+
+
+def list_all_place_history_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM place_history ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_place_history_row(r) for r in rows]
+
+
+def list_place_history_records(
+    place_id: str, viewer_soul_id: str | None = None
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM place_history WHERE place_id = ? ORDER BY created_at ASC",
+        (place_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    records = [_map_place_history_row(r) for r in rows]
+    if viewer_soul_id is None:
+        return [r for r in records if r["visibility"] == "public_canon"]
+    return [
+        r
+        for r in records
+        if r["visibility"] == "public_canon" or r["soul_id"] == viewer_soul_id
+    ]
+
+
+def get_or_create_location_consent_record(soul_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM location_consent WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return {
+            "soul_id": row["soul_id"],
+            "location_access_granted": bool(row["location_access_granted"]),
+            "purpose": row["purpose"],
+            "precision_level": row["precision_level"],
+            "retention_days": row["retention_days"],
+            "updated_at": row["updated_at"],
+        }
+    cursor.execute(
+        """
+        INSERT INTO location_consent (soul_id, location_access_granted, purpose, precision_level)
+        VALUES (?, 0, '', 'coarse')
+    """,
+        (soul_id,),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "soul_id": soul_id,
+        "location_access_granted": False,
+        "purpose": "",
+        "precision_level": "coarse",
+        "retention_days": None,
+        "updated_at": None,
+    }
+
+
+def update_location_consent_record(
+    *,
+    soul_id: str,
+    location_access_granted: bool,
+    purpose: str = "",
+    precision_level: str = "coarse",
+    retention_days: int | None = None,
+) -> dict[str, Any]:
+    get_or_create_location_consent_record(soul_id)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE location_consent SET
+            location_access_granted = ?, purpose = ?, precision_level = ?,
+            retention_days = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE soul_id = ?
+    """,
+        (
+            1 if location_access_granted else 0,
+            purpose,
+            precision_level,
+            retention_days,
+            soul_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM location_consent WHERE soul_id = ?", (soul_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "soul_id": row["soul_id"],
+        "location_access_granted": bool(row["location_access_granted"]),
+        "purpose": row["purpose"],
+        "precision_level": row["precision_level"],
+        "retention_days": row["retention_days"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def create_location_sample_record(
+    *,
+    soul_id: str,
+    latitude: float,
+    longitude: float,
+    precision_m: float,
+    purpose: str,
+    consent_scope: str = "private",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    sample_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO location_samples
+            (sample_id, soul_id, latitude, longitude, precision_m, purpose, consent_scope)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (sample_id, soul_id, latitude, longitude, precision_m, purpose, consent_scope),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM location_samples WHERE sample_id = ?", (sample_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return {
+        "sample_id": row["sample_id"],
+        "soul_id": row["soul_id"],
+        "latitude": row["latitude"],
+        "longitude": row["longitude"],
+        "precision_m": row["precision_m"],
+        "purpose": row["purpose"],
+        "consent_scope": row["consent_scope"],
+        "created_at": row["created_at"],
+    }
+
+
+def list_location_samples_records(soul_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM location_samples WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "sample_id": row["sample_id"],
+            "soul_id": row["soul_id"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "precision_m": row["precision_m"],
+            "purpose": row["purpose"],
+            "consent_scope": row["consent_scope"],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def create_wandering_discovery_record(
+    *,
+    soul_id: str,
+    place_id: str | None,
+    opportunity_type: str,
+    opportunity_id: str | None,
+    hidden_details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    discovery_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO wandering_discoveries
+            (discovery_id, soul_id, place_id, opportunity_type, opportunity_id, hidden_details_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            discovery_id,
+            soul_id,
+            place_id,
+            opportunity_type,
+            opportunity_id,
+            json.dumps(hidden_details or {}),
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM wandering_discoveries WHERE discovery_id = ?", (discovery_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_wandering_discovery_row(row)
+
+
+def _map_wandering_discovery_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "discovery_id": r["discovery_id"],
+        "soul_id": r["soul_id"],
+        "place_id": r["place_id"],
+        "opportunity_type": r["opportunity_type"],
+        "opportunity_id": r["opportunity_id"],
+        "hidden_details": _json_or_none(r["hidden_details_json"]) or {},
+        "created_at": r["created_at"],
+    }
+
+
+def list_wandering_discoveries_records(soul_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM wandering_discoveries WHERE soul_id = ? ORDER BY created_at DESC",
+        (soul_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_wandering_discovery_row(r) for r in rows]

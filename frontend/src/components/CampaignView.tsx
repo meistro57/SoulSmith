@@ -1,8 +1,8 @@
 // frontend/src/components/CampaignView.tsx
 import React, { useCallback, useEffect, useState } from 'react';
-import type { CampaignOpportunity, CampaignSession, CampaignTransition } from '../types';
+import type { CampaignAspect, CampaignOpportunity, CampaignSession, CampaignTransition, NearbyDiscoveryResult, Place } from '../types';
 import { apiClient } from '../lib/api';
-import { Compass, RefreshCw, Sparkles, ScrollText, ShieldCheck, Play, Eye, CircleDashed, Check, X, Clock3 } from 'lucide-react';
+import { Compass, RefreshCw, Sparkles, ScrollText, ShieldCheck, Play, Eye, CircleDashed, Check, X, Clock3, Users, MapPin, LocateFixed, ShieldAlert } from 'lucide-react';
 
 interface CampaignViewProps {
   soulName: string;
@@ -19,6 +19,11 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [narrativeId, setNarrativeId] = useState<string | null>(null);
   const [narrativeData, setNarrativeData] = useState<Record<string, any> | null>(null);
+  const [aspects, setAspects] = useState<CampaignAspect[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [nearby, setNearby] = useState<NearbyDiscoveryResult | null>(null);
+  const [locationGranted, setLocationGranted] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const ensureSession = useCallback(async () => {
     setLoading(true);
@@ -47,6 +52,10 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
       setTransitions(state.transitions);
       const summary = await apiClient.getCampaignAftermath(id);
       setAftermath(summary);
+      if (state.session.campaign_id) {
+        const aspectsResult = await apiClient.listCampaignAspects(state.session.campaign_id);
+        setAspects(aspectsResult.aspects);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -125,6 +134,76 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
     }
   };
 
+  const handleSwitchAspect = async (targetSoulId: string) => {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.switchCampaignAspect({
+        campaign_id: session.campaign_id,
+        session_id: session.session_id,
+        target_soul_id: targetSoulId,
+      });
+      await refresh(session.session_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadPlaces = async () => {
+    setLocationError(null);
+    try {
+      const result = await apiClient.listPlaces();
+      setPlaces(result.places);
+    } catch (err) {
+      setLocationError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleLocate = async () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not available on this device.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const result = await apiClient.getNearbyDiscoveries({
+            soul_id: soulName,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+          setNearby(result);
+          if (result.authorized) setLocationGranted(true);
+        } catch (err) {
+          setLocationError(err instanceof Error ? err.message : String(err));
+        }
+      },
+      (err) => {
+        setLocationGranted(false);
+        setLocationError(`Location permission denied: ${err.message}. Core play is unaffected.`);
+      }
+    );
+  };
+
+  const handleGrantLocation = async () => {
+    setLocationError(null);
+    try {
+      await apiClient.updateLocationConsent({
+        soul_id: soulName,
+        location_access_granted: true,
+        purpose: 'wandering_discovery',
+        precision_level: 'coarse',
+      });
+      setLocationGranted(true);
+      await handleLocate();
+    } catch (err) {
+      setLocationError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   if (loading && !session) {
     return (
       <div className="flex items-center justify-center min-h-[400px] text-indigo-300">
@@ -173,6 +252,101 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
       {error && (
         <div className="rounded-xl bg-rose-950/60 border border-rose-500/40 p-4 text-rose-200 text-sm">{error}</div>
       )}
+
+      {/* Multi-Aspect Switcher */}
+      <section className="rounded-xl bg-slate-900/80 border border-slate-800 p-5">
+        <div className="flex items-center space-x-2 mb-3">
+          <Users className="w-4 h-4 text-sky-400" />
+          <h2 className="text-lg font-bold text-slate-100">Playable Aspects</h2>
+        </div>
+        {aspects.length === 0 ? (
+          <p className="text-sm text-slate-400 italic">No additional Aspects registered for this campaign.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {aspects.map((aspect) => {
+              const active = session?.active_soul_id === aspect.soul_id || (session?.active_soul_id == null && session?.soul_id === aspect.soul_id);
+              return (
+                <button
+                  key={aspect.soul_id}
+                  onClick={() => handleSwitchAspect(aspect.soul_id)}
+                  disabled={busy || active}
+                  className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-mono border transition-all cursor-pointer disabled:opacity-60 ${
+                    active
+                      ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+                      : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'
+                  }`}
+                >
+                  <MapPin className="w-3.5 h-3.5 mr-2" />
+                  {aspect.display_name}
+                  {active && <span className="ml-2 text-[10px] uppercase text-emerald-300">active</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Wandering Foundation */}
+      <section className="rounded-xl bg-slate-900/80 border border-slate-800 p-5">
+        <div className="flex items-center space-x-2 mb-3">
+          <LocateFixed className="w-4 h-4 text-amber-400" />
+          <h2 className="text-lg font-bold text-slate-100">Wandering</h2>
+          <span className="text-xs font-mono uppercase text-slate-500">real-world play, safely</span>
+        </div>
+        {locationError && (
+          <div className="rounded-lg bg-rose-950/60 border border-rose-500/40 p-3 text-rose-200 text-xs mb-3 flex items-start gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{locationError}</span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            onClick={handleGrantLocation}
+            disabled={busy || locationGranted}
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-sm font-mono cursor-pointer disabled:opacity-50"
+          >
+            <LocateFixed className="w-4 h-4 mr-2" />
+            Grant location access
+          </button>
+          <button
+            onClick={loadPlaces}
+            disabled={busy}
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-300 text-sm font-mono cursor-pointer disabled:opacity-50"
+          >
+            <MapPin className="w-4 h-4 mr-2" />
+            Load places
+          </button>
+        </div>
+        {nearby && (
+          <div className="space-y-2">
+            {!nearby.authorized && (
+              <p className="text-sm text-slate-400 italic">Location access declined. Core play remains fully available.</p>
+            )}
+            {nearby.authorized && nearby.places.length === 0 && (
+              <p className="text-sm text-slate-400 italic">No nearby stories rooted here yet.</p>
+            )}
+            {nearby.places.map((entry) => (
+              <div key={entry.place.place_id} className="text-sm text-slate-300 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-amber-400" />
+                <span>{entry.place.place_name}</span>
+                <span className="text-xs font-mono text-slate-500">{entry.distance_m}m</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {places.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-800">
+            <div className="text-xs font-mono uppercase text-slate-500 mb-2">Remembered places</div>
+            <div className="flex flex-wrap gap-2">
+              {places.map((place) => (
+                <span key={place.place_id} className="inline-flex items-center text-xs font-mono bg-slate-800 border border-slate-700 px-2 py-1 rounded-full text-slate-300">
+                  {place.place_name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Aftermath */}
       {aftermath && (

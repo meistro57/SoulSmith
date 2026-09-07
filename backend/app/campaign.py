@@ -44,6 +44,10 @@ OpportunityType = Literal[
     "recognition",
     "reflection_prompt",
     "chronicle_painting_eligibility",
+    "aspect_switch",
+    "cross_aspect_meeting",
+    "recurring_location",
+    "location_bound_seed",
 ]
 
 # The bounded, extensible vocabulary of opportunity types. New types may be
@@ -68,6 +72,10 @@ OPPORTUNITY_TYPES: frozenset[str] = frozenset(
         "recognition",
         "reflection_prompt",
         "chronicle_painting_eligibility",
+        "aspect_switch",
+        "cross_aspect_meeting",
+        "recurring_location",
+        "location_bound_seed",
     }
 )
 
@@ -102,6 +110,10 @@ COOLDOWN_WINDOW: dict[str, int] = {
     "recognition": 1,
     "reflection_prompt": 1,
     "chronicle_painting_eligibility": 1,
+    "aspect_switch": 0,
+    "cross_aspect_meeting": 2,
+    "recurring_location": 1,
+    "location_bound_seed": 1,
 }
 
 
@@ -184,6 +196,7 @@ class CampaignSessionModel(BaseModel):
     session_id: str
     campaign_id: str
     soul_id: str
+    active_soul_id: str | None = None
     constellation_id: str | None = None
     status: str = "active"
     current_opportunity_id: str | None = None
@@ -1086,6 +1099,175 @@ def _entity_involved_in_promise(promise: dict[str, Any], entity_id: str) -> bool
         if participant.get("entity_id") == entity_id:
             return True
     return False
+
+
+# Phase 20: multi-Aspect and Wandering candidate builders. These are pure and
+# deterministic; they read structured state only and never infer meaning.
+
+
+def build_aspect_switch_candidates(
+    campaign_aspects: list[dict[str, Any]], current_soul_id: str
+) -> list[CandidateSpec]:
+    """Another registered playable Aspect is always a valid switch target. This
+    is an eligibility cue, not a knowledge transfer: switching never widens the
+    new Aspect's knowledge beyond its own provenance-backed state."""
+    candidates: list[CandidateSpec] = []
+    for aspect in campaign_aspects:
+        if aspect.get("soul_id") == current_soul_id:
+            continue
+        candidates.append(
+            {
+                "opportunity_type": "aspect_switch",
+                "eligibility_rule": "Another playable Aspect is registered in this campaign.",
+                "source_evidence": [
+                    _evidence(
+                        "campaign_aspect",
+                        aspect.get("soul_id"),
+                        "Playable Aspect available to switch to.",
+                    )
+                ],
+                "involved_entities": [
+                    _entity("aspect", aspect.get("soul_id"), aspect.get("display_name"))
+                ],
+                "visibility_scope": "public_canon",
+                "urgency_class": "low",
+                "participation": "player_triggered",
+                "cooldown_key": f"aspect_switch:{aspect.get('soul_id')}",
+                "domain_action": "switch_aspect",
+                "domain_action_payload": {"target_soul_id": aspect.get("soul_id")},
+                "reasoning": {"target_soul_id": aspect.get("soul_id")},
+            }
+        )
+    return candidates
+
+
+def build_cross_aspect_meeting_candidates(
+    campaign_aspects: list[dict[str, Any]],
+    current_soul_id: str,
+    relationships: list[dict[str, Any]],
+) -> list[CandidateSpec]:
+    """Two playable Aspects who share a canonical relationship (or bond) are
+    eligible to meet. The shared event keeps separate participant perspectives."""
+    candidates: list[CandidateSpec] = []
+    other_aspects = [a for a in campaign_aspects if a.get("soul_id") != current_soul_id]
+    for other in other_aspects:
+        other_id = other.get("soul_id")
+        shared = False
+        evidence: list[dict[str, Any]] = []
+        for rel in relationships:
+            participants = rel.get("participants", []) or []
+            ids = {p.get("entity_id") for p in participants}
+            if current_soul_id in ids and other_id in ids:
+                shared = True
+                evidence.append(
+                    _evidence(
+                        "relationship",
+                        rel.get("relationship_id"),
+                        f"A relationship links {current_soul_id} and {other_id}.",
+                    )
+                )
+                break
+        if not shared:
+            continue
+        candidates.append(
+            {
+                "opportunity_type": "cross_aspect_meeting",
+                "eligibility_rule": "Two playable Aspects share a canonical relationship/bond.",
+                "source_evidence": evidence,
+                "involved_entities": [
+                    _entity("aspect", current_soul_id),
+                    _entity("aspect", other_id),
+                ],
+                "visibility_scope": "public_canon",
+                "urgency_class": "normal",
+                "participation": "optional",
+                "cooldown_key": f"cross_aspect_meeting:{other_id}",
+                "domain_action": "cross_aspect_meeting",
+                "domain_action_payload": {"other_soul_id": other_id},
+                "reasoning": {"other_soul_id": other_id},
+            }
+        )
+    return candidates
+
+
+def build_recurring_location_candidates(
+    place_history: list[dict[str, Any]], current_soul_id: str
+) -> list[CandidateSpec]:
+    """A place that has accumulated history is eligible to be revisited by any
+    Aspect who may legitimately see that history (public-canon history, or the
+    Aspect's own prior events). This lets a later Aspect receive a callback from
+    an earlier Aspect's prior place history without leaking private history."""
+    candidates: list[CandidateSpec] = []
+    seen_places: set[str] = set()
+    for entry in place_history:
+        place_id = entry.get("place_id")
+        if not place_id or place_id in seen_places:
+            continue
+        visible = (
+            entry.get("visibility") == "public_canon"
+            or entry.get("soul_id") == current_soul_id
+        )
+        if not visible:
+            continue
+        seen_places.add(place_id)
+        candidates.append(
+            {
+                "opportunity_type": "recurring_location",
+                "eligibility_rule": "A place with accumulated, visible history may be revisited.",
+                "source_evidence": [
+                    _evidence(
+                        "place_history",
+                        entry.get("history_id"),
+                        f"Place '{place_id}' has accumulated history.",
+                    )
+                ],
+                "involved_entities": [_entity("place", place_id)],
+                "visibility_scope": entry.get("visibility", "public_canon"),
+                "urgency_class": "low",
+                "participation": "optional",
+                "cooldown_key": f"recurring_location:{place_id}",
+                "domain_action": "revisit_location",
+                "domain_action_payload": {"place_id": place_id},
+                "reasoning": {"place_id": place_id},
+            }
+        )
+    return candidates
+
+
+def build_location_bound_seed_candidates(
+    seeds: list[dict[str, Any]],
+    place_history: list[dict[str, Any]],
+    current_soul_id: str,
+) -> list[CandidateSpec]:
+    """A Seed the current Aspect holds that is also linked to a place they have
+    history at. The Seed retains its provenance; the location is context only."""
+    place_ids = {
+        e.get("place_id") for e in place_history if e.get("soul_id") == current_soul_id
+    }
+    candidates: list[CandidateSpec] = []
+    for seed in seeds:
+        if seed.get("stage") in ("retired", "integrated"):
+            continue
+        seed_id = seed.get("id")
+        symbol = seed.get("symbol")
+        candidates.append(
+            {
+                "opportunity_type": "location_bound_seed",
+                "eligibility_rule": "The Aspect holds a Seed that may be rooted at a remembered place.",
+                "source_evidence": [
+                    _evidence("seed", seed_id, f"Seed '{symbol}' retains provenance.")
+                ],
+                "involved_entities": [_entity("seed", seed_id, symbol)],
+                "visibility_scope": "public_canon",
+                "urgency_class": "low",
+                "participation": "optional",
+                "cooldown_key": f"location_bound_seed:{seed_id}",
+                "domain_action": "surface_location_seed",
+                "domain_action_payload": {"seed_id": seed_id, "symbol": symbol},
+                "reasoning": {"seed_id": seed_id, "place_count": len(place_ids)},
+            }
+        )
+    return candidates
 
 
 # Cooldown helper (pure).

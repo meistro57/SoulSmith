@@ -27,15 +27,19 @@ from app.campaign import (
     CAMPAIGN_COMPILER_VERSION,
     NarrativeContext,
     RecognitionDecision,
+    build_aspect_switch_candidates,
     build_chronicle_painting_candidates,
     build_cross_aspect_echo_candidates,
+    build_cross_aspect_meeting_candidates,
     build_group_memory_callback_candidates,
     build_integration_candidates,
+    build_location_bound_seed_candidates,
     build_new_encounter_candidate,
     build_npc_historical_reaction_candidates,
     build_probable_path_echo_candidates,
     build_promise_consequence_candidates,
     build_recognition_candidates,
+    build_recurring_location_candidates,
     build_recurring_symbol_candidates,
     build_reflection_prompt_candidate,
     build_relationship_callback_candidates,
@@ -71,6 +75,8 @@ SUBSYSTEM_CANDIDATE_TYPES: dict[str, list[str]] = {
     "Threads & Integration": ["integration_candidate", "recognition"],
     "Reflection": ["reflection_prompt"],
     "Chronicle Paintings": ["chronicle_painting_eligibility"],
+    "Multi-Aspect": ["aspect_switch", "cross_aspect_meeting"],
+    "Wandering": ["recurring_location", "location_bound_seed"],
 }
 
 
@@ -81,12 +87,23 @@ class CampaignOrchestratorError(ValueError):
 def start_or_resume_session(
     *, soul_id: str = "Kaelen the Star-Watcher", campaign_id: str | None = None
 ) -> dict[str, Any]:
-    """Create or resume a campaign session. Idempotent per (campaign, soul)."""
+    """Create or resume a campaign session. The session is campaign-level; the
+    requested ``soul_id`` is registered as a playable Aspect and becomes the
+    active Aspect. Idempotent: replaying start/resume never creates a second
+    session for the same campaign."""
     from app import db
+    from app.multi_aspect import ensure_campaign_aspect_registered
 
     campaign_id = campaign_id or "north_star_campaign"
-    existing = db.get_active_campaign_session_record(campaign_id, soul_id)
+    ensure_campaign_aspect_registered(campaign_id, soul_id)
+
+    existing = db.get_active_campaign_session_for_campaign(campaign_id)
     if existing:
+        if existing.get("active_soul_id") != soul_id:
+            existing = db.set_campaign_session_active_soul(
+                existing["session_id"], soul_id
+            )
+            db.set_campaign_aspect_active(campaign_id, soul_id)
         return {"session": existing, "resumed": True}
 
     constellation = db.get_or_create_primary_constellation()
@@ -94,7 +111,9 @@ def start_or_resume_session(
         campaign_id=campaign_id,
         soul_id=soul_id,
         constellation_id=constellation.get("id"),
+        active_soul_id=soul_id,
     )
+    db.set_campaign_aspect_active(campaign_id, soul_id)
     return {"session": session, "resumed": False}
 
 
@@ -113,14 +132,15 @@ def get_session_state(session_id: str) -> dict[str, Any]:
 
 def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
     from app import db
+    from app.multi_aspect import active_soul_id
     from app.relationship import (
         promise_visible_to,
         relationship_visible_to,
     )
     from app.world_memory import memory_object_visible_to, world_memory_visible_to
 
-    soul_id = session["soul_id"]
-    events = db.get_all_canonical_events()
+    soul_id = active_soul_id(session)
+    events = db.get_canonical_events_for_soul(soul_id)
     world_memories = [
         m for m in db.list_world_memory_records() if world_memory_visible_to(m, soul_id)
     ]
@@ -138,8 +158,8 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
     promises = [p for p in db.list_promise_records() if promise_visible_to(p, soul_id)]
     return {
         "soul_id": soul_id,
-        "seeds": db.get_all_seeds(),
-        "open_questions": db.get_all_open_questions(),
+        "seeds": db.get_seeds_for_soul(soul_id),
+        "open_questions": db.get_open_questions_for_soul(soul_id),
         "threads": db.get_all_local_threads(soul_id=soul_id),
         "probable_paths": db.get_probable_paths_records(soul_id=soul_id),
         "relics": db.get_or_create_relics_records(soul_id=soul_id),
@@ -151,6 +171,8 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
         "promises": promises,
         "events": events,
         "recent_event": events[0] if events else None,
+        "campaign_aspects": db.list_campaign_aspect_records(session["campaign_id"]),
+        "place_history": db.list_all_place_history_records(),
     }
 
 
@@ -204,6 +226,18 @@ def _build_subsystem_candidates(
         built = [candidate] if candidate else []
     elif system_name == "Chronicle Paintings":
         built = build_chronicle_painting_candidates(state["memory_objects"])
+    elif system_name == "Multi-Aspect":
+        built = build_aspect_switch_candidates(
+            state["campaign_aspects"], soul_id
+        ) + build_cross_aspect_meeting_candidates(
+            state["campaign_aspects"], soul_id, state["relationships"]
+        )
+    elif system_name == "Wandering":
+        built = build_recurring_location_candidates(
+            state["place_history"], soul_id
+        ) + build_location_bound_seed_candidates(
+            state["seeds"], state["place_history"], soul_id
+        )
     else:
         built = []
     return [c for c in built if c is not None]
@@ -699,6 +733,60 @@ def resolve_opportunity(
                 narration_source=narration.get("narration_source", "deterministic"),
             )
 
+    elif opportunity_type == "aspect_switch":
+        systems_invoked.append("Multi-Aspect")
+        target_soul_id = payload.get("target_soul_id")
+        if target_soul_id:
+            from app.multi_aspect import switch_aspect
+
+            switch_result = switch_aspect(
+                session["campaign_id"], session_id, target_soul_id
+            )
+            outcomes.append(
+                {
+                    "system_name": "Multi-Aspect",
+                    "result_kind": "state_updated",
+                    "details": {
+                        "from_soul_id": switch_result["from_soul_id"],
+                        "to_soul_id": switch_result["to_soul_id"],
+                        "idempotent": switch_result["idempotent"],
+                    },
+                }
+            )
+        else:
+            outcomes.append(
+                {
+                    "system_name": "Multi-Aspect",
+                    "result_kind": "no_action",
+                    "details": {"reason": "No switch target specified."},
+                }
+            )
+        next_lifecycle = "resolved"
+
+    elif opportunity_type == "cross_aspect_meeting":
+        systems_invoked.append("Multi-Aspect")
+        other_soul_id = payload.get("other_soul_id")
+        if other_soul_id:
+            from app.multi_aspect import resolve_cross_aspect_encounter
+
+            meeting = resolve_cross_aspect_encounter(session_id, other_soul_id)
+            outcomes.append(
+                {
+                    "system_name": "Multi-Aspect",
+                    "result_kind": "state_updated",
+                    "details": meeting,
+                }
+            )
+        else:
+            outcomes.append(
+                {
+                    "system_name": "Multi-Aspect",
+                    "result_kind": "no_action",
+                    "details": {"reason": "No other Aspect specified."},
+                }
+            )
+        next_lifecycle = "resolved"
+
     else:
         # Cue-only opportunities (reflection, probable path echo, group memory,
         # legend encounter, painting eligibility, unresolved question, etc.).
@@ -758,6 +846,10 @@ def _system_for_type(opportunity_type: str) -> str:
         "reflection_prompt": "Reflection",
         "relationship_callback": "Relationship & Promises",
         "promise_consequence": "Relationship & Promises",
+        "aspect_switch": "Multi-Aspect",
+        "cross_aspect_meeting": "Multi-Aspect",
+        "recurring_location": "Wandering",
+        "location_bound_seed": "Wandering",
     }.get(opportunity_type, opportunity_type)
 
 
@@ -999,3 +1091,68 @@ def regenerate_narrative(opportunity_id: str) -> dict[str, Any]:
         "failure": None,
         "canonical_state": opportunity["lifecycle_state"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 20: multi-Aspect campaign surfaces. These coordinate switching and
+# knowledge projection through the existing domain systems; they never merge
+# viewpoints or leak private state across Aspects.
+# ---------------------------------------------------------------------------
+
+
+def list_campaign_aspects(campaign_id: str) -> dict[str, Any]:
+    from app.multi_aspect import list_campaign_aspects as _list
+
+    return _list(campaign_id)
+
+
+def switch_campaign_aspect(
+    campaign_id: str, session_id: str, target_soul_id: str
+) -> dict[str, Any]:
+    """Switch the active Aspect, then return the destination Aspect's view and a
+    freshly evaluated opportunity set. Idempotent switching is a no-op for state
+    but still returns the current view."""
+    from app import db
+    from app.multi_aspect import (
+        active_soul_id,
+        compile_aspect_view,
+        switch_aspect,
+    )
+
+    session = db.get_campaign_session_record(session_id)
+    if not session:
+        raise CampaignOrchestratorError(f"Session '{session_id}' not found")
+
+    switch_result = switch_aspect(campaign_id, session_id, target_soul_id)
+    session = switch_result["session"]
+    view = compile_aspect_view(session)
+    return {
+        "switch": switch_result,
+        "active_aspect": active_soul_id(session),
+        "view": view,
+    }
+
+
+def inspect_aspect_view(session_id: str) -> dict[str, Any]:
+    """Authorized-debug view of the active Aspect's bounded knowledge projection,
+    including the canonical events it is *not* shown. Never mutates."""
+    from app import db
+    from app.multi_aspect import compile_aspect_view, knowledge_projection
+
+    session = db.get_campaign_session_record(session_id)
+    if not session:
+        raise CampaignOrchestratorError(f"Session '{session_id}' not found")
+    return {
+        "session_id": session_id,
+        "active_aspect": session.get("active_soul_id") or session["soul_id"],
+        "knowledge_projection": knowledge_projection(session).model_dump(),
+        "view": compile_aspect_view(session),
+    }
+
+
+def resolve_cross_aspect_encounter(
+    session_id: str, other_soul_id: str
+) -> dict[str, Any]:
+    from app.multi_aspect import resolve_cross_aspect_encounter as _resolve
+
+    return _resolve(session_id, other_soul_id)

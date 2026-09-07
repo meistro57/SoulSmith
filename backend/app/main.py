@@ -67,12 +67,16 @@ from app.campaign_orchestrator import (
     get_pending_reviews,
     get_session_state,
     get_transition_provenance,
+    inspect_aspect_view,
     inspect_narrative,
     inspect_opportunity,
+    list_campaign_aspects,
     preview_narrative_context,
     regenerate_narrative,
+    resolve_cross_aspect_encounter,
     resolve_opportunity,
     start_or_resume_session,
+    switch_campaign_aspect,
 )
 from app.chronicle_paintings import (
     ChroniclePaintingModel,
@@ -253,6 +257,12 @@ from app.group_memories import (
     project_group_for_viewer,
     suggest_related_by_similarity,
 )
+from app.multi_aspect import (
+    CampaignAspectModel,
+    CrossAspectEncounterRequest,
+    RegisterCampaignAspectRequest,
+    SwitchAspectRequest,
+)
 from app.painting_compiler import compile_chronicle_painting_scene
 from app.painting_pipeline import (
     create_painting_attempt,
@@ -348,6 +358,21 @@ from app.visual_world import (
     GenerateWorldVisualCandidateRequest,
     VisualEntityVersionModel,
     WorldVisualCandidateModel,
+)
+from app.wandering import (
+    CreatePlaceRequest,
+    LocationConsentRequest,
+    LocationSampleRequest,
+    PlaceModel,
+    RecordDiscoveryRequest,
+    RecordPlaceHistoryRequest,
+    RetirePlaceRequest,
+    inspect_place_history,
+    list_places_visible_to,
+    nearby_eligible_places,
+    record_place_discovery,
+    record_place_history,
+    submit_location_sample,
 )
 from app.world_gallery import (
     AddGalleryCollectionItemRequest,
@@ -3294,3 +3319,160 @@ def regenerate_campaign_opportunity_narrative(opportunity_id: str):
         return regenerate_narrative(opportunity_id)
     except CampaignOrchestratorError as exc:
         raise _orchestrator_error(exc)
+
+
+# ---------------------------------------------------------------------------
+# Phase 20: multi-Aspect campaign sessions and Wandering foundation.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/campaign/{campaign_id}/aspects")
+def get_campaign_aspects(campaign_id: str):
+    try:
+        result = list_campaign_aspects(campaign_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "campaign_id": result["campaign_id"],
+        "aspects": [CampaignAspectModel(**a).model_dump() for a in result["aspects"]],
+    }
+
+
+@app.post("/api/v1/campaign/aspects/register")
+def register_campaign_aspect(req: RegisterCampaignAspectRequest):
+    from app.multi_aspect import ensure_campaign_aspect_registered
+
+    aspect = ensure_campaign_aspect_registered(
+        req.campaign_id,
+        req.soul_id,
+        display_name=req.display_name,
+        viewpoint_location=req.viewpoint_location,
+    )
+    return {"aspect": CampaignAspectModel(**aspect).model_dump()}
+
+
+@app.post("/api/v1/campaign/aspects/switch")
+def switch_campaign_aspect_endpoint(req: SwitchAspectRequest):
+    try:
+        result = switch_campaign_aspect(
+            req.campaign_id, req.session_id, req.target_soul_id
+        )
+    except (CampaignOrchestratorError, ValueError) as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+    return {
+        "switch": result["switch"],
+        "active_aspect": result["active_aspect"],
+    }
+
+
+@app.get("/api/v1/campaign/session/{session_id}/aspect-view")
+def get_campaign_aspect_view(session_id: str):
+    try:
+        return inspect_aspect_view(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/encounters/cross-aspect")
+def resolve_cross_aspect_encounter_endpoint(req: CrossAspectEncounterRequest):
+    try:
+        return resolve_cross_aspect_encounter(req.session_id, req.other_soul_id)
+    except (CampaignOrchestratorError, ValueError) as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+@app.post("/api/v1/wandering/places")
+def create_place(req: CreatePlaceRequest):
+    from app.db import create_place_record
+
+    place = create_place_record(
+        place_name=req.place_name,
+        place_kind=req.place_kind,
+        public_label=req.public_label,
+        region_id=req.region_id,
+        region_precision=req.region_precision,
+        coordinate_latitude=req.coordinate_latitude,
+        coordinate_longitude=req.coordinate_longitude,
+        coordinate_precision_m=req.coordinate_precision_m,
+        consent_scope=req.consent_scope,
+        safety_status=req.safety_status,
+        created_by_soul_id=req.created_by_soul_id,
+    )
+    return {"place": PlaceModel(**place).model_dump()}
+
+
+@app.get("/api/v1/wandering/places")
+def list_wandering_places(viewer_soul_id: str | None = None, debug: bool = False):
+    return {"places": list_places_visible_to(viewer_soul_id, debug=debug)}
+
+
+@app.post("/api/v1/wandering/places/retire")
+def retire_wandering_place(req: RetirePlaceRequest):
+    from app.db import update_place_safety_status
+
+    place = update_place_safety_status(req.place_id, req.safety_status)
+    return {"place": PlaceModel(**place).model_dump()}
+
+
+@app.post("/api/v1/wandering/location-consent")
+def update_location_consent(req: LocationConsentRequest):
+    from app.db import update_location_consent_record
+
+    consent = update_location_consent_record(
+        soul_id=req.soul_id,
+        location_access_granted=req.location_access_granted,
+        purpose=req.purpose,
+        precision_level=req.precision_level,
+        retention_days=req.retention_days,
+    )
+    return {"consent": consent}
+
+
+@app.get("/api/v1/wandering/location-consent/{soul_id}")
+def get_location_consent(soul_id: str):
+    from app.db import get_or_create_location_consent_record
+
+    return {"consent": get_or_create_location_consent_record(soul_id)}
+
+
+@app.post("/api/v1/wandering/location-sample")
+def submit_location_sample_endpoint(req: LocationSampleRequest):
+    try:
+        sample = submit_location_sample(req)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    return {"sample": sample}
+
+
+@app.get("/api/v1/wandering/nearby")
+def get_nearby_discoveries(
+    soul_id: str, latitude: float, longitude: float, radius_m: float = 500.0
+):
+    return nearby_eligible_places(
+        soul_id=soul_id, latitude=latitude, longitude=longitude, radius_m=radius_m
+    )
+
+
+@app.post("/api/v1/wandering/discoveries/record")
+def record_wandering_discovery(req: RecordDiscoveryRequest):
+    try:
+        return record_place_discovery(req.soul_id, req.place_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.post("/api/v1/wandering/place-history")
+def record_wandering_place_history(req: RecordPlaceHistoryRequest):
+    try:
+        history = record_place_history(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {"history": history}
+
+
+@app.get("/api/v1/wandering/places/{place_id}/history")
+def get_place_history(place_id: str, viewer_soul_id: str | None = None):
+    try:
+        return inspect_place_history(place_id, viewer_soul_id=viewer_soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

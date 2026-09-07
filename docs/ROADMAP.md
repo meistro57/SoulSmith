@@ -878,6 +878,52 @@ See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
 
 ---
 
+### Phase 20: Multi-Aspect Campaign Sessions & Wandering Mode Foundation `[Status: Integrated]`
+
+Let multiple Aspects coexist meaningfully inside one campaign while preserving
+strict viewpoint boundaries, and lay the architectural foundation for
+real-world **WANDERING** play.
+
+> **THE PLAYER MAY KNOW THE WHOLE STORY. EACH ASPECT KNOWS ONLY THE LIFE THEY
+> HAVE LIVED.**
+>
+> **THE WORLD MAY SUGGEST WHERE TO LOOK. IT MUST NEVER REQUIRE THE PLAYER TO
+> SURRENDER THEIR PRIVACY OR SAFETY.**
+
+- Campaign-level sessions with multiple registered playable Aspects; each
+  Aspect keeps independent structured state (identity, viewpoint, location,
+  Chronicle visibility, knowledge, relationships, promises, relic history,
+  Threads, Seeds, World Memory exposure, opportunities).
+- Explicit knowledge layers — `CANONICAL TRUTH != PLAYER KNOWLEDGE != ASPECT
+  KNOWLEDGE != NPC KNOWLEDGE != WORLD MEMORY` — enforced by Aspect-scoped
+  Chronicle/Curiosity queries and a bounded `knowledge_projection` with
+  `forbidden_events`.
+- Deterministic, idempotent Aspect switching that persists departing state,
+  loads destination state, rebuilds `NarrativeContext`, recalculates
+  opportunities/NPC projection, and preserves campaign-level history.
+- Cross-Aspect encounters with one shared canonical event and separate
+  participant perspectives; Relationships/Promises/Relics integrated through
+  provenance-backed inheritance/transfer and entity links.
+- WANDERING foundation: persistent place entities that accumulate Chronicle
+  history, consent-safe location sampling (opt-in, minimized precision, no
+  continuous tracking), bounded deterministic nearby discovery, a
+  map-provider abstraction, and privacy/safety rules (retired/restricted places
+  stop new discovery without deleting old history).
+- Frontend Aspect switcher and Wandering discovery shell; the game remains
+  fully usable when location permission is declined.
+
+**Exit criteria**
+
+- A player can maintain multiple Aspects in one campaign, switch between them,
+  and allow them to coexist or meet without collapsing their knowledge into the
+  player's omniscient view; an action by Aspect A can leave a provenance-backed
+  consequence that Aspect B later encounters without automatically
+  understanding it.
+
+See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
+
+---
+
 ## Near-Term Implementation Priorities
 
 The phases listed above are **shipped and integrated** (Phases 0-19). The
@@ -891,7 +937,9 @@ remaining work is hardening and optional deepening, not foundational:
    NPC promise-reaction path is exercised through World Memory)~~
    — **Integrated** as Phase 19 (Relationship & Promise Engine).
    See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
-3. Support multi-Aspect simultaneous sessions within one campaign.
+3. ~~Support multi-Aspect simultaneous sessions within one campaign~~ — **Integrated**
+   as Phase 20 (Multi-Aspect Campaign Sessions & Wandering Mode Foundation).
+   See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
 4. Move the ComfyUI/visual providers from mock to a local instance for art
    moments, preserving the canonical/Guardian pipelines already built.
 5. Optional wall-clock cooldowns in addition to the deterministic count-based

@@ -315,7 +315,7 @@ A small group gathers around a table and creates a shared Chronicle.
 
 ### Wandering
 
-Players roll in real-world locations and allow those places to enter the mythology.
+Players roll in real-world locations and allow those places to enter the mythology. Phase 20 ships the consent-safe, provider-independent domain foundation for this mode: persistent place entities, opt-in location sampling, bounded deterministic nearby discovery, and a map-provider abstraction. The world may suggest where to look; it never requires the player to surrender privacy or safety.
 
 ### Chronicle
 
@@ -386,7 +386,7 @@ npm run dev
 
 ## Project Status
 
-SoulSmith is at **Advanced Playable Production Engine (Phase 0–18 Complete)**.
+SoulSmith is at **Advanced Playable Production Engine (Phase 0–20 Complete)**.
 
 Key Features Built:
 1. **3D STL Polyhedral Dice Sanctuary**: Real-time Three.js `STLLoader` engine for 6 custom polyhedral STL dice (`d20.stl`, `d12.stl`, `d10.stl`, `d8.stl`, `d6.stl`, `d4.stl`) with translucent sapphire resin optics, clearcoat gloss, transparent glass mode toggle, custom hex color picker, and opacity slider.
@@ -420,6 +420,7 @@ Key Features Built:
 29. **Campaign Orchestrator (North-Star Playable Loop)**: The conductor that turns Phases 0-16 into one continuous playable experience. A dedicated orchestrator evaluates deterministic, provenance-carrying `CampaignOpportunity`s before narration, runs an auditable reaction pipeline after each canonical event, enforces count-based cooldowns, preserves player recognition/rejection without punishment, coordinates relic memory/awakening candidates without claiming awakening authority, projects scoped NPC knowledge, and exposes traceable transition provenance and a deterministic North-Star end-to-end fixture. See [`docs/CAMPAIGN_ORCHESTRATOR.md`](docs/CAMPAIGN_ORCHESTRATOR.md).
 30. **Soulkeeper Narrative Engine & Provider Runtime**: A real storyteller with no authority over canon. A consent-safe `NarrativeContext` compiler, structured `NarrativeOutput`, a provider runtime with timeout/bounded retry/deterministic fallback, a real configurable OpenAI-compatible provider alongside the deterministic mock, a narrative Guardian (pass/retry/block) distinct from the Visual Canon and World Memory Guardians, NPC-scoped narration from Phase 16 knowledge projection, a fact-free style layer, and API/frontend surfaces for narration, dialogue, Soulkeeper questions, provenance, and re-voicing without changing campaign state. See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](docs/SOULKEEPER_NARRATIVE_ENGINE.md).
 31. **Relationship & Promise Engine**: First-class, provenance-backed persistence for bonds and oaths under the invariant **a relationship is history between people, a promise is a claim on the future, and neither may be invented by the narrator**. Relationships derive from canonical interactions with participant-specific perspectives that never become objective truth; promises carry immutable original wording, a source event or player authorization, an evidence-backed lifecycle (kept/broken/fulfilled/released/inherited/transferred/disputed/forgotten/rediscovered), relic/World Memory/NPC knowledge integration, and first-class `relationship_callback`/`promise_consequence` opportunities in the Campaign Orchestrator. See [`docs/RELATIONSHIPS_AND_PROMISES.md`](docs/RELATIONSHIPS_AND_PROMISES.md).
+32. **Multi-Aspect Campaign Sessions & Wandering Mode Foundation**: Multiple playable Aspects coexist in one campaign under the invariant **the player may know the whole story, each Aspect knows only the life it has lived**. Explicit knowledge layers (`canonical truth != player knowledge != Aspect knowledge != NPC knowledge != World Memory`) are enforced by Aspect-scoped Chronicle/Curiosity queries; deterministic idempotent Aspect switching rebuilds `NarrativeContext` and opportunities from the destination viewpoint; cross-Aspect encounters share one canonical event with separate participant perspectives. A safe WANDERING foundation adds persistent places that accumulate Chronicle history, consent-safe location sampling, bounded deterministic nearby discovery, and a map-provider abstraction — the world may suggest where to look, never requiring the player to surrender privacy or safety. See [`docs/MULTI_ASPECT_AND_WANDERING.md`](docs/MULTI_ASPECT_AND_WANDERING.md).
 
 ---
 

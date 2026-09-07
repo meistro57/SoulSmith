@@ -926,6 +926,7 @@ export interface CampaignSession {
   session_id: string;
   campaign_id: string;
   soul_id: string;
+  active_soul_id?: string | null;
   constellation_id?: string;
   status: string;
   current_opportunity_id?: string;
@@ -1134,3 +1135,98 @@ export interface RelationshipPromiseKnowledgeProjection {
   promises: RelationshipKnowledgeEntry[];
 }
 
+
+
+// Phase 20: Multi-Aspect Campaign Sessions & Wandering Foundation
+
+export interface CampaignAspect {
+  campaign_id: string;
+  soul_id: string;
+  aspect_id?: string | null;
+  display_name: string;
+  viewpoint_location?: string | null;
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AspectSwitchResult {
+  session: CampaignSession;
+  from_soul_id: string;
+  to_soul_id: string;
+  idempotent: boolean;
+  viewpoint?: string | null;
+}
+
+export interface AspectKnowledgeProjection {
+  aspect_soul_id: string;
+  campaign_id: string;
+  visible_events: string[];
+  seeds: string[];
+  questions: string[];
+  threads: string[];
+  relics: string[];
+  relationships: string[];
+  promises: string[];
+  world_memories: string[];
+  forbidden_events: string[];
+  provenance_ids: string[];
+}
+
+export interface Place {
+  place_id: string;
+  place_name: string;
+  place_kind: string;
+  public_label?: string | null;
+  region_id?: string | null;
+  region_precision: string;
+  coordinate_latitude?: number | null;
+  coordinate_longitude?: number | null;
+  coordinate_precision_m: string;
+  consent_scope: string;
+  safety_status: string;
+  is_active: boolean;
+  created_by_soul_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlaceHistoryEntry {
+  history_id: string;
+  place_id: string;
+  event_type: string;
+  event_id: string;
+  soul_id?: string | null;
+  provenance_source_type: string;
+  provenance_source_id: string;
+  visibility: string;
+  created_at?: string | null;
+}
+
+export interface LocationConsent {
+  soul_id: string;
+  location_access_granted: boolean;
+  purpose: string;
+  precision_level: string;
+  retention_days?: number | null;
+  updated_at?: string | null;
+}
+
+export interface NearbyPlace {
+  place: Place;
+  distance_m: number;
+}
+
+export interface NearbyDiscoveryResult {
+  authorized: boolean;
+  places: NearbyPlace[];
+  radius_m?: number;
+  reason?: string;
+}
+
+export interface CrossAspectMeeting {
+  shared_event: Record<string, any>;
+  active_aspect: Record<string, any>;
+  other_aspect: Record<string, any>;
+  knowledge_boundary: Record<string, any>;
+}
