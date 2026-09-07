@@ -978,3 +978,35 @@ export interface CampaignTransition {
   rejected_invalid_transition: boolean;
   created_at?: string;
 }
+
+// Phase 18: Soulkeeper Narrative Engine
+
+export interface NarrativeDialogue {
+  speaker: string;
+  line: string;
+  kind: string;
+}
+
+export interface NarrativeQuestion {
+  prompt: string;
+  kind: string;
+  choice_hint?: string;
+}
+
+export interface NarrativeGeneration {
+  generation_id: string;
+  session_id?: string;
+  opportunity_id?: string;
+  transition_id?: string;
+  provider: string;
+  provider_model: string;
+  template_version: string;
+  generation_timestamp?: string;
+  retry_count: number;
+  validation_outcome: string;
+  latency_ms?: number;
+  used_fallback: boolean;
+  context_stats: Record<string, any>;
+  output: Record<string, any>;
+  error?: string;
+}

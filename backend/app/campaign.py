@@ -21,6 +21,11 @@ from pydantic import BaseModel, Field
 
 CAMPAIGN_COMPILER_VERSION = "1.0.0"
 
+# Version of the Soulkeeper narrative template/system prompt used by real
+# providers. Changing this must never rewrite prior canonical events or
+# historical generated prose records.
+NARRATIVE_TEMPLATE_VERSION = "1.0.0"
+
 OpportunityType = Literal[
     "new_encounter",
     "seed_echo",
@@ -186,8 +191,53 @@ class CampaignSessionModel(BaseModel):
     updated_at: str | None = None
 
 
+class NarrativeDialogue(BaseModel):
+    """A single attributable line of dialogue. The speaker must already be
+    visible to the current scene; the runtime never invents participants."""
+
+    speaker: str
+    line: str
+    kind: str = "spoken"  # spoken | thought | inscription | song | rumor
+
+
+class NarrativeQuestion(BaseModel):
+    """A player-facing prompt/question. It must not change structured choices."""
+
+    prompt: str
+    kind: str = "open"  # open | choice | reflection
+    choice_hint: str | None = None
+
+
+class NarrativeFlavorLine(BaseModel):
+    text: str
+    kind: str = "sensory"  # sensory | connective | atmosphere | aside
+
+
+class NarrativePresentationCue(BaseModel):
+    kind: str
+    emphasis: str | None = None
+
+
+class NarrativeContinuity(BaseModel):
+    """Explicit, structured scene continuity. This is never raw chat history;
+    it is the smallest set of SoulSmith-owned state needed to avoid amnesia."""
+
+    location: str | None = None
+    environment: str | None = None
+    current_participants: list[str] = Field(default_factory=list)
+    prior_transition_summary: str | None = None
+    active_unresolved_opportunity: str | None = None
+    recent_visible_actions: list[str] = Field(default_factory=list)
+    current_relics: list[str] = Field(default_factory=list)
+
+
 class NarrativeContext(BaseModel):
-    """Consent-safe structured context handed to the narrative provider."""
+    """Consent-safe structured context handed to the narrative provider.
+
+    The provider only receives information the current scene is allowed to know.
+    It never receives the whole database, and it may never invent facts absent
+    from this context.
+    """
 
     soul_id: str
     campaign_id: str
@@ -199,14 +249,74 @@ class NarrativeContext(BaseModel):
     visible_entities: list[InvolvedEntity] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
 
+    # Authorized scene facts and viewpoint.
+    active_aspect: str | None = None
+    location: str | None = None
+    environment: str | None = None
+    participants: list[InvolvedEntity] = Field(default_factory=list)
+    knowledge_boundaries: dict[str, Any] = Field(default_factory=dict)
+
+    # Already-canonical, visible relationships/promises (never invented).
+    relationships: list[str] = Field(default_factory=list)
+
+    # Relic state: only what the scene is permitted to know.
+    relic_state: dict[str, Any] | None = None
+    permitted_relic_knowledge: list[str] = Field(default_factory=list)
+
+    # Seeds / questions / symbols that may be echoed.
+    seeds: list[dict[str, Any]] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    symbols: list[str] = Field(default_factory=list)
+
+    # Thread evidence only when the current opportunity allows it.
+    thread_evidence: list[dict[str, Any]] = Field(default_factory=list)
+
+    # World Memory / NPC knowledge projection where applicable.
+    world_memory_context: list[dict[str, Any]] = Field(default_factory=list)
+    npc_knowledge: list[dict[str, Any]] = Field(default_factory=list)
+
+    # Player-visible consequences and allowed uncertainty.
+    player_visible_consequences: list[str] = Field(default_factory=list)
+    allowed_uncertainty: list[str] = Field(default_factory=list)
+
+    # Style/tone hints (interpretation only, never new information).
+    style: dict[str, Any] = Field(default_factory=dict)
+    art_direction_refs: list[str] = Field(default_factory=list)
+
+    # Facts explicitly forbidden/private (must never leak).
+    forbidden_facts: list[str] = Field(default_factory=list)
+
+    # Provenance ids backing every meaningful claim.
+    provenance_ids: list[str] = Field(default_factory=list)
+
+    # Scene continuity (structured, not chat history).
+    continuity: NarrativeContinuity | None = None
+
+    # Correction instructions appended by the runtime during retry; providers
+    # may phrase around a gap but must not widen context on their own.
+    corrections: list[str] = Field(default_factory=list)
+
 
 class NarrativeOutput(BaseModel):
+    """Structured provider output. ``prose`` remains the primary scene prose;
+    the optional fields give the UI and validator bounded control without
+    turning prose into bureaucracy."""
+
     title: str | None = None
-    prose: str
+    prose: str = ""
+    scene_prose: str | None = None
+    soulkeeper_narration: str | None = None
+    dialogue: list[NarrativeDialogue] = Field(default_factory=list)
+    question: NarrativeQuestion | None = None
+    flavor_lines: list[str] = Field(default_factory=list)
+    presentation_cues: list[NarrativePresentationCue] = Field(default_factory=list)
     claims: list[str] = Field(default_factory=list)
     source_evidence: list[SourceEvidence] = Field(default_factory=list)
+    referenced_provenance_ids: list[str] = Field(default_factory=list)
+    declared_uncertainty: list[str] = Field(default_factory=list)
     provider: str
     provider_model: str
+    template_version: str = "1.0.0"
 
 
 # Request schemas.
@@ -232,6 +342,14 @@ class ResolveOpportunityRequest(BaseModel):
 class CommitEventRequest(BaseModel):
     session_id: str
     event_id: str
+
+
+class SelectNarrativeProviderRequest(BaseModel):
+    provider: str = "mock"
+
+
+class PreviewNarrativeContextRequest(BaseModel):
+    opportunity_id: str
 
 
 # Candidate shape produced by deterministic eligibility builders. The orchestrator

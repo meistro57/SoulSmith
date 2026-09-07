@@ -17,6 +17,8 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inspectId, setInspectId] = useState<string | null>(null);
+  const [narrativeId, setNarrativeId] = useState<string | null>(null);
+  const [narrativeData, setNarrativeData] = useState<Record<string, any> | null>(null);
 
   const ensureSession = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,38 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
 
   const handleInspect = async (opportunityId: string) => {
     setInspectId(inspectId === opportunityId ? null : opportunityId);
+  };
+
+  const handleNarrative = async (opportunityId: string) => {
+    if (narrativeId === opportunityId) {
+      setNarrativeId(null);
+      setNarrativeData(null);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await apiClient.getCampaignOpportunityNarrative(opportunityId);
+      setNarrativeData(data);
+      setNarrativeId(opportunityId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRegenerate = async (opportunity: CampaignOpportunity) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.regenerateCampaignOpportunityNarrative(opportunity.opportunity_id);
+      await refresh(session!.session_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (loading && !session) {
@@ -224,12 +258,52 @@ export const CampaignView: React.FC<CampaignViewProps> = ({ soulName }) => {
                   <button onClick={() => handleInspect(opportunity.opportunity_id)} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-800/60 border border-slate-700 text-slate-300 cursor-pointer">
                     <Eye className="w-3.5 h-3.5 mr-1" /> Why
                   </button>
+                  <button onClick={() => handleNarrative(opportunity.opportunity_id)} disabled={busy} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-mono bg-purple-500/20 border border-purple-400/40 text-purple-200 cursor-pointer disabled:opacity-50">
+                    <Sparkles className="w-3.5 h-3.5 mr-1" /> Story
+                  </button>
+                  <button onClick={() => handleRegenerate(opportunity)} disabled={busy} className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-800/60 border border-slate-700 text-slate-300 cursor-pointer disabled:opacity-50">
+                    <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy ? 'animate-spin' : ''}`} /> Re-voice
+                  </button>
                 </div>
 
                 {inspectId === opportunity.opportunity_id && (
                   <pre className="text-xs font-mono bg-slate-950/80 rounded-lg p-3 overflow-x-auto text-slate-300">
                     {JSON.stringify(opportunity, null, 2)}
                   </pre>
+                )}
+
+                {narrativeId === opportunity.opportunity_id && narrativeData && (
+                  <div className="space-y-3 bg-slate-950/70 rounded-lg p-3 border border-purple-500/30">
+                    {narrativeData.generations?.[0]?.output?.dialogue?.length > 0 && (
+                      <div className="space-y-2">
+                        {narrativeData.generations[0].output.dialogue.map((d: any, i: number) => (
+                          <div key={i} className="text-sm">
+                            <span className="font-mono text-purple-300">{d.speaker}: </span>
+                            <span className="text-slate-200 italic">"{d.line}"</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {narrativeData.generations?.[0]?.output?.question && (
+                      <p className="text-sm text-amber-200">
+                        <span className="font-mono uppercase text-amber-400 text-xs">Soulkeeper asks: </span>
+                        {narrativeData.generations[0].output.question.prompt}
+                      </p>
+                    )}
+                    {narrativeData.generations?.[0]?.output?.flavor_lines?.length > 0 && (
+                      <div className="text-xs text-slate-400 space-y-1">
+                        {narrativeData.generations[0].output.flavor_lines.map((f: string, i: number) => (
+                          <div key={i}>· {f}</div>
+                        ))}
+                      </div>
+                    )}
+                    {narrativeData.generations?.[0] && (
+                      <div className="text-[11px] font-mono text-slate-500 border-t border-slate-800 pt-2">
+                        {narrativeData.generations[0].provider}/{narrativeData.generations[0].provider_model} · v{narrativeData.generations[0].template_version} · {narrativeData.generations[0].validation_outcome}
+                        {narrativeData.generations[0].used_fallback ? ' · deterministic fallback' : ''}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

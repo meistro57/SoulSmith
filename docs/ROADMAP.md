@@ -791,14 +791,55 @@ See [`docs/CAMPAIGN_ORCHESTRATOR.md`](CAMPAIGN_ORCHESTRATOR.md).
 
 ---
 
+### Phase 18: Soulkeeper Narrative Engine & Provider Runtime `[Status: Integrated]`
+
+Give SoulSmith a real storyteller without giving the storyteller authority over
+canon.
+
+> **DOMAIN SYSTEMS DECIDE WHAT IS TRUE. THE SOULKEEPER DECIDES HOW IT IS TOLD.**
+
+- A formalized, consent-safe `NarrativeContext` compiled from the smallest
+  authorized evidence set, with explicit structured scene continuity (never
+  provider chat history).
+- A structured `NarrativeOutput` (scene prose, NPC dialogue, Soulkeeper
+  narration, questions, flavor lines, provenance, uncertainty, presentation
+  cues) behind the existing `CampaignNarrativeProvider` abstraction.
+- A provider runtime (`NarrativeRuntime`) with selection/configuration, timeout,
+  bounded retry, deterministic validation, safe deterministic fallback, and
+  generation metadata (provider/model/template/timestamp/retry/validation).
+- A real, configurable OpenAI-compatible provider (no vendor SDK hard-wired)
+  alongside the first-class deterministic mock.
+- A deterministic narrative Guardian distinct from the Visual Canon and World
+  Memory Guardians: pass / retry / block, rejecting unknown participants,
+  invented prior events, dates/durations, relic abilities, Thread/Integration
+  overreach, perspective violations, private leaks, and psychological authority.
+- A fact-free Soulkeeper style layer and NPC-scoped narrative contexts built
+  from Phase 16 knowledge projection.
+- API surfaces for provider status/capabilities, authorized context preview,
+  generation inspection, and re-voicing without changing campaign/domain state.
+- Frontend support for structured narration, NPC dialogue, Soulkeeper
+  questions, provenance, and graceful provider failure/fallback.
+
+**Exit criteria**
+
+- The Phase 17 North-Star loop runs with a real narrative provider that
+  transforms deterministic, provenance-backed campaign state into compelling
+  player-facing storytelling without ever creating new canon.
+- Provider failure never damages canon; the complete system still runs with
+  deterministic local/mock infrastructure.
+
+See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
+
+---
+
 ## Near-Term Implementation Priorities
 
-The phases listed above are **shipped and integrated** (Phases 0-16 plus the
-Phase 17 orchestrator). The remaining work is hardening and optional deepening,
-not foundational:
+The phases listed above are **shipped and integrated** (Phases 0-18). The
+remaining work is hardening and optional deepening, not foundational:
 
-1. Add a real (non-mock) narrative provider behind `CampaignNarrativeProvider`
-   without changing its contract or authority boundaries.
+1. ~~Add a real (non-mock) narrative provider behind `CampaignNarrativeProvider`~~
+   — **Integrated** as Phase 18 (Soulkeeper Narrative Engine & Provider Runtime).
+   See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
 2. Add a dedicated relationship/promise data model so `relationship_callback`
    and `promise_consequence` opportunities can be auto-generated (today the
    NPC promise-reaction path is exercised through World Memory).

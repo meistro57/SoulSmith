@@ -46,6 +46,11 @@ from app.campaign import (
     cooldown_window,
 )
 from app.campaign_provider import get_campaign_provider
+from app.narrative_context_compiler import (
+    compile_narrative_context,
+    compile_npc_narrative_context,
+)
+from app.narrative_runtime import NarrativeRuntime
 
 # Each subsystem's follow-up candidate types. The reaction pipeline records one
 # structured result per subsystem so a transition is fully auditable.
@@ -233,43 +238,84 @@ def _dedupe_existing(
 
 def _narrate(
     context: NarrativeContext,
+    *,
+    opportunity_id: str | None = None,
+    transition_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    try:
-        provider = get_campaign_provider()
-        output = provider.narrate(context)
-        return {
-            "title": output.title,
-            "prose": output.prose,
-            "claims": output.claims,
-            "provider": output.provider,
-            "provider_model": output.provider_model,
-        }, None
-    except Exception as exc:  # noqa: BLE001 - convert any provider failure into a clean result
-        return None, str(exc)
+    provider = get_campaign_provider()
+    result = NarrativeRuntime(provider=provider).narrate(context)
+    _persist_narrative_generation(context, result, opportunity_id, transition_id)
+    if result.failure:
+        return None, result.failure
+    output = result.output
+    return _output_dict(output, result), None
+
+
+def _output_dict(output, result) -> dict[str, Any]:
+    return {
+        "title": output.title,
+        "prose": output.prose,
+        "scene_prose": output.scene_prose,
+        "soulkeeper_narration": output.soulkeeper_narration,
+        "dialogue": [d.model_dump() for d in output.dialogue],
+        "question": output.question.model_dump() if output.question else None,
+        "flavor_lines": output.flavor_lines,
+        "presentation_cues": [c.model_dump() for c in output.presentation_cues],
+        "claims": output.claims,
+        "source_evidence": [e.model_dump() for e in output.source_evidence],
+        "referenced_provenance_ids": output.referenced_provenance_ids,
+        "declared_uncertainty": output.declared_uncertainty,
+        "provider": output.provider,
+        "provider_model": output.provider_model,
+        "template_version": output.template_version,
+        "narration_source": _narration_source(output),
+        "validation": result.validation.model_dump() if result.validation else None,
+        "used_fallback": result.used_fallback,
+    }
+
+
+def _narration_source(output) -> str:
+    if output.provider == "mock":
+        return "deterministic"
+    return output.provider
+
+
+def _persist_narrative_generation(
+    context: NarrativeContext,
+    result,
+    opportunity_id: str | None,
+    transition_id: str | None,
+) -> None:
+    from app import db
+
+    metadata = result.metadata
+    output_dict = result.output.model_dump() if result.output else {}
+    db.create_narrative_generation_record(
+        generation_id=metadata["generation_id"],
+        session_id=context.session_id,
+        opportunity_id=opportunity_id,
+        transition_id=transition_id,
+        provider=metadata["provider"],
+        provider_model=metadata["provider_model"],
+        template_version=metadata["template_version"],
+        retry_count=metadata.get("retry_count", 0),
+        validation_outcome=(
+            result.validation.verdict
+            if result.validation
+            else metadata.get("validation_outcome", "provider_failure")
+        ),
+        latency_ms=metadata.get("latency_ms"),
+        used_fallback=result.used_fallback,
+        context_stats=metadata.get("context_stats", {}),
+        output=output_dict,
+        error=result.failure,
+    )
 
 
 def _narrative_context_for(
     opportunity: dict[str, Any], session: dict[str, Any]
 ) -> NarrativeContext:
-    allowed_claims = []
-    constraints: list[str] = []
-    for evidence in opportunity.get("source_evidence", []):
-        note = evidence.get("note")
-        if note:
-            allowed_claims.append(note)
-    if opportunity["opportunity_type"] == "recognition":
-        constraints.append("player_choice_pending")
-    return NarrativeContext(
-        soul_id=session["soul_id"],
-        campaign_id=session["campaign_id"],
-        session_id=session["session_id"],
-        opportunity_type=opportunity["opportunity_type"],
-        title_hint=None,
-        allowed_claims=allowed_claims,
-        source_evidence=opportunity.get("source_evidence", []),
-        visible_entities=opportunity.get("involved_entities", []),
-        constraints=constraints,
-    )
+    return compile_narrative_context(opportunity, session)
 
 
 def _persist_opportunity(
@@ -291,13 +337,16 @@ def _persist_opportunity(
         domain_action_payload=candidate.get("domain_action_payload", {}),
         reasoning=candidate.get("reasoning", {}),
     )
-    narrative, _ = _narrate(_narrative_context_for(opportunity, session))
+    narrative, _ = _narrate(
+        _narrative_context_for(opportunity, session),
+        opportunity_id=opportunity["opportunity_id"],
+    )
     if narrative:
         opportunity = db.update_campaign_opportunity_state_record(
             opportunity["opportunity_id"],
             "eligible",
             narration=narrative["prose"],
-            narration_source="deterministic",
+            narration_source=narrative.get("narration_source", "deterministic"),
         )
     return opportunity
 
@@ -609,7 +658,7 @@ def resolve_opportunity(
                 opportunity_id,
                 "resolved",
                 narration=narration["prose"],
-                narration_source="deterministic",
+                narration_source=narration.get("narration_source", "deterministic"),
             )
 
     elif opportunity_type == "relic_memory":
@@ -628,7 +677,7 @@ def resolve_opportunity(
                 opportunity_id,
                 "resolved",
                 narration=narration["prose"],
-                narration_source="deterministic",
+                narration_source=narration.get("narration_source", "deterministic"),
             )
 
     else:
@@ -649,7 +698,7 @@ def resolve_opportunity(
                 opportunity_id,
                 "resolved",
                 narration=narration["prose"],
-                narration_source="deterministic",
+                narration_source=narration.get("narration_source", "deterministic"),
             )
 
     transition_id = str(uuid.uuid4())
@@ -708,7 +757,7 @@ def _surface_opportunity(
     opportunity: dict[str, Any], session: dict[str, Any]
 ) -> tuple[dict[str, Any] | None, str | None]:
     context = _narrative_context_for(opportunity, session)
-    return _narrate(context)
+    return _narrate(context, opportunity_id=opportunity.get("opportunity_id"))
 
 
 def _npc_reaction(
@@ -747,25 +796,10 @@ def _npc_reaction(
     if not projection.entries:
         return None, "No legitimate NPC knowledge projected."
 
-    claims = []
-    for entry in projection.entries:
-        claims.append(entry.memory.title)
-        if entry.memory.narrative:
-            claims.append(entry.memory.narrative)
-        claims.append(f"Fidelity: {entry.fidelity} ({entry.reason})")
-
-    context = NarrativeContext(
-        soul_id=session["soul_id"],
-        campaign_id=session["campaign_id"],
-        session_id=session["session_id"],
-        opportunity_type="npc_historical_reaction",
-        title_hint="A Voice From the Past",
-        allowed_claims=claims,
-        source_evidence=opportunity.get("source_evidence", []),
-        visible_entities=opportunity.get("involved_entities", []),
-        constraints=["npc_knowledge_scoped"],
+    context = compile_npc_narrative_context(
+        opportunity, session, npc_projection=projection
     )
-    return _narrate(context)
+    return _narrate(context, opportunity_id=opportunity.get("opportunity_id"))
 
 
 def get_transition_provenance(transition_id: str) -> dict[str, Any]:
@@ -862,4 +896,87 @@ def inspect_opportunity(opportunity_id: str) -> dict[str, Any]:
         "narration_source": opportunity["narration_source"],
         "narration": opportunity["narration"],
         "lifecycle_state": opportunity["lifecycle_state"],
+    }
+
+
+def get_narrative_provider_status() -> dict[str, Any]:
+    """Report provider status/capabilities without exposing secrets."""
+    from app.campaign_provider import list_campaign_provider_capabilities
+
+    return list_campaign_provider_capabilities()
+
+
+def preview_narrative_context(opportunity_id: str) -> dict[str, Any]:
+    """Authorized-debug preview of the compiled NarrativeContext. Never mutates."""
+    from app import db
+    from app.narrative_context_compiler import context_stats
+
+    opportunity = db.get_campaign_opportunity_record(opportunity_id)
+    if not opportunity:
+        raise CampaignOrchestratorError(f"Opportunity '{opportunity_id}' not found")
+    session = db.get_campaign_session_record(opportunity["session_id"])
+    if not session:
+        raise CampaignOrchestratorError("Opportunity session not found")
+    context = compile_narrative_context(opportunity, session)
+    return {
+        "opportunity_id": opportunity_id,
+        "context": context.model_dump(),
+        "stats": context_stats(context),
+    }
+
+
+def inspect_narrative(opportunity_id: str) -> dict[str, Any]:
+    """Inspect generation metadata and validation report for an opportunity."""
+    from app import db
+
+    opportunity = db.get_campaign_opportunity_record(opportunity_id)
+    if not opportunity:
+        raise CampaignOrchestratorError(f"Opportunity '{opportunity_id}' not found")
+    generations = db.list_narrative_generation_records(opportunity_id=opportunity_id)
+    return {
+        "opportunity_id": opportunity_id,
+        "narration": opportunity["narration"],
+        "narration_source": opportunity["narration_source"],
+        "generations": generations,
+    }
+
+
+def regenerate_narrative(opportunity_id: str) -> dict[str, Any]:
+    """Regenerate phrasing for an opportunity without changing campaign/domain
+    state. A new generation record is written; the opportunity's lifecycle and
+    canon are untouched."""
+    from app import db
+
+    opportunity = db.get_campaign_opportunity_record(opportunity_id)
+    if not opportunity:
+        raise CampaignOrchestratorError(f"Opportunity '{opportunity_id}' not found")
+    session = db.get_campaign_session_record(opportunity["session_id"])
+    if not session:
+        raise CampaignOrchestratorError("Opportunity session not found")
+
+    context = compile_narrative_context(opportunity, session)
+    provider = get_campaign_provider()
+    result = NarrativeRuntime(provider=provider).narrate(context)
+    _persist_narrative_generation(context, result, opportunity_id, None)
+
+    if result.failure:
+        return {
+            "opportunity_id": opportunity_id,
+            "narration": None,
+            "failure": result.failure,
+            "canonical_state": opportunity["lifecycle_state"],
+        }
+
+    narration = _output_dict(result.output, result)
+    db.update_campaign_opportunity_state_record(
+        opportunity_id,
+        opportunity["lifecycle_state"],
+        narration=narration["prose"],
+        narration_source=narration.get("narration_source", "deterministic"),
+    )
+    return {
+        "opportunity_id": opportunity_id,
+        "narration": narration,
+        "failure": None,
+        "canonical_state": opportunity["lifecycle_state"],
     }

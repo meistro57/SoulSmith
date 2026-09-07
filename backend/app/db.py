@@ -837,6 +837,28 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Phase 18: Soulkeeper narrative engine. Generation metadata is bookkeeping,
+    # never canonical history. It records provider/model/template/validation so
+    # generated prose is auditable and template changes never rewrite canon.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS narrative_generations (
+            generation_id TEXT PRIMARY KEY,
+            session_id TEXT,
+            opportunity_id TEXT,
+            transition_id TEXT,
+            provider TEXT NOT NULL,
+            provider_model TEXT NOT NULL,
+            template_version TEXT NOT NULL,
+            generation_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            validation_outcome TEXT NOT NULL DEFAULT 'pass',
+            latency_ms INTEGER,
+            used_fallback INTEGER NOT NULL DEFAULT 0,
+            context_stats_json TEXT NOT NULL DEFAULT '{}',
+            output_json TEXT NOT NULL DEFAULT '{}',
+            error TEXT
+        )
+    """)
 
     # Track which Art Direction Profile/version produced a generated candidate.
     _add_column_if_missing(
@@ -6314,6 +6336,109 @@ def get_recent_campaign_cooldown_keys(session_id: str, limit: int) -> list[str]:
     keys = [r["cooldown_key"] for r in cursor.fetchall()]
     conn.close()
     return keys
+
+
+def _map_narrative_generation_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "generation_id": r["generation_id"],
+        "session_id": r["session_id"],
+        "opportunity_id": r["opportunity_id"],
+        "transition_id": r["transition_id"],
+        "provider": r["provider"],
+        "provider_model": r["provider_model"],
+        "template_version": r["template_version"],
+        "generation_timestamp": r["generation_timestamp"],
+        "retry_count": r["retry_count"],
+        "validation_outcome": r["validation_outcome"],
+        "latency_ms": r["latency_ms"],
+        "used_fallback": bool(r["used_fallback"]),
+        "context_stats": _json_or_none(r["context_stats_json"]) or {},
+        "output": _json_or_none(r["output_json"]) or {},
+        "error": r["error"],
+    }
+
+
+def create_narrative_generation_record(
+    *,
+    generation_id: str,
+    session_id: str | None,
+    opportunity_id: str | None,
+    transition_id: str | None,
+    provider: str,
+    provider_model: str,
+    template_version: str,
+    retry_count: int,
+    validation_outcome: str,
+    latency_ms: int | None,
+    used_fallback: bool,
+    context_stats: dict[str, Any],
+    output: dict[str, Any],
+    error: str | None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO narrative_generations (
+            generation_id, session_id, opportunity_id, transition_id,
+            provider, provider_model, template_version, retry_count,
+            validation_outcome, latency_ms, used_fallback,
+            context_stats_json, output_json, error
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            generation_id,
+            session_id,
+            opportunity_id,
+            transition_id,
+            provider,
+            provider_model,
+            template_version,
+            retry_count,
+            validation_outcome,
+            latency_ms,
+            1 if used_fallback else 0,
+            json.dumps(context_stats),
+            json.dumps(output),
+            error,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM narrative_generations WHERE generation_id = ?", (generation_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_narrative_generation_row(row)
+
+
+def list_narrative_generation_records(
+    *,
+    session_id: str | None = None,
+    opportunity_id: str | None = None,
+    transition_id: str | None = None,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clauses = []
+    params: list[Any] = []
+    if session_id:
+        clauses.append("session_id = ?")
+        params.append(session_id)
+    if opportunity_id:
+        clauses.append("opportunity_id = ?")
+        params.append(opportunity_id)
+    if transition_id:
+        clauses.append("transition_id = ?")
+        params.append(transition_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cursor.execute(
+        f"SELECT * FROM narrative_generations {where} ORDER BY generation_timestamp DESC",
+        params,
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_narrative_generation_row(r) for r in rows]
 
 
 def get_canonical_event_record(event_id: str) -> dict[str, Any] | None:

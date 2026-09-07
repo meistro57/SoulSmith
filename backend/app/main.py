@@ -53,7 +53,9 @@ from app.campaign import (
     CampaignTransitionModel,
     CommitEventRequest,
     EvaluateOpportunitiesRequest,
+    PreviewNarrativeContextRequest,
     ResolveOpportunityRequest,
+    SelectNarrativeProviderRequest,
     StartSessionRequest,
 )
 from app.campaign_orchestrator import (
@@ -61,10 +63,14 @@ from app.campaign_orchestrator import (
     commit_canonical_event,
     evaluate_opportunities,
     get_aftermath,
+    get_narrative_provider_status,
     get_pending_reviews,
     get_session_state,
     get_transition_provenance,
+    inspect_narrative,
     inspect_opportunity,
+    preview_narrative_context,
+    regenerate_narrative,
     resolve_opportunity,
     start_or_resume_session,
 )
@@ -2907,5 +2913,49 @@ def get_campaign_aftermath(session_id: str):
 def inspect_campaign_opportunity(opportunity_id: str):
     try:
         return inspect_opportunity(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/narrative/status")
+def get_campaign_narrative_status():
+    return get_narrative_provider_status()
+
+
+@app.post("/api/v1/campaign/narrative/select")
+def select_campaign_narrative_provider(req: SelectNarrativeProviderRequest):
+    # Selection is advisory/debug; the environment determines the active
+    # provider so a client cannot override deployment policy or secrets.
+    from app.campaign_provider import get_campaign_provider
+
+    provider = get_campaign_provider(req.provider)
+    return {
+        "requested": req.provider,
+        "effective": provider.provider,
+        "model": provider.provider_model,
+        "narration_source": provider.narration_source,
+    }
+
+
+@app.post("/api/v1/campaign/narrative/preview-context")
+def preview_campaign_narrative_context(req: PreviewNarrativeContextRequest):
+    try:
+        return preview_narrative_context(req.opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/opportunities/{opportunity_id}/narrative")
+def get_campaign_opportunity_narrative(opportunity_id: str):
+    try:
+        return inspect_narrative(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/opportunities/{opportunity_id}/regenerate")
+def regenerate_campaign_opportunity_narrative(opportunity_id: str):
+    try:
+        return regenerate_narrative(opportunity_id)
     except CampaignOrchestratorError as exc:
         raise _orchestrator_error(exc)
