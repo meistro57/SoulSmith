@@ -69,6 +69,44 @@ _BARE_YEAR_RE = re.compile(r"\b(1[0-9]{3}|2[0-9]{3})\b")
 # already authorizes that ability.
 _RELIC_ABILITY_VERBS = ("grant", "bestow", "unlock", "awaken", "summon", "command")
 
+# Markers that introduce a promise/vow. Only permitted when a structured promise
+# or relationship already authorizes the claim.
+PROMISE_INVENTION_MARKERS = (
+    "you promised",
+    "you swore",
+    "she promised",
+    "he promised",
+    "a vow was made",
+    "a promise was made",
+    "they promised",
+)
+
+# Markers that assert a promise outcome. Only the domain model may decide
+# fulfillment/breach/release from evidence.
+PROMISE_STATE_MARKERS = (
+    "the promise is fulfilled",
+    "the promise was fulfilled",
+    "the promise is broken",
+    "the promise was broken",
+    "the vow is fulfilled",
+    "the vow is broken",
+    "fulfilled the promise",
+    "broke the promise",
+    "kept the promise",
+    "broke their promise",
+)
+
+# Markers that invent a relationship between people. Only structured
+# relationship authority may establish a bond; narrative chemistry may not.
+RELATIONSHIP_INVENTION_MARKERS = (
+    "were always friends",
+    "have always been friends",
+    "were always lovers",
+    "have always been lovers",
+    "your old friend",
+    "your lifelong friend",
+)
+
 
 class NarrativeValidationIssue(BaseModel):
     code: str
@@ -116,6 +154,8 @@ def _declared_text(context: NarrativeContext) -> str:
         parts += [str(v) for v in k.values()]
     parts += list(context.player_visible_consequences)
     parts += list(context.allowed_uncertainty)
+    parts += list(context.relationships)
+    parts += list(context.promises)
     if context.continuity:
         parts.append(context.continuity.model_dump_json())
     return " ".join(parts).lower()
@@ -296,6 +336,43 @@ def validate_narrative(
                 )
             )
     checked.append("undeclared_facts")
+
+    # 11. Relationship/promise boundaries: the Soulkeeper may phrase only from
+    #     structured relationship/promise authority. It must never invent a
+    #     promise or decide fulfillment/breach without domain evidence.
+    if not context.promises and not context.relationships:
+        for marker in PROMISE_INVENTION_MARKERS:
+            if marker in blob:
+                issues.append(
+                    _issue(
+                        "block",
+                        "invented_promise",
+                        f"Narration invented a promise/vow ('{marker}') without "
+                        "domain authority.",
+                    )
+                )
+        for marker in RELATIONSHIP_INVENTION_MARKERS:
+            if marker in blob:
+                issues.append(
+                    _issue(
+                        "block",
+                        "invented_relationship",
+                        f"Narration invented a relationship ('{marker}') "
+                        "without domain authority.",
+                    )
+                )
+    if context.opportunity_type not in ("promise_consequence", "relationship_callback"):
+        for marker in PROMISE_STATE_MARKERS:
+            if marker in blob and not context.promises:
+                issues.append(
+                    _issue(
+                        "block",
+                        "promise_state_authority",
+                        f"Narration decided a promise outcome ('{marker}') "
+                        "without domain evidence.",
+                    )
+                )
+    checked.append("relationship_promises")
 
     if any(i.severity == "block" for i in issues):
         verdict: Verdict = "block"

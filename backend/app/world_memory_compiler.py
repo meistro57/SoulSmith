@@ -257,6 +257,9 @@ def gather_world_memory_sources(
     )
     _append_painting_sources(memory_objects, viewer_soul_id, source_refs)
     _append_identity_sources(subject_entity_type, subject_entity_id, source_refs)
+    _append_relationship_promise_sources(
+        subject_entity_type, subject_entity_id, source_refs
+    )
 
     return {
         "memory_objects": memory_objects,
@@ -414,6 +417,36 @@ def _append_identity_sources(
             WorldMemorySourceRef(
                 source_type="story_mark",
                 source_id=mark["id"],
+                claim_kind="canonical_fact",
+            )
+        )
+
+
+def _append_relationship_promise_sources(
+    subject_entity_type: str,
+    subject_entity_id: str,
+    source_refs: list[WorldMemorySourceRef],
+) -> None:
+    """Trace a person's relationships/promises as canonical source refs without
+    copying or mutating them. World Memory may derive from these, but the
+    relationship/promise rows remain the authoritative canonical evidence."""
+    if subject_entity_type != "person":
+        return
+    from app.db import promises_for_entity, relationships_for_entity
+
+    for rel in relationships_for_entity(subject_entity_type, subject_entity_id):
+        source_refs.append(
+            WorldMemorySourceRef(
+                source_type="relationship",
+                source_id=rel["relationship_id"],
+                claim_kind="canonical_fact",
+            )
+        )
+    for promise in promises_for_entity(subject_entity_type, subject_entity_id):
+        source_refs.append(
+            WorldMemorySourceRef(
+                source_type="promise",
+                source_id=promise["promise_id"],
                 claim_kind="canonical_fact",
             )
         )

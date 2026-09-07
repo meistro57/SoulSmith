@@ -258,6 +258,7 @@ class NarrativeContext(BaseModel):
 
     # Already-canonical, visible relationships/promises (never invented).
     relationships: list[str] = Field(default_factory=list)
+    promises: list[str] = Field(default_factory=list)
 
     # Relic state: only what the scene is permitted to know.
     relic_state: dict[str, Any] | None = None
@@ -970,6 +971,121 @@ def build_chronicle_painting_candidates(
             }
         )
     return candidates
+
+
+def build_relationship_callback_candidates(
+    relationships: list[dict[str, Any]],
+    current_soul_id: str,
+) -> list[CandidateSpec]:
+    """A canonical relationship the current soul participates in may surface as a
+    callback. Eligibility comes from structured relationship state (participants,
+    canonical source events, status), never from narrative chemistry."""
+    candidates: list[CandidateSpec] = []
+    for rel in relationships:
+        participants = rel.get("participants", []) or []
+        if not any(p.get("entity_id") == current_soul_id for p in participants):
+            continue
+        if rel.get("status") not in ("active", "distant", "historical"):
+            continue
+        rid = rel.get("relationship_id")
+        kinds = ", ".join(rel.get("kinds", []) or []) or "relationship"
+        evidence = [
+            _evidence("relationship", rid, f"A {kinds} relationship exists."),
+        ]
+        for ref in rel.get("source_refs", []) or []:
+            evidence.append(_evidence(ref.get("source_type"), ref.get("source_id")))
+        candidates.append(
+            {
+                "opportunity_type": "relationship_callback",
+                "eligibility_rule": "Current soul participates in an active/distant/historical relationship + cooldown satisfied.",
+                "source_evidence": evidence,
+                "involved_entities": [
+                    _entity("relationship", rid, kinds),
+                    *[
+                        _entity(p.get("entity_type"), p.get("entity_id"))
+                        for p in participants
+                    ],
+                ],
+                "visibility_scope": rel.get("visibility", "public_canon"),
+                "urgency_class": "normal",
+                "participation": "optional",
+                "cooldown_key": f"relationship_callback:{rid}",
+                "domain_action": "surface_relationship",
+                "domain_action_payload": {"relationship_id": rid},
+                "reasoning": {
+                    "status": rel.get("status"),
+                    "kind_count": len(rel.get("kinds", []) or []),
+                    "event_count": len(rel.get("events", []) or []),
+                },
+            }
+        )
+    return candidates
+
+
+def build_promise_consequence_candidates(
+    promises: list[dict[str, Any]],
+    current_soul_id: str,
+) -> list[CandidateSpec]:
+    """An unresolved (or newly rediscovered) promise the current soul is bound to
+    may surface a consequence. Only promises the current scene is allowed to know
+    reach this builder; the eligibility layer has already consent-filtered them."""
+    candidates: list[CandidateSpec] = []
+    for promise in promises:
+        if not _entity_involved_in_promise(promise, current_soul_id):
+            continue
+        state = promise.get("lifecycle_state")
+        if state not in (
+            "made",
+            "acknowledged",
+            "active",
+            "disputed",
+            "inherited",
+            "rediscovered",
+            "unresolved",
+        ):
+            continue
+        pid = promise.get("promise_id")
+        candidates.append(
+            {
+                "opportunity_type": "promise_consequence",
+                "eligibility_rule": "Current soul is bound to an unresolved promise + cooldown satisfied.",
+                "source_evidence": [
+                    _evidence("promise", pid, promise.get("promise_text")),
+                    _evidence(
+                        promise.get("source_type"),
+                        promise.get("source_id"),
+                        "Canonical promise source.",
+                    ),
+                ],
+                "involved_entities": [
+                    _entity("promise", pid, promise.get("promise_text")),
+                    _entity(
+                        promise.get("promisor_entity_type"),
+                        promise.get("promisor_entity_id"),
+                    ),
+                ],
+                "visibility_scope": promise.get("visibility", "public_canon"),
+                "urgency_class": "normal",
+                "participation": "optional",
+                "cooldown_key": f"promise_consequence:{pid}",
+                "domain_action": "surface_promise",
+                "domain_action_payload": {"promise_id": pid},
+                "reasoning": {
+                    "lifecycle_state": state,
+                    "scope": promise.get("scope"),
+                },
+            }
+        )
+    return candidates
+
+
+def _entity_involved_in_promise(promise: dict[str, Any], entity_id: str) -> bool:
+    if promise.get("promisor_entity_id") == entity_id:
+        return True
+    for participant in promise.get("participants", []) or []:
+        if participant.get("entity_id") == entity_id:
+            return True
+    return False
 
 
 # Cooldown helper (pure).

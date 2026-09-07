@@ -34,9 +34,11 @@ from app.campaign import (
     build_new_encounter_candidate,
     build_npc_historical_reaction_candidates,
     build_probable_path_echo_candidates,
+    build_promise_consequence_candidates,
     build_recognition_candidates,
     build_recurring_symbol_candidates,
     build_reflection_prompt_candidate,
+    build_relationship_callback_candidates,
     build_relic_awakening_candidates,
     build_relic_memory_candidates,
     build_seed_echo_candidates,
@@ -65,6 +67,7 @@ SUBSYSTEM_CANDIDATE_TYPES: dict[str, list[str]] = {
     "Soul Constellation": ["cross_aspect_echo"],
     "World Memory": ["npc_historical_reaction", "world_memory_legend_encounter"],
     "Group Memories": ["group_memory_callback"],
+    "Relationship & Promises": ["relationship_callback", "promise_consequence"],
     "Threads & Integration": ["integration_candidate", "recognition"],
     "Reflection": ["reflection_prompt"],
     "Chronicle Paintings": ["chronicle_painting_eligibility"],
@@ -110,6 +113,10 @@ def get_session_state(session_id: str) -> dict[str, Any]:
 
 def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
     from app import db
+    from app.relationship import (
+        promise_visible_to,
+        relationship_visible_to,
+    )
     from app.world_memory import memory_object_visible_to, world_memory_visible_to
 
     soul_id = session["soul_id"]
@@ -123,6 +130,12 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
         if memory_object_visible_to(mo, soul_id)
     ]
     group_memories = _group_memories_with_members()
+    relationships = [
+        rel
+        for rel in db.list_relationship_records()
+        if relationship_visible_to(rel, soul_id)
+    ]
+    promises = [p for p in db.list_promise_records() if promise_visible_to(p, soul_id)]
     return {
         "soul_id": soul_id,
         "seeds": db.get_all_seeds(),
@@ -134,6 +147,8 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
         "memory_objects": memory_objects,
         "group_memories": group_memories,
         "world_memories": world_memories,
+        "relationships": relationships,
+        "promises": promises,
         "events": events,
         "recent_event": events[0] if events else None,
     }
@@ -176,6 +191,10 @@ def _build_subsystem_candidates(
         ) + build_world_memory_legend_candidates(state["world_memories"])
     elif system_name == "Group Memories":
         built = build_group_memory_callback_candidates(state["group_memories"], soul_id)
+    elif system_name == "Relationship & Promises":
+        built = build_relationship_callback_candidates(
+            state["relationships"], soul_id
+        ) + build_promise_consequence_candidates(state["promises"], soul_id)
     elif system_name == "Threads & Integration":
         built = build_integration_candidates(
             state["threads"], state["seeds"]
@@ -737,8 +756,8 @@ def _system_for_type(opportunity_type: str) -> str:
         "world_memory_legend_encounter": "World Memory",
         "chronicle_painting_eligibility": "Chronicle Paintings",
         "reflection_prompt": "Reflection",
-        "relationship_callback": "Soul Constellation",
-        "promise_consequence": "World Memory",
+        "relationship_callback": "Relationship & Promises",
+        "promise_consequence": "Relationship & Promises",
     }.get(opportunity_type, opportunity_type)
 
 

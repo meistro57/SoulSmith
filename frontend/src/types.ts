@@ -1010,3 +1010,127 @@ export interface NarrativeGeneration {
   output: Record<string, any>;
   error?: string;
 }
+
+// Phase 19: Relationship & Promise Engine
+
+export interface RelationshipSourceRef {
+  source_type: string;
+  source_id: string;
+  claim_kind: string;
+}
+
+export interface RelationshipParticipant {
+  entity_type: string;
+  entity_id: string;
+  role: string;
+}
+
+export interface RelationshipEvent {
+  event_id: string;
+  relationship_id: string;
+  event_type: string;
+  source_type: string;
+  source_id: string;
+  summary: string;
+  created_at?: string;
+}
+
+export interface RelationshipPerspective {
+  perspective_id: string;
+  relationship_id: string;
+  entity_type: string;
+  entity_id: string;
+  kind: string;
+  view: string;
+  is_canonical_interaction: boolean;
+  visibility: string;
+  created_at?: string;
+}
+
+export interface RelationshipEntityLink {
+  link_id: string;
+  relationship_id: string;
+  link_type: string;
+  entity_type: string;
+  entity_id: string;
+  created_at?: string;
+}
+
+export interface Relationship {
+  relationship_id: string;
+  kinds: string[];
+  status: string;
+  visibility: string;
+  creation_context: string;
+  participants: RelationshipParticipant[];
+  source_refs: RelationshipSourceRef[];
+  events: RelationshipEvent[];
+  perspectives: RelationshipPerspective[];
+  entity_links: RelationshipEntityLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PromiseParticipant {
+  participant_type: string;
+  entity_type: string;
+  entity_id: string;
+}
+
+export interface PromiseStateChange {
+  state_id: string;
+  promise_id: string;
+  previous_state: string;
+  new_state: string;
+  evidence_type?: string;
+  evidence_id?: string;
+  reason: string;
+  created_at?: string;
+}
+
+export interface PromiseEntityLink {
+  link_id: string;
+  promise_id: string;
+  link_type: string;
+  entity_type: string;
+  entity_id: string;
+  created_at?: string;
+}
+
+export interface PromiseRecord {
+  promise_id: string;
+  promisor_entity_type: string;
+  promisor_entity_id: string;
+  promise_text: string;
+  structured_meaning: Record<string, any>;
+  conditions: string[];
+  scope: string;
+  visibility: string;
+  source_type: string;
+  source_id: string;
+  source_authorization: string;
+  lifecycle_state: string;
+  inheritable: boolean;
+  transferable: boolean;
+  participants: PromiseParticipant[];
+  state_history: PromiseStateChange[];
+  entity_links: PromiseEntityLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RelationshipKnowledgeEntry {
+  relationship?: Relationship;
+  promise?: PromiseRecord;
+  fidelity: string;
+  reason: string;
+}
+
+export interface RelationshipPromiseKnowledgeProjection {
+  npc: Record<string, any>;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  relationships: RelationshipKnowledgeEntry[];
+  promises: RelationshipKnowledgeEntry[];
+}
+

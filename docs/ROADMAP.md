@@ -832,17 +832,65 @@ See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
 
 ---
 
+### Phase 19: Relationship & Promise Engine `[Status: Integrated]`
+
+Give relationships and promises first-class, provenance-backed persistence so
+bonds between people can become durable story machinery across encounters,
+Aspects, generations, relics, and World Memory.
+
+> **A RELATIONSHIP IS HISTORY BETWEEN PEOPLE. A PROMISE IS A CLAIM ON THE FUTURE.
+> NEITHER MAY BE INVENTED BY THE NARRATOR.**
+
+- A dedicated relationship domain model with stable IDs, participants, kinds,
+  canonical source-event links, status, an immutable events/history timeline,
+  and participant-specific perspectives that never collapse into objective
+  emotional truth.
+- A dedicated promise domain model with a maker, recipient/beneficiary, original
+  immutable wording, structured meaning, conditions, scope, visibility/secrecy,
+  source provenance, and an immutable lifecycle-state history.
+- A promise lifecycle (`proposed` → `made` → `acknowledged` → `active` →
+  `fulfilled`/`broken`/`released`/`disputed`/`impossible`/`unresolved`, plus
+  `inherited`/`transferred`/`forgotten`/`rediscovered`) where the original
+  wording/source is never rewritten and release is historical, not deletion.
+- Evidence-backed fulfillment/breach/release/inheritance/transfer: canonical
+  events or explicit player authorization of subjective conditions; ambiguous
+  evidence is represented as dispute rather than forced.
+- Relic integration (a relic may witness/record/be the subject of a promise and
+  feed Relic Recognition evidence without the engine ever awakening a relic),
+  Soul Constellation pattern surfacing, and World Memory source tracing that
+  never mutates the relationship/promise rows.
+- Consent-safe NPC knowledge projection for relationships/promises (a secret
+  promise never leaks merely because it exists in the database).
+- First-class `relationship_callback` and `promise_consequence` opportunity
+  generation wired into the Campaign Orchestrator, replacing the old
+  World-Memory-routed promise path.
+- Phase 18 `NarrativeContext`/Guardian extension so the Soulkeeper may phrase
+  relationship/promise material only from structured authority and cannot invent
+  a promise, relationship, or decide a promise outcome.
+
+**Exit criteria**
+
+- SoulSmith can remember not only what happened to people, but what happened
+  *between* them, with every relationship and promise traceable to canonical
+  evidence and every callback deterministically eligible.
+
+See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
+
+---
+
 ## Near-Term Implementation Priorities
 
-The phases listed above are **shipped and integrated** (Phases 0-18). The
+The phases listed above are **shipped and integrated** (Phases 0-19). The
 remaining work is hardening and optional deepening, not foundational:
 
 1. ~~Add a real (non-mock) narrative provider behind `CampaignNarrativeProvider`~~
    — **Integrated** as Phase 18 (Soulkeeper Narrative Engine & Provider Runtime).
    See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
-2. Add a dedicated relationship/promise data model so `relationship_callback`
+2. ~~Add a dedicated relationship/promise data model so `relationship_callback`
    and `promise_consequence` opportunities can be auto-generated (today the
-   NPC promise-reaction path is exercised through World Memory).
+   NPC promise-reaction path is exercised through World Memory)~~
+   — **Integrated** as Phase 19 (Relationship & Promise Engine).
+   See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
 3. Support multi-Aspect simultaneous sessions within one campaign.
 4. Move the ComfyUI/visual providers from mock to a local instance for art
    moments, preserving the canonical/Guardian pipelines already built.

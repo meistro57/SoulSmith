@@ -74,6 +74,8 @@ def compile_narrative_context(
     allowed_claims: list[str] = []
     provenance_ids: list[str] = []
     source_evidence: list[SourceEvidence] = []
+    relationships: list[str] = []
+    promises: list[str] = []
     for raw in opportunity.get("source_evidence", []):
         evidence = SourceEvidence(**raw)
         source_evidence.append(evidence)
@@ -81,6 +83,10 @@ def compile_narrative_context(
             allowed_claims.append(evidence.note)
         if evidence.source_id:
             provenance_ids.append(f"{evidence.source_type}:{evidence.source_id}")
+        if evidence.source_type == "relationship" and evidence.note:
+            relationships.append(evidence.note)
+        if evidence.source_type == "promise" and evidence.note:
+            promises.append(evidence.note)
 
     constraints = list(opportunity.get("constraints", []) or [])
     if opportunity["opportunity_type"] == "recognition":
@@ -100,6 +106,8 @@ def compile_narrative_context(
         participants=opportunity.get("involved_entities", []),
         constraints=constraints,
         provenance_ids=provenance_ids,
+        relationships=relationships,
+        promises=promises,
         continuity=_continuity_for(opportunity, session)
         if include_continuity
         else None,

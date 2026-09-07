@@ -860,6 +860,132 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 19: Relationship & Promise Engine. Relationships are canonical
+    # history between entities; promises are claims on the future. Both carry
+    # normalized provenance and are never invented by narration.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationships (
+            relationship_id TEXT PRIMARY KEY,
+            kind_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'active',
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            creation_context TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_participants (
+            participant_id TEXT PRIMARY KEY,
+            relationship_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'participant',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(relationship_id, entity_type, entity_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_source_events (
+            link_id TEXT PRIMARY KEY,
+            relationship_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            claim_kind TEXT NOT NULL DEFAULT 'canonical_fact',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(relationship_id, source_type, source_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_events (
+            event_id TEXT PRIMARY KEY,
+            relationship_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            summary TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_perspectives (
+            perspective_id TEXT PRIMARY KEY,
+            relationship_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            view TEXT NOT NULL DEFAULT '',
+            is_canonical_interaction INTEGER NOT NULL DEFAULT 0,
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_entity_links (
+            link_id TEXT PRIMARY KEY,
+            relationship_id TEXT NOT NULL,
+            link_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(relationship_id, link_type, entity_type, entity_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS promises (
+            promise_id TEXT PRIMARY KEY,
+            promisor_entity_type TEXT NOT NULL,
+            promisor_entity_id TEXT NOT NULL,
+            promise_text TEXT NOT NULL,
+            structured_meaning_json TEXT NOT NULL DEFAULT '{}',
+            conditions_json TEXT NOT NULL DEFAULT '[]',
+            scope TEXT NOT NULL DEFAULT 'personal',
+            visibility TEXT NOT NULL DEFAULT 'public_canon',
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            source_authorization TEXT NOT NULL DEFAULT 'canonical_event',
+            lifecycle_state TEXT NOT NULL DEFAULT 'made',
+            inheritable INTEGER NOT NULL DEFAULT 0,
+            transferable INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS promise_participants (
+            participant_id TEXT PRIMARY KEY,
+            promise_id TEXT NOT NULL,
+            participant_type TEXT NOT NULL DEFAULT 'recipient',
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(promise_id, participant_type, entity_type, entity_id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS promise_state_history (
+            state_id TEXT PRIMARY KEY,
+            promise_id TEXT NOT NULL,
+            previous_state TEXT NOT NULL,
+            new_state TEXT NOT NULL,
+            evidence_type TEXT,
+            evidence_id TEXT,
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS promise_entity_links (
+            link_id TEXT PRIMARY KEY,
+            promise_id TEXT NOT NULL,
+            link_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(promise_id, link_type, entity_type, entity_id)
+        )
+    """)
+
     # Track which Art Direction Profile/version produced a generated candidate.
     _add_column_if_missing(
         cursor,
@@ -6465,3 +6591,624 @@ def get_canonical_event_record(event_id: str) -> dict[str, Any] | None:
         "canon_facts": _json_or_none(row["canon_facts_json"]) or [],
         "created_at": row["created_at"],
     }
+
+
+# Phase 19: Relationship & Promise Engine persistence helpers.
+
+
+def _map_relationship_participant_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "entity_type": r["entity_type"],
+        "entity_id": r["entity_id"],
+        "role": r["role"],
+    }
+
+
+def _map_relationship_source_ref_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "source_type": r["source_type"],
+        "source_id": r["source_id"],
+        "claim_kind": r["claim_kind"],
+    }
+
+
+def _map_relationship_event_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "event_id": r["event_id"],
+        "relationship_id": r["relationship_id"],
+        "event_type": r["event_type"],
+        "source_type": r["source_type"],
+        "source_id": r["source_id"],
+        "summary": r["summary"],
+        "created_at": r["created_at"],
+    }
+
+
+def _map_relationship_perspective_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "perspective_id": r["perspective_id"],
+        "relationship_id": r["relationship_id"],
+        "entity_type": r["entity_type"],
+        "entity_id": r["entity_id"],
+        "kind": r["kind"],
+        "view": r["view"],
+        "is_canonical_interaction": bool(r["is_canonical_interaction"]),
+        "visibility": r["visibility"],
+        "created_at": r["created_at"],
+    }
+
+
+def _map_relationship_entity_link_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "link_id": r["link_id"],
+        "relationship_id": r["relationship_id"],
+        "link_type": r["link_type"],
+        "entity_type": r["entity_type"],
+        "entity_id": r["entity_id"],
+        "created_at": r["created_at"],
+    }
+
+
+def _load_relationship_children(
+    cursor: sqlite3.Cursor, relationship_id: str
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    cursor.execute(
+        "SELECT * FROM relationship_participants WHERE relationship_id = ? ORDER BY created_at ASC",
+        (relationship_id,),
+    )
+    participants = [_map_relationship_participant_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM relationship_source_events WHERE relationship_id = ? ORDER BY created_at ASC",
+        (relationship_id,),
+    )
+    source_refs = [_map_relationship_source_ref_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM relationship_events WHERE relationship_id = ? ORDER BY created_at ASC",
+        (relationship_id,),
+    )
+    events = [_map_relationship_event_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM relationship_perspectives WHERE relationship_id = ? ORDER BY created_at ASC",
+        (relationship_id,),
+    )
+    perspectives = [_map_relationship_perspective_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM relationship_entity_links WHERE relationship_id = ? ORDER BY created_at ASC",
+        (relationship_id,),
+    )
+    entity_links = [_map_relationship_entity_link_row(r) for r in cursor.fetchall()]
+    return participants, source_refs, events, perspectives, entity_links
+
+
+def _map_relationship_row(
+    r: sqlite3.Row,
+    children: tuple[
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+    ],
+) -> dict[str, Any]:
+    participants, source_refs, events, perspectives, entity_links = children
+    return {
+        "relationship_id": r["relationship_id"],
+        "kinds": _json_or_none(r["kind_json"]) or [],
+        "status": r["status"],
+        "visibility": r["visibility"],
+        "creation_context": r["creation_context"],
+        "participants": participants,
+        "source_refs": source_refs,
+        "events": events,
+        "perspectives": perspectives,
+        "entity_links": entity_links,
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def create_relationship_record(
+    *,
+    kinds: list[str],
+    participants: list[dict[str, Any]],
+    status: str,
+    visibility: str,
+    creation_context: str,
+    source_type: str | None,
+    source_id: str | None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    relationship_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO relationships (relationship_id, kind_json, status, visibility, creation_context)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (relationship_id, json.dumps(kinds), status, visibility, creation_context),
+    )
+    for participant in participants:
+        cursor.execute(
+            """
+            INSERT INTO relationship_participants (participant_id, relationship_id, entity_type, entity_id, role)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (
+                str(uuid.uuid4()),
+                relationship_id,
+                participant.get("entity_type"),
+                participant.get("entity_id"),
+                participant.get("role", "participant"),
+            ),
+        )
+    if source_type and source_id:
+        cursor.execute(
+            """
+            INSERT INTO relationship_source_events (link_id, relationship_id, source_type, source_id, claim_kind)
+            VALUES (?, ?, ?, ?, 'canonical_fact')
+        """,
+            (str(uuid.uuid4()), relationship_id, source_type, source_id),
+        )
+    conn.commit()
+    record = get_relationship_record(relationship_id)
+    conn.close()
+    return record
+
+
+def get_relationship_record(relationship_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM relationships WHERE relationship_id = ?", (relationship_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    children = _load_relationship_children(cursor, relationship_id)
+    record = _map_relationship_row(row, children)
+    conn.close()
+    return record
+
+
+def list_relationship_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM relationships ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    records = [
+        _map_relationship_row(
+            r, _load_relationship_children(cursor, r["relationship_id"])
+        )
+        for r in rows
+    ]
+    conn.close()
+    return records
+
+
+def add_relationship_event_record(
+    *,
+    relationship_id: str,
+    event_type: str,
+    source_type: str,
+    source_id: str,
+    summary: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO relationship_events (event_id, relationship_id, event_type, source_type, source_id, summary)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            str(uuid.uuid4()),
+            relationship_id,
+            event_type,
+            source_type,
+            source_id,
+            summary,
+        ),
+    )
+    cursor.execute(
+        "UPDATE relationships SET updated_at = CURRENT_TIMESTAMP WHERE relationship_id = ?",
+        (relationship_id,),
+    )
+    conn.commit()
+    record = get_relationship_record(relationship_id)
+    conn.close()
+    return record
+
+
+def add_relationship_perspective_record(
+    *,
+    relationship_id: str,
+    entity_type: str,
+    entity_id: str,
+    kind: str,
+    view: str,
+    is_canonical_interaction: bool,
+    visibility: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO relationship_perspectives (
+            perspective_id, relationship_id, entity_type, entity_id, kind, view,
+            is_canonical_interaction, visibility
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            str(uuid.uuid4()),
+            relationship_id,
+            entity_type,
+            entity_id,
+            kind,
+            view,
+            1 if is_canonical_interaction else 0,
+            visibility,
+        ),
+    )
+    conn.commit()
+    record = get_relationship_record(relationship_id)
+    conn.close()
+    return record
+
+
+def add_relationship_entity_link_record(
+    *, relationship_id: str, link_type: str, entity_type: str, entity_id: str
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO relationship_entity_links (link_id, relationship_id, link_type, entity_type, entity_id)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (str(uuid.uuid4()), relationship_id, link_type, entity_type, entity_id),
+    )
+    conn.commit()
+    record = get_relationship_record(relationship_id)
+    conn.close()
+    return record
+
+
+def _map_promise_participant_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "participant_type": r["participant_type"],
+        "entity_type": r["entity_type"],
+        "entity_id": r["entity_id"],
+    }
+
+
+def _map_promise_state_history_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "state_id": r["state_id"],
+        "promise_id": r["promise_id"],
+        "previous_state": r["previous_state"],
+        "new_state": r["new_state"],
+        "evidence_type": r["evidence_type"],
+        "evidence_id": r["evidence_id"],
+        "reason": r["reason"],
+        "created_at": r["created_at"],
+    }
+
+
+def _map_promise_entity_link_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "link_id": r["link_id"],
+        "promise_id": r["promise_id"],
+        "link_type": r["link_type"],
+        "entity_type": r["entity_type"],
+        "entity_id": r["entity_id"],
+        "created_at": r["created_at"],
+    }
+
+
+def _load_promise_children(
+    cursor: sqlite3.Cursor, promise_id: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    cursor.execute(
+        "SELECT * FROM promise_participants WHERE promise_id = ? ORDER BY created_at ASC",
+        (promise_id,),
+    )
+    participants = [_map_promise_participant_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM promise_state_history WHERE promise_id = ? ORDER BY created_at ASC",
+        (promise_id,),
+    )
+    state_history = [_map_promise_state_history_row(r) for r in cursor.fetchall()]
+    cursor.execute(
+        "SELECT * FROM promise_entity_links WHERE promise_id = ? ORDER BY created_at ASC",
+        (promise_id,),
+    )
+    entity_links = [_map_promise_entity_link_row(r) for r in cursor.fetchall()]
+    return participants, state_history, entity_links
+
+
+def _map_promise_row(
+    r: sqlite3.Row,
+    children: tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]],
+) -> dict[str, Any]:
+    participants, state_history, entity_links = children
+    return {
+        "promise_id": r["promise_id"],
+        "promisor_entity_type": r["promisor_entity_type"],
+        "promisor_entity_id": r["promisor_entity_id"],
+        "promise_text": r["promise_text"],
+        "structured_meaning": _json_or_none(r["structured_meaning_json"]) or {},
+        "conditions": _json_or_none(r["conditions_json"]) or [],
+        "scope": r["scope"],
+        "visibility": r["visibility"],
+        "source_type": r["source_type"],
+        "source_id": r["source_id"],
+        "source_authorization": r["source_authorization"],
+        "lifecycle_state": r["lifecycle_state"],
+        "inheritable": bool(r["inheritable"]),
+        "transferable": bool(r["transferable"]),
+        "participants": participants,
+        "state_history": state_history,
+        "entity_links": entity_links,
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def create_promise_record(
+    *,
+    promisor_entity_type: str,
+    promisor_entity_id: str,
+    promise_text: str,
+    structured_meaning: dict[str, Any],
+    conditions: list[str],
+    scope: str,
+    visibility: str,
+    source_type: str,
+    source_id: str,
+    source_authorization: str,
+    participants: list[dict[str, Any]],
+    inheritable: bool,
+    transferable: bool,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    promise_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO promises (
+            promise_id, promisor_entity_type, promisor_entity_id, promise_text,
+            structured_meaning_json, conditions_json, scope, visibility,
+            source_type, source_id, source_authorization, lifecycle_state,
+            inheritable, transferable
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'made', ?, ?)
+    """,
+        (
+            promise_id,
+            promisor_entity_type,
+            promisor_entity_id,
+            promise_text,
+            json.dumps(structured_meaning),
+            json.dumps(conditions),
+            scope,
+            visibility,
+            source_type,
+            source_id,
+            source_authorization,
+            1 if inheritable else 0,
+            1 if transferable else 0,
+        ),
+    )
+    for participant in participants:
+        cursor.execute(
+            """
+            INSERT INTO promise_participants (participant_id, promise_id, participant_type, entity_type, entity_id)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (
+                str(uuid.uuid4()),
+                promise_id,
+                participant.get("participant_type", "recipient"),
+                participant.get("entity_type"),
+                participant.get("entity_id"),
+            ),
+        )
+    conn.commit()
+    record = get_promise_record(promise_id)
+    conn.close()
+    return record
+
+
+def get_promise_record(promise_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM promises WHERE promise_id = ?", (promise_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    children = _load_promise_children(cursor, promise_id)
+    record = _map_promise_row(row, children)
+    conn.close()
+    return record
+
+
+def list_promise_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM promises ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    records = [
+        _map_promise_row(r, _load_promise_children(cursor, r["promise_id"]))
+        for r in rows
+    ]
+    conn.close()
+    return records
+
+
+def transition_promise_record(
+    promise_id: str,
+    new_state: str,
+    *,
+    evidence_type: str | None = None,
+    evidence_id: str | None = None,
+    reason: str = "",
+    target_entity_type: str | None = None,
+    target_entity_id: str | None = None,
+) -> dict[str, Any]:
+    """Validate and apply a promise state transition. Idempotent for the same
+    state; the original wording/source is never mutated, and each transition is
+    appended to immutable state history."""
+    from app.relationship import validate_promise_transition
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM promises WHERE promise_id = ?", (promise_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise ValueError("Promise not found")
+
+    current = row["lifecycle_state"]
+    validate_promise_transition(
+        {
+            "lifecycle_state": current,
+            "conditions": _json_or_none(row["conditions_json"]) or [],
+            "source_authorization": row["source_authorization"],
+        },
+        new_state,
+        evidence_type=evidence_type,
+        evidence_id=evidence_id,
+        player_authorized=(evidence_type == "player_authorized"),
+        target_entity_type=target_entity_type,
+        target_entity_id=target_entity_id,
+    )
+
+    if new_state == current:
+        conn.close()
+        return get_promise_record(promise_id)
+
+    cursor.execute(
+        """
+        INSERT INTO promise_state_history (state_id, promise_id, previous_state, new_state, evidence_type, evidence_id, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            str(uuid.uuid4()),
+            promise_id,
+            current,
+            new_state,
+            evidence_type,
+            evidence_id,
+            reason,
+        ),
+    )
+    cursor.execute(
+        "UPDATE promises SET lifecycle_state = ?, updated_at = CURRENT_TIMESTAMP WHERE promise_id = ?",
+        (new_state, promise_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_promise_record(promise_id)
+
+
+def add_promise_entity_link_record(
+    *, promise_id: str, link_type: str, entity_type: str, entity_id: str
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO promise_entity_links (link_id, promise_id, link_type, entity_type, entity_id)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (str(uuid.uuid4()), promise_id, link_type, entity_type, entity_id),
+    )
+    conn.commit()
+    record = get_promise_record(promise_id)
+    conn.close()
+    return record
+
+
+def relationships_for_entity(entity_type: str, entity_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT relationship_id FROM relationship_participants
+        WHERE entity_type = ? AND entity_id = ?
+    """,
+        (entity_type, entity_id),
+    )
+    ids = {r["relationship_id"] for r in cursor.fetchall()}
+    records = []
+    for relationship_id in ids:
+        cursor.execute(
+            "SELECT * FROM relationships WHERE relationship_id = ?", (relationship_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            records.append(
+                _map_relationship_row(
+                    row, _load_relationship_children(cursor, relationship_id)
+                )
+            )
+    conn.close()
+    return records
+
+
+def promises_for_entity(entity_type: str, entity_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT promise_id FROM promises WHERE promisor_entity_type = ? AND promisor_entity_id = ?
+    """,
+        (entity_type, entity_id),
+    )
+    ids = {r["promise_id"] for r in cursor.fetchall()}
+    cursor.execute(
+        """
+        SELECT promise_id FROM promise_participants WHERE entity_type = ? AND entity_id = ?
+    """,
+        (entity_type, entity_id),
+    )
+    ids |= {r["promise_id"] for r in cursor.fetchall()}
+    records = []
+    for promise_id in ids:
+        cursor.execute("SELECT * FROM promises WHERE promise_id = ?", (promise_id,))
+        row = cursor.fetchone()
+        if row:
+            records.append(
+                _map_promise_row(row, _load_promise_children(cursor, promise_id))
+            )
+    conn.close()
+    return records
+
+
+def promises_linked_to_entity(entity_type: str, entity_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT promise_id FROM promise_entity_links WHERE entity_type = ? AND entity_id = ?
+    """,
+        (entity_type, entity_id),
+    )
+    ids = {r["promise_id"] for r in cursor.fetchall()}
+    records = []
+    for promise_id in ids:
+        cursor.execute("SELECT * FROM promises WHERE promise_id = ?", (promise_id,))
+        row = cursor.fetchone()
+        if row:
+            records.append(
+                _map_promise_row(row, _load_promise_children(cursor, promise_id))
+            )
+    conn.close()
+    return records

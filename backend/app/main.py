@@ -107,6 +107,10 @@ from app.db import (
     add_group_memory_member_record,
     add_group_memory_tag_record,
     add_legendary_figure_link_record,
+    add_promise_entity_link_record,
+    add_relationship_entity_link_record,
+    add_relationship_event_record,
+    add_relationship_perspective_record,
     add_story_mark_record,
     approve_biography_transaction,
     approve_chronicle_painting_transaction,
@@ -125,7 +129,9 @@ from app.db import (
     create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
+    create_promise_record,
     create_reflection_record,
+    create_relationship_record,
     create_user_record,
     create_world_memory_placement_record,
     create_world_visual_candidate_record,
@@ -167,7 +173,9 @@ from app.db import (
     get_portrait_versions_records,
     get_private_notes_records,
     get_probable_paths_records,
+    get_promise_record,
     get_reflections_records,
+    get_relationship_record,
     get_relic_history_records,
     get_story_marks_records,
     get_user_by_email,
@@ -185,6 +193,8 @@ from app.db import (
     list_gallery_collections_records,
     list_group_memory_records,
     list_legendary_figures_records,
+    list_promise_records,
+    list_relationship_records,
     list_world_memory_placements_records,
     list_world_memory_records,
     list_world_memory_versions_records,
@@ -192,17 +202,21 @@ from app.db import (
     log_probable_path_record,
     mark_world_memory_state_record,
     plant_or_echo_seed,
+    promises_for_entity,
+    promises_linked_to_entity,
     reject_biography_record,
     reject_chronicle_painting_record,
     reject_portrait_candidate_record,
     reject_world_memory_record,
     reject_world_visual_candidate_record,
+    relationships_for_entity,
     remove_gallery_collection_item_record,
     remove_group_memory_member_record,
     remove_group_memory_tag_record,
     reorder_gallery_collection_items_record,
     resolve_open_question,
     set_art_direction_profile_status_record,
+    transition_promise_record,
     update_awakening_stage_record,
     update_candidate_generation_result,
     update_gallery_collection_record,
@@ -271,6 +285,24 @@ from app.reflection import (
     PrivateNoteModel,
     ReflectionSessionModel,
     UpdatePreferencesRequest,
+)
+from app.relationship import (
+    AddRelationshipEventRequest,
+    AddRelationshipPerspectiveRequest,
+    CreatePromiseRequest,
+    CreateRelationshipRequest,
+    EvaluatePromiseRequest,
+    LinkPromiseEntityRequest,
+    LinkRelationshipEntityRequest,
+    PromiseModel,
+    RelationshipModel,
+    RelationshipPromiseNPCKnowledgeRequest,
+    TransitionPromiseRequest,
+    project_promise_for_viewer,
+    project_relationship_for_viewer,
+    project_relationship_promise_npc_knowledge,
+    promise_visible_to,
+    relationship_visible_to,
 )
 from app.relics import (
     RelicAttuneRequest,
@@ -2761,6 +2793,309 @@ def get_legendary_figure_endpoint(figure_id: str):
             detail=f"Legendary figure '{figure_id}' not found",
         )
     return {"figure": LegendaryFigureModel(**figure)}
+
+
+# Phase 19: Relationship & Promise Engine. Relationships are canonical history
+# between people; promises are claims on the future. Neither may be invented by
+# the narrator. These endpoints never mutate Chronicle history.
+
+
+def _project_relationship(
+    relationship: dict, viewer_soul_id: str | None
+) -> RelationshipModel:
+    return RelationshipModel(
+        **project_relationship_for_viewer(relationship, viewer_soul_id)
+    )
+
+
+def _project_promise(promise: dict, viewer_soul_id: str | None) -> PromiseModel:
+    return PromiseModel(**project_promise_for_viewer(promise, viewer_soul_id))
+
+
+@app.post("/api/v1/relationships")
+def create_relationship_endpoint(req: CreateRelationshipRequest):
+    relationship = create_relationship_record(
+        kinds=req.kinds,
+        participants=[p.model_dump() for p in req.participants],
+        status=req.status,
+        visibility=req.visibility,
+        creation_context=req.creation_context,
+        source_type=req.source_type,
+        source_id=req.source_id,
+    )
+    return {"relationship": _project_relationship(relationship, None).model_dump()}
+
+
+@app.get("/api/v1/relationships")
+def list_relationships_endpoint(
+    viewer_soul_id: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    records = list_relationship_records()
+    if entity_type and entity_id:
+        records = [
+            r
+            for r in records
+            if any(
+                p.get("entity_type") == entity_type and p.get("entity_id") == entity_id
+                for p in r.get("participants", [])
+            )
+        ]
+    return {
+        "relationships": [
+            _project_relationship(r, viewer_soul_id).model_dump()
+            for r in records
+            if relationship_visible_to(r, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/relationships/query")
+def query_relationships_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    records = relationships_for_entity(entity_type, entity_id)
+    return {
+        "relationships": [
+            _project_relationship(r, viewer_soul_id).model_dump()
+            for r in records
+            if relationship_visible_to(r, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/relationships/{relationship_id}")
+def get_relationship_endpoint(relationship_id: str, viewer_soul_id: str | None = None):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    return {
+        "relationship": _project_relationship(relationship, viewer_soul_id).model_dump()
+    }
+
+
+@app.post("/api/v1/relationships/{relationship_id}/events")
+def add_relationship_event_endpoint(
+    relationship_id: str, req: AddRelationshipEventRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_event_record(
+        relationship_id=relationship_id,
+        event_type=req.event_type,
+        source_type=req.source_type,
+        source_id=req.source_id,
+        summary=req.summary,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/{relationship_id}/perspectives")
+def add_relationship_perspective_endpoint(
+    relationship_id: str, req: AddRelationshipPerspectiveRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_perspective_record(
+        relationship_id=relationship_id,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+        kind=req.kind,
+        view=req.view,
+        is_canonical_interaction=req.is_canonical_interaction,
+        visibility=req.visibility,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/{relationship_id}/links")
+def link_relationship_entity_endpoint(
+    relationship_id: str, req: LinkRelationshipEntityRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_entity_link_record(
+        relationship_id=relationship_id,
+        link_type=req.link_type,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/promises")
+def create_promise_endpoint(req: CreatePromiseRequest):
+    promise = create_promise_record(
+        promisor_entity_type=req.promisor_entity_type,
+        promisor_entity_id=req.promisor_entity_id,
+        promise_text=req.promise_text,
+        structured_meaning=req.structured_meaning,
+        conditions=req.conditions,
+        scope=req.scope,
+        visibility=req.visibility,
+        source_type=req.source_type,
+        source_id=req.source_id,
+        source_authorization=req.source_authorization,
+        participants=[p.model_dump() for p in req.participants],
+        inheritable=req.inheritable,
+        transferable=req.transferable,
+    )
+    return {"promise": _project_promise(promise, None).model_dump()}
+
+
+@app.get("/api/v1/promises")
+def list_promises_endpoint(
+    viewer_soul_id: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    records = list_promise_records()
+    if entity_type and entity_id:
+        records = [
+            p
+            for p in records
+            if (
+                p.get("promisor_entity_type") == entity_type
+                and p.get("promisor_entity_id") == entity_id
+            )
+            or any(
+                part.get("entity_type") == entity_type
+                and part.get("entity_id") == entity_id
+                for part in p.get("participants", [])
+            )
+        ]
+    return {
+        "promises": [
+            _project_promise(p, viewer_soul_id).model_dump()
+            for p in records
+            if promise_visible_to(p, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/promises/query")
+def query_promises_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    records = promises_for_entity(entity_type, entity_id)
+    linked = promises_linked_to_entity(entity_type, entity_id)
+    by_id = {p["promise_id"]: p for p in records + linked}
+    return {
+        "promises": [
+            _project_promise(p, viewer_soul_id).model_dump()
+            for p in by_id.values()
+            if promise_visible_to(p, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/promises/{promise_id}")
+def get_promise_endpoint(promise_id: str, viewer_soul_id: str | None = None):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    return {"promise": _project_promise(promise, viewer_soul_id).model_dump()}
+
+
+@app.post("/api/v1/promises/{promise_id}/transition")
+def transition_promise_endpoint(promise_id: str, req: TransitionPromiseRequest):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    try:
+        updated = transition_promise_record(
+            promise_id,
+            req.new_state,
+            evidence_type=req.evidence_type,
+            evidence_id=req.evidence_id,
+            reason=req.reason,
+            target_entity_type=req.target_entity_type,
+            target_entity_id=req.target_entity_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "promise": _project_promise(updated, None).model_dump(),
+        "message": "Promise state updated; original wording/source were untouched.",
+    }
+
+
+@app.post("/api/v1/promises/{promise_id}/evaluate")
+def evaluate_promise_endpoint(promise_id: str, req: EvaluatePromiseRequest):
+    from app.relationship import evaluate_promise_resolution
+
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    verdict = evaluate_promise_resolution(
+        promise,
+        req.candidate_state,
+        evidence_type=req.evidence_type,
+        evidence_id=req.evidence_id,
+        player_authorized=req.player_authorized,
+        reason=req.reason,
+    )
+    return verdict
+
+
+@app.post("/api/v1/promises/{promise_id}/links")
+def link_promise_entity_endpoint(promise_id: str, req: LinkPromiseEntityRequest):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    updated = add_promise_entity_link_record(
+        promise_id=promise_id,
+        link_type=req.link_type,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+    )
+    return {"promise": _project_promise(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/npc-knowledge")
+def project_relationship_promise_npc_knowledge_endpoint(
+    req: RelationshipPromiseNPCKnowledgeRequest,
+):
+    relationships = relationships_for_entity(
+        req.subject_entity_type, req.subject_entity_id
+    )
+    promises = promises_for_entity(req.subject_entity_type, req.subject_entity_id)
+    projection = project_relationship_promise_npc_knowledge(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        npc=req,
+        relationships=relationships,
+        promises=promises,
+    )
+    return {"knowledge": projection.model_dump()}
 
 
 @app.websocket("/ws/v1/convergence/{room_id}")

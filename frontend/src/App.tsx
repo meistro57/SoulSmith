@@ -22,12 +22,13 @@ import { WorldGalleryView } from './components/WorldGalleryView';
 import { WorldMemoryView } from './components/WorldMemoryView';
 import { BiographyView } from './components/BiographyView';
 import { CampaignView } from './components/CampaignView';
+import { RelationshipsView } from './components/RelationshipsView';
 import { AuthModal } from './components/AuthModal';
 
 import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe, Landmark, Map } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art' | 'campaign'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art' | 'campaign' | 'relationships'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -238,6 +239,7 @@ export function App() {
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
               { id: 'campaign', label: 'Campaign', icon: Map },
+              { id: 'relationships', label: 'Relationships', icon: HeartHandshake },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'constellation', label: 'Constellation', icon: Sparkles },
@@ -466,6 +468,8 @@ export function App() {
         )}
 
         {activeTab === 'campaign' && <CampaignView soulName={soulSheet.name} />}
+
+        {activeTab === 'relationships' && <RelationshipsView soulName={soulSheet.name} />}
 
         {activeTab === 'scan' && (
           <DiceScanView
