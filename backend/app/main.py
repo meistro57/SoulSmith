@@ -257,6 +257,27 @@ from app.group_memories import (
     project_group_for_viewer,
     suggest_related_by_similarity,
 )
+from app.living_visual import (
+    CurateArtMomentRequest,
+    LivingVisualRuntimeError,
+    ProcessVisualJobRequest,
+    QueueArtMomentsRequest,
+    approve_visual_job,
+    get_art_moment,
+    get_guardian_verdict,
+    get_visual_job,
+    hide_visual_job,
+    inspect_scene_spec,
+    list_art_moments,
+    list_visual_jobs,
+    process_visual_job,
+    queue_art_moments,
+    record_human_curation,
+    regenerate_visual_job,
+    reject_visual_job,
+    visual_history,
+)
+from app.living_visual_provider import get_living_visual_status
 from app.multi_aspect import (
     CampaignAspectModel,
     CrossAspectEncounterRequest,
@@ -3476,3 +3497,143 @@ def get_place_history(place_id: str, viewer_soul_id: str | None = None):
         return inspect_place_history(place_id, viewer_soul_id=viewer_soul_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: Living Visual World endpoints.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/living-visuals/providers/status")
+def living_visual_provider_status():
+    return get_living_visual_status()
+
+
+@app.get("/api/v1/living-visuals/art-moments")
+def list_living_visual_art_moments(session_id: str | None = None):
+    return list_art_moments(session_id=session_id)
+
+
+@app.get("/api/v1/living-visuals/art-moments/{art_moment_id}")
+def get_living_visual_art_moment(art_moment_id: str):
+    try:
+        return get_art_moment(art_moment_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/art-moments/evaluate")
+def queue_living_visual_art_moments(req: QueueArtMomentsRequest):
+    try:
+        return queue_art_moments(req.session_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/art-moments/{art_moment_id}/curate")
+def curate_living_visual_art_moment(art_moment_id: str, req: CurateArtMomentRequest):
+    try:
+        return record_human_curation(
+            art_moment_id,
+            contributor_id=req.contributor_id,
+            contributor_name=req.contributor_name,
+            style_guidance=req.style_guidance,
+            composition=req.composition,
+            mood=req.mood,
+            motif=req.motif,
+            symbolism=req.symbolism,
+            provenance_note=req.provenance_note,
+        )
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs")
+def list_living_visual_jobs(
+    session_id: str | None = None, art_moment_id: str | None = None
+):
+    return list_visual_jobs(session_id=session_id, art_moment_id=art_moment_id)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}")
+def get_living_visual_job(job_id: str):
+    try:
+        return get_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/process")
+def process_living_visual_job(job_id: str, req: ProcessVisualJobRequest | None = None):
+    try:
+        result = process_visual_job(
+            job_id,
+            provider_type=req.provider_type if req else None,
+            seed=req.seed if req else None,
+        )
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+    return result
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/approve")
+def approve_living_visual_job(job_id: str):
+    try:
+        return approve_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/reject")
+def reject_living_visual_job(job_id: str):
+    try:
+        return reject_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/hide")
+def hide_living_visual_job(job_id: str):
+    try:
+        return hide_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/regenerate")
+def regenerate_living_visual_job(job_id: str):
+    try:
+        return regenerate_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}/scene-spec")
+def inspect_living_visual_scene_spec(job_id: str):
+    try:
+        return inspect_scene_spec(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}/guardian")
+def get_living_visual_guardian(job_id: str):
+    try:
+        return get_guardian_verdict(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/history")
+def get_living_visual_history(
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    soul_id: str | None = None,
+    session_id: str | None = None,
+):
+    return visual_history(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        soul_id=soul_id,
+        session_id=session_id,
+    )

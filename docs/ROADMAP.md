@@ -924,6 +924,48 @@ See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
 
 ---
 
+### Phase 21: Living Visual World & ComfyUI Runtime `[Status: Integrated]`
+
+Turn the completed visual architecture into a living runtime that paints
+meaningful moments during actual play.
+
+> **SOULSMITH DOES NOT ILLUSTRATE EVERYTHING. IT PAINTS WHAT BECOMES WORTH
+> REMEMBERING.**
+>
+> **MEMORY IS CANON. ART IS INTERPRETATION.**
+
+- `CANONICAL STATE -> ART DIRECTOR ELIGIBILITY -> SCENE/PORTRAIT/OBJECT SPEC ->
+  VISUAL PROVIDER -> QUARANTINE -> VISUAL CANON GUARDIAN -> APPROVAL ->
+  GALLERY/MEMORY`; never `GENERATED IMAGE -> NEW CANON`.
+- Persistent `ArtMoment` (what the Art Director found worth painting) and
+  `VisualJob` (auditable, resumable generation lifecycle) tables, with
+  provenance (provider/workflow/version/reference assets/Guardian verdicts).
+- Deterministic Art Director eligibility over structured state (Chronicle
+  importance, Integration/Thread transition, relic state, relationship events,
+  promise outcomes, Group Memory significance, World Memory significance,
+  Wandering place history). Most events produce no Art Moment.
+- A configurable local ComfyUI runtime that reuses the existing
+  `app.comfyui` client/workflow stack (no second image stack), with workflow
+  selection by visual type, timeout/retry, health/capability diagnostics, and a
+  deterministic mock fallback requiring no GPU or internet.
+- Portrait continuity keeps locked historical references and never silently
+  falls back to text-to-image; approved art creates new interpretation, not new
+  canon.
+- A human creative-direction extension point (curation) that may interpret but
+  never rewrite locked canonical facts, laying groundwork for a future
+  Mythmaker Workshop.
+
+**Exit criteria**
+
+- A meaningful canonical moment becomes an Art Moment through deterministic
+  eligibility; a configured local ComfyUI instance renders it asynchronously;
+  raw output is quarantined and validated before any player-visible approval.
+  If ComfyUI disappears, SoulSmith keeps playing.
+
+See [`docs/LIVING_VISUAL_WORLD.md`](LIVING_VISUAL_WORLD.md).
+
+---
+
 ## Near-Term Implementation Priorities
 
 The phases listed above are **shipped and integrated** (Phases 0-19). The
@@ -940,8 +982,10 @@ remaining work is hardening and optional deepening, not foundational:
 3. ~~Support multi-Aspect simultaneous sessions within one campaign~~ — **Integrated**
    as Phase 20 (Multi-Aspect Campaign Sessions & Wandering Mode Foundation).
    See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
-4. Move the ComfyUI/visual providers from mock to a local instance for art
-   moments, preserving the canonical/Guardian pipelines already built.
+4. ~~Move the ComfyUI/visual providers from mock to a local instance for art
+   moments, preserving the canonical/Guardian pipelines already built~~ —
+   **Integrated** as Phase 21 (Living Visual World & ComfyUI Runtime).
+   See [`docs/LIVING_VISUAL_WORLD.md`](LIVING_VISUAL_WORLD.md).
 5. Optional wall-clock cooldowns in addition to the deterministic count-based
    pacing currently used by the orchestrator.
 

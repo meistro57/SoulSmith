@@ -1230,3 +1230,138 @@ export interface CrossAspectMeeting {
   other_aspect: Record<string, any>;
   knowledge_boundary: Record<string, any>;
 }
+
+export type VisualJobType =
+  | 'portrait'
+  | 'portrait_continuity'
+  | 'memory_object'
+  | 'chronicle_painting'
+  | 'relic'
+  | 'relationship'
+  | 'group_memory'
+  | 'legendary_figure'
+  | 'world_memory'
+  | 'place'
+  | 'environment';
+
+export type ArtMomentStatus =
+  | 'eligible'
+  | 'queued'
+  | 'curated'
+  | 'deferred'
+  | 'rejected'
+  | 'completed'
+  | 'hidden';
+
+export type VisualJobState =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'guardian_review'
+  | 'approved'
+  | 'rejected'
+  | 'hidden'
+  | 'blocked'
+  | 'failed'
+  | 'cancelled'
+  | 'deferred';
+
+export interface VisualSceneSpec {
+  visual_type: VisualJobType;
+  spec_version: string;
+  title: string;
+  source_entity_type?: string | null;
+  source_entity_id?: string | null;
+  permitted_participants: Array<{
+    soul_id: string;
+    character_name: string;
+    role_in_event: string;
+    portrait_version_id?: string | null;
+    reference_image_url?: string | null;
+    identity_strategy: string;
+  }>;
+  canonical_objects: string[];
+  relic_state?: string | null;
+  location?: string | null;
+  environment?: string | null;
+  time_context?: string | null;
+  action_facts: string[];
+  outcome_facts: string[];
+  prohibited_additions: string[];
+  unknown_fields: string[];
+  emotional_tone: string;
+  composition: string;
+  style_guidance: string;
+  mood: string;
+  motif: string;
+  symbolism: string;
+  source_evidence: Array<{
+    source_type: string;
+    source_id: string;
+    claim_kind?: string;
+    note?: string | null;
+  }>;
+}
+
+export interface ArtMoment {
+  art_moment_id: string;
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  visual_type: VisualJobType;
+  cooldown_key?: string | null;
+  eligibility_rule: string;
+  source_entity_type?: string | null;
+  source_entity_id?: string | null;
+  title: string;
+  source_evidence: Array<Record<string, any>>;
+  reference_asset_ids: string[];
+  spec: Record<string, any>;
+  status: ArtMomentStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface VisualJob {
+  job_id: string;
+  art_moment_id: string;
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  visual_type: VisualJobType;
+  provider: string;
+  provider_model?: string | null;
+  workflow_role?: string | null;
+  workflow_version: string;
+  provider_request_id?: string | null;
+  generation_seed?: number | null;
+  generation_state: VisualJobState;
+  retry_count: number;
+  spec: Record<string, any>;
+  reference_asset_ids: string[];
+  quarantined_image_url?: string | null;
+  final_image_url?: string | null;
+  guardian_status: string;
+  guardian_report?: Record<string, any> | null;
+  failure_reason?: string | null;
+  superseded_job_id?: string | null;
+  contributor_id?: string | null;
+  contributor_name?: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface HumanCuration {
+  curation_id: string;
+  art_moment_id: string;
+  contributor_id: string;
+  contributor_name?: string | null;
+  style_guidance: string;
+  composition: string;
+  mood: string;
+  motif: string;
+  symbolism: string;
+  provenance_note: string;
+  created_at?: string | null;
+}

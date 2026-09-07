@@ -544,9 +544,18 @@ def commit_canonical_event(session_id: str, event_id: str) -> dict[str, Any]:
     follow_ups = _dedupe_existing(session_id, follow_ups)
     opportunities = [_persist_opportunity(session, c) for c in follow_ups]
     transition = db.get_campaign_transition_record(transition_id)
+
+    # Phase 21: evaluate Art Director eligibility and queue living visual jobs.
+    # This is deferred bookkeeping; a failure here never rolls back canon.
+    try:
+        living_visuals = queue_eligible_art_moments(session_id)
+    except Exception:  # noqa: BLE001 - visual generation is never canonical
+        living_visuals = {"error": "living visual evaluation failed", "created": 0}
+
     return {
         "transition": transition,
         "opportunities": opportunities,
+        "living_visuals": living_visuals,
         "idempotent": False,
     }
 
@@ -1156,3 +1165,17 @@ def resolve_cross_aspect_encounter(
     from app.multi_aspect import resolve_cross_aspect_encounter as _resolve
 
     return _resolve(session_id, other_soul_id)
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: Living Visual World integration. The Art Director decides which
+# canonical moments deserve a painting; the runtime paints them asynchronously.
+# ---------------------------------------------------------------------------
+
+
+def queue_eligible_art_moments(session_id: str) -> dict[str, Any]:
+    """Evaluate Art Director eligibility and enqueue queued VisualJobs. Never
+    mutates canonical state; a VisualJob failure must not roll back history."""
+    from app.living_visual import queue_art_moments
+
+    return queue_art_moments(session_id)

@@ -1144,6 +1144,87 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 21: Living Visual World. Art Moments record *what the Art Director
+    # found worth painting*; VisualJobs record the auditable generation lifecycle.
+    # Neither is canonical history: approved art is an interpretation, not evidence.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS art_moments (
+            art_moment_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            campaign_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            visual_type TEXT NOT NULL,
+            cooldown_key TEXT,
+            eligibility_rule TEXT NOT NULL,
+            source_entity_type TEXT,
+            source_entity_id TEXT,
+            title TEXT NOT NULL,
+            source_evidence_json TEXT NOT NULL DEFAULT '[]',
+            reference_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+            spec_json TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'eligible',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visual_jobs (
+            job_id TEXT PRIMARY KEY,
+            art_moment_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            campaign_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            visual_type TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'mock',
+            provider_model TEXT,
+            workflow_role TEXT,
+            workflow_version TEXT NOT NULL DEFAULT '1.0.0',
+            provider_request_id TEXT,
+            generation_seed INTEGER,
+            generation_state TEXT NOT NULL DEFAULT 'queued',
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            spec_json TEXT NOT NULL DEFAULT '{}',
+            reference_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+            quarantined_image_url TEXT,
+            final_image_url TEXT,
+            guardian_status TEXT NOT NULL DEFAULT 'pending',
+            guardian_report_json TEXT,
+            failure_reason TEXT,
+            superseded_job_id TEXT,
+            contributor_id TEXT,
+            contributor_name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visual_job_guardian_reports (
+            report_id TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 0.0,
+            violations_json TEXT NOT NULL DEFAULT '[]',
+            correction_instructions_json TEXT NOT NULL DEFAULT '[]',
+            inspected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS visual_curations (
+            curation_id TEXT PRIMARY KEY,
+            art_moment_id TEXT NOT NULL,
+            contributor_id TEXT NOT NULL,
+            contributor_name TEXT,
+            style_guidance TEXT NOT NULL DEFAULT '',
+            composition TEXT NOT NULL DEFAULT '',
+            mood TEXT NOT NULL DEFAULT '',
+            motif TEXT NOT NULL DEFAULT '',
+            symbolism TEXT NOT NULL DEFAULT '',
+            provenance_note TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
         cursor.execute(
@@ -8031,3 +8112,524 @@ def list_wandering_discoveries_records(soul_id: str) -> list[dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     return [_map_wandering_discovery_row(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: Living Visual World persistence. Art Moments and VisualJobs are
+# bookkeeping/interpretation, never canonical history.
+# ---------------------------------------------------------------------------
+
+
+def _map_art_moment_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "art_moment_id": r["art_moment_id"],
+        "session_id": r["session_id"],
+        "campaign_id": r["campaign_id"],
+        "soul_id": r["soul_id"],
+        "visual_type": r["visual_type"],
+        "cooldown_key": r["cooldown_key"],
+        "eligibility_rule": r["eligibility_rule"],
+        "source_entity_type": r["source_entity_type"],
+        "source_entity_id": r["source_entity_id"],
+        "title": r["title"],
+        "source_evidence": _json_or_none(r["source_evidence_json"]) or [],
+        "reference_asset_ids": _json_or_none(r["reference_asset_ids_json"]) or [],
+        "spec": _json_or_none(r["spec_json"]) or {},
+        "status": r["status"],
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def _map_visual_job_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "job_id": r["job_id"],
+        "art_moment_id": r["art_moment_id"],
+        "session_id": r["session_id"],
+        "campaign_id": r["campaign_id"],
+        "soul_id": r["soul_id"],
+        "visual_type": r["visual_type"],
+        "provider": r["provider"],
+        "provider_model": r["provider_model"],
+        "workflow_role": r["workflow_role"],
+        "workflow_version": r["workflow_version"],
+        "generation_state": r["generation_state"],
+        "retry_count": r["retry_count"],
+        "spec": _json_or_none(r["spec_json"]) or {},
+        "reference_asset_ids": _json_or_none(r["reference_asset_ids_json"]) or [],
+        "quarantined_image_url": r["quarantined_image_url"],
+        "final_image_url": r["final_image_url"],
+        "guardian_status": r["guardian_status"],
+        "guardian_report": _json_or_none(r["guardian_report_json"]),
+        "failure_reason": r["failure_reason"],
+        "superseded_job_id": r["superseded_job_id"],
+        "contributor_id": r["contributor_id"],
+        "contributor_name": r["contributor_name"],
+        "created_at": r["created_at"],
+        "started_at": r["started_at"],
+        "completed_at": r["completed_at"],
+    }
+
+
+def _map_visual_job_guardian_report_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "report_id": r["report_id"],
+        "job_id": r["job_id"],
+        "status": r["status"],
+        "confidence": r["confidence"],
+        "violations": _json_or_none(r["violations_json"]) or [],
+        "correction_instructions": (
+            _json_or_none(r["correction_instructions_json"]) or []
+        ),
+        "inspected_at": r["inspected_at"],
+    }
+
+
+def _map_visual_curation_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "curation_id": r["curation_id"],
+        "art_moment_id": r["art_moment_id"],
+        "contributor_id": r["contributor_id"],
+        "contributor_name": r["contributor_name"],
+        "style_guidance": r["style_guidance"],
+        "composition": r["composition"],
+        "mood": r["mood"],
+        "motif": r["motif"],
+        "symbolism": r["symbolism"],
+        "provenance_note": r["provenance_note"],
+        "created_at": r["created_at"],
+    }
+
+
+def create_art_moment_record(
+    *,
+    session_id: str,
+    campaign_id: str,
+    soul_id: str,
+    visual_type: str,
+    cooldown_key: str | None,
+    eligibility_rule: str,
+    source_entity_type: str | None,
+    source_entity_id: str | None,
+    title: str,
+    source_evidence: list[dict[str, Any]],
+    reference_asset_ids: list[str],
+    spec: dict[str, Any],
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    art_moment_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO art_moments (
+            art_moment_id, session_id, campaign_id, soul_id, visual_type,
+            cooldown_key, eligibility_rule, source_entity_type, source_entity_id,
+            title, source_evidence_json, reference_asset_ids_json, spec_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            art_moment_id,
+            session_id,
+            campaign_id,
+            soul_id,
+            visual_type,
+            cooldown_key,
+            eligibility_rule,
+            source_entity_type,
+            source_entity_id,
+            title,
+            json.dumps(source_evidence),
+            json.dumps(reference_asset_ids),
+            json.dumps(spec),
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM art_moments WHERE art_moment_id = ?", (art_moment_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_moment_row(row)
+
+
+def get_art_moment_record(art_moment_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_moments WHERE art_moment_id = ?", (art_moment_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_moment_row(row) if row else None
+
+
+def get_art_moment_by_cooldown_key_record(
+    cooldown_key: str,
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM art_moments WHERE cooldown_key = ? ORDER BY created_at DESC LIMIT 1",
+        (cooldown_key,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_moment_row(row) if row else None
+
+
+def list_art_moments_records(session_id: str | None = None) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if session_id:
+        cursor.execute(
+            "SELECT * FROM art_moments WHERE session_id = ? ORDER BY created_at ASC",
+            (session_id,),
+        )
+    else:
+        cursor.execute("SELECT * FROM art_moments ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_art_moment_row(r) for r in rows]
+
+
+def update_art_moment_state_record(
+    art_moment_id: str, status: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE art_moments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE art_moment_id = ?",
+        (status, art_moment_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM art_moments WHERE art_moment_id = ?", (art_moment_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_moment_row(row) if row else None
+
+
+def update_art_moment_spec_record(
+    art_moment_id: str, spec: dict[str, Any]
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE art_moments SET spec_json = ?, updated_at = CURRENT_TIMESTAMP WHERE art_moment_id = ?",
+        (json.dumps(spec), art_moment_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM art_moments WHERE art_moment_id = ?", (art_moment_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_art_moment_row(row) if row else None
+
+
+def create_visual_job_record(
+    *,
+    art_moment_id: str,
+    session_id: str,
+    campaign_id: str,
+    soul_id: str,
+    visual_type: str,
+    spec: dict[str, Any],
+    reference_asset_ids: list[str],
+    retry_count: int = 0,
+    superseded_job_id: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    job_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO visual_jobs (
+            job_id, art_moment_id, session_id, campaign_id, soul_id, visual_type,
+            retry_count, spec_json, reference_asset_ids_json, superseded_job_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            job_id,
+            art_moment_id,
+            session_id,
+            campaign_id,
+            soul_id,
+            visual_type,
+            retry_count,
+            json.dumps(spec),
+            json.dumps(reference_asset_ids),
+            superseded_job_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM visual_jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row)
+
+
+def get_visual_job_record(job_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM visual_jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row) if row else None
+
+
+def get_latest_visual_job_for_art_moment_record(
+    art_moment_id: str,
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_jobs WHERE art_moment_id = ? ORDER BY created_at DESC LIMIT 1",
+        (art_moment_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row) if row else None
+
+
+def list_visual_jobs_records(
+    *,
+    session_id: str | None = None,
+    art_moment_id: str | None = None,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clauses = []
+    params: list[Any] = []
+    if session_id:
+        clauses.append("session_id = ?")
+        params.append(session_id)
+    if art_moment_id:
+        clauses.append("art_moment_id = ?")
+        params.append(art_moment_id)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cursor.execute(f"SELECT * FROM visual_jobs {where} ORDER BY created_at ASC", params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_visual_job_row(r) for r in rows]
+
+
+def update_visual_job_generation_record(
+    job_id: str,
+    *,
+    generation_state: str | None = None,
+    provider: str | None = None,
+    provider_model: str | None = None,
+    workflow_role: str | None = None,
+    workflow_version: str | None = None,
+    provider_request_id: str | None = None,
+    generation_seed: int | None = None,
+    quarantined_image_url: str | None = None,
+    guardian_status: str | None = None,
+    failure_reason: str | None = None,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    updates = []
+    params: list[Any] = []
+    if generation_state is not None:
+        updates.append("generation_state = ?")
+        params.append(generation_state)
+        if generation_state == "running":
+            updates.append("started_at = COALESCE(started_at, CURRENT_TIMESTAMP)")
+        if generation_state in (
+            "completed",
+            "approved",
+            "rejected",
+            "hidden",
+            "blocked",
+            "failed",
+            "cancelled",
+        ):
+            updates.append("completed_at = CURRENT_TIMESTAMP")
+    if provider is not None:
+        updates.append("provider = ?")
+        params.append(provider)
+    if provider_model is not None:
+        updates.append("provider_model = ?")
+        params.append(provider_model)
+    if workflow_role is not None:
+        updates.append("workflow_role = ?")
+        params.append(workflow_role)
+    if workflow_version is not None:
+        updates.append("workflow_version = ?")
+        params.append(workflow_version)
+    if provider_request_id is not None:
+        updates.append("provider_request_id = ?")
+        params.append(provider_request_id)
+    if generation_seed is not None:
+        updates.append("generation_seed = ?")
+        params.append(generation_seed)
+    if quarantined_image_url is not None:
+        updates.append("quarantined_image_url = ?")
+        params.append(quarantined_image_url)
+    if guardian_status is not None:
+        updates.append("guardian_status = ?")
+        params.append(guardian_status)
+    if failure_reason is not None:
+        updates.append("failure_reason = ?")
+        params.append(failure_reason)
+    params.append(job_id)
+    cursor.execute(
+        f"UPDATE visual_jobs SET {', '.join(updates)} WHERE job_id = ?", params
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM visual_jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row)
+
+
+def update_visual_job_promotion_record(
+    job_id: str,
+    *,
+    final_image_url: str,
+    guardian_status: str,
+    guardian_report: dict[str, Any],
+    generation_state: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE visual_jobs
+        SET final_image_url = ?, guardian_status = ?, guardian_report_json = ?,
+            generation_state = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE job_id = ?
+    """,
+        (
+            final_image_url,
+            guardian_status,
+            json.dumps(guardian_report),
+            generation_state,
+            job_id,
+        ),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM visual_jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row)
+
+
+def update_visual_job_state_record(job_id: str, state: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE visual_jobs SET generation_state = ?, completed_at = CURRENT_TIMESTAMP WHERE job_id = ?",
+        (state, job_id),
+    )
+    conn.commit()
+    cursor.execute("SELECT * FROM visual_jobs WHERE job_id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_row(row)
+
+
+def record_visual_job_guardian_report(
+    job_id: str, report: dict[str, Any]
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    report_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO visual_job_guardian_reports (
+            report_id, job_id, status, confidence, violations_json,
+            correction_instructions_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+    """,
+        (
+            report_id,
+            job_id,
+            report.get("status", "pass"),
+            report.get("confidence", 0.0),
+            json.dumps(report.get("violations", [])),
+            json.dumps(report.get("correction_instructions", [])),
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM visual_job_guardian_reports WHERE report_id = ?", (report_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_job_guardian_report_row(row)
+
+
+def list_visual_job_guardian_reports_records(
+    job_id: str,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_job_guardian_reports WHERE job_id = ? ORDER BY inspected_at ASC",
+        (job_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_visual_job_guardian_report_row(r) for r in rows]
+
+
+def create_visual_curation_record(
+    *,
+    art_moment_id: str,
+    contributor_id: str,
+    contributor_name: str | None,
+    style_guidance: str,
+    composition: str,
+    mood: str,
+    motif: str,
+    symbolism: str,
+    provenance_note: str,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    curation_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO visual_curations (
+            curation_id, art_moment_id, contributor_id, contributor_name,
+            style_guidance, composition, mood, motif, symbolism, provenance_note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            curation_id,
+            art_moment_id,
+            contributor_id,
+            contributor_name,
+            style_guidance,
+            composition,
+            mood,
+            motif,
+            symbolism,
+            provenance_note,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM visual_curations WHERE curation_id = ?", (curation_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_visual_curation_row(row)
+
+
+def list_visual_curations_records(
+    art_moment_id: str,
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM visual_curations WHERE art_moment_id = ? ORDER BY created_at ASC",
+        (art_moment_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_visual_curation_row(r) for r in rows]
