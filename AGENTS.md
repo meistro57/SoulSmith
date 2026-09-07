@@ -105,6 +105,9 @@ npm run build       # tsc -b && vite build
 | `world_memory_compiler.py` | Phase 16 deterministic World Memory compiler: gathers consent-filtered canonical sources into an inspectable `WorldMemorySpec` before provider generation and Guardian validation. |
 | `world_memory_provider.py` | Phase 16 cultural-artifact provider abstraction (mock default) that renders a structured spec into legend/song/inscription/etc. without inventing undeclared canon. |
 | `world_memory_guardian.py` | Phase 16 World Memory Guardian (pass/retry/block): verifies deviations are declared and safe, never "corrects" legends into canon. |
+| `campaign.py` | Phase 17 Campaign Orchestrator models + deterministic eligibility/pacing helpers (`CampaignSession`, `CampaignOpportunity`, `CampaignTransition`, `build_*_candidates`, `COOLDOWN_WINDOW`). |
+| `campaign_orchestrator.py` | Phase 17 Campaign Orchestrator service: evaluates eligible opportunities, runs the reaction pipeline after a committed event, resolves opportunities by delegating to owning domain systems, and exposes provenance/aftermath. |
+| `campaign_provider.py` | Phase 17 narrative provider abstraction + deterministic mock (`soulsmith-mock-campaign-v1`) receiving a consent-safe `NarrativeContext`. |
 | `comfyui/` | ComfyUI rendering adapter (`client.py`, `workflow_loader.py`, `workflow_binder.py`, `workflow_roles.py`, `storage.py`, `errors.py`, bundled `workflows/`). |
 | `vision.py` | Dice photo recognition. **Simulated** (random tentative reads). |
 | `auth.py` | bcrypt password hashing, JWT tokens, `get_current_user`. |
@@ -195,6 +198,8 @@ This is the single most important rule in the codebase:
 
 19. **World Memory is derived, never canonical.** Phase 16 (`world_memory.py`, `world_memory_compiler.py`, `world_memory_provider.py`, `world_memory_guardian.py`) turns preserved history into cultural memory (legends, monuments, songs, festivals, relic legends, NPC knowledge) under the invariant **history may become legend, legend must never become history by accident**. World Memory rows (`world_memories`) carry normalized source links, declared deviations, memory-state history, and Legendary Figure links; they never mutate Memory Objects, Group Memories, Biographies, relics, or approved visual history. The World Memory Guardian (pass/retry/block) rejects undeclared drift, undeclared hallucinated facts, private leaks, scoped-perspective omniscience, and unapproved visual references — a declared exaggeration passes, an undeclared one fails. NPC knowledge projection is consent-safe and scoped; an NPC never automatically receives canonical database truth. See `docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`.
 
+20. **The Campaign Orchestrator coordinates, never owns meaning.** Phase 17 (`campaign.py`, `campaign_orchestrator.py`, `campaign_provider.py`) decides *what gets an opportunity to act next*, not *what the player's story means*. It evaluates deterministic, provenance-carrying `CampaignOpportunity`s from structured state before narration; runs an auditable `CampaignTransition` reaction pipeline after each committed event; enforces count-based cooldowns (not wall-clock) so callbacks never become spam; preserves player recognition/rejection (recognize/reject/rename/reinterpret/postpone/hide) without mutating canonical Thread state; surfaces relic-memory/awakening candidates without ever awakening a relic; projects scoped NPC knowledge through Phase 16 rather than raw Chronicle omniscience; and delegates every canonical mutation to the domain system that owns it. Orchestrator rows (`campaign_sessions`, `campaign_opportunities`, `campaign_transitions`, `campaign_reactions`) are bookkeeping, never canonical history. See `docs/CAMPAIGN_ORCHESTRATOR.md`.
+
 ---
 
 ## Testing approach
@@ -214,4 +219,5 @@ This is the single most important rule in the codebase:
 - 3D dice renderer → `frontend/src/three/`, `docs/DICE_RENDERING_SYSTEM.md`
 - Art direction & gallery → `backend/app/art_director.py`, `backend/app/world_gallery.py`, `docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`
 - Legendary Figures & World Memory → `backend/app/world_memory.py`, `backend/app/world_memory_compiler.py`, `backend/app/world_memory_guardian.py`, `docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`
+- Campaign Orchestrator & North-Star loop → `backend/app/campaign.py`, `backend/app/campaign_orchestrator.py`, `backend/app/campaign_provider.py`, `docs/CAMPAIGN_ORCHESTRATOR.md`
 - Current design intent and roadmap → `docs/ROADMAP.md`

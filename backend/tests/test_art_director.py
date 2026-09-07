@@ -1,4 +1,6 @@
 # backend/tests/test_art_director.py
+from fastapi.testclient import TestClient
+
 from app.art_director import (
     ArtDirectionProfileVersionModel,
     compile_art_direction_spec,
@@ -10,7 +12,6 @@ from app.style_reviewer import (
     MockArtDirectionReviewer,
     final_verdict_after_style_review,
 )
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

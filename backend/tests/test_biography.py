@@ -2,6 +2,8 @@
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app import db
 from app.biography import (
     BiographyNarrativeSection,
@@ -13,7 +15,6 @@ from app.biography import (
 )
 from app.biography_guardian import MockBiographyGuardian
 from app.main import app
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

@@ -2,10 +2,11 @@
 import importlib
 
 import pytest
-from app.grammar import NumericDiceRoll, generate_numeric_roll, interpret_numeric_roll
-from app.main import app
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+
+from app.grammar import NumericDiceRoll, generate_numeric_roll, interpret_numeric_roll
+from app.main import app
 
 client = TestClient(app)
 

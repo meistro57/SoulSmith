@@ -386,7 +386,7 @@ npm run dev
 
 ## Project Status
 
-SoulSmith is at **Advanced Playable Production Engine (Phase 1–4 Complete Core)**.
+SoulSmith is at **Advanced Playable Production Engine (Phase 0–17 Complete)**.
 
 Key Features Built:
 1. **3D STL Polyhedral Dice Sanctuary**: Real-time Three.js `STLLoader` engine for 6 custom polyhedral STL dice (`d20.stl`, `d12.stl`, `d10.stl`, `d8.stl`, `d6.stl`, `d4.stl`) with translucent sapphire resin optics, clearcoat gloss, transparent glass mode toggle, custom hex color picker, and opacity slider.
@@ -417,6 +417,7 @@ Key Features Built:
 26. **Living Biography**: An evolving, provenance-aware life story derived from the Chronicle (never rewriting it) — a deterministic structured compiler, immutable version/section/provenance model, chronology without invented dates, recurring-thread extraction, fact-vs-perspective classification, a deterministic narrative provider, a Biography Guardian, draft/current/version lifecycle, consent-aware public/private publication, and a reading experience with expandable "From the Chronicle" provenance. See [`docs/LIVING_BIOGRAPHY.md`](docs/LIVING_BIOGRAPHY.md).
 27. **Art Director & World Gallery**: Persistent, versioned Art Direction Profiles that give portraits, world visuals, and Chronicle artwork a coherent visual language *without changing what they depict* — a deterministic style hierarchy and inspectable Art Direction Spec, honest provider-capability degradation, an optional style reviewer that can never override a Visual Canon Guardian BLOCK, and a consent-safe, accessible World Gallery with curated Collections and immutable timelines. See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
 28. **Legendary Figures & World Memory**: The world itself remembers — preserved Chronicle, Group Memory, Biography, relic, and Gallery history becomes derived in-world cultural memory (legends, monuments, songs, festivals, relic legends, NPC knowledge) under the invariant **history may become legend, legend must never become history by accident**. Every legend carries normalized provenance and declared drift, Legendary Figures reference canonical identity without mutating it, forgetting never deletes canon, and a World Memory Guardian rejects undeclared hallucinations while letting declared exaggeration pass. See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
+29. **Campaign Orchestrator (North-Star Playable Loop)**: The conductor that turns Phases 0-16 into one continuous playable experience. A dedicated orchestrator evaluates deterministic, provenance-carrying `CampaignOpportunity`s before narration, runs an auditable reaction pipeline after each canonical event, enforces count-based cooldowns, preserves player recognition/rejection without punishment, coordinates relic memory/awakening candidates without claiming awakening authority, projects scoped NPC knowledge, and exposes traceable transition provenance and a deterministic North-Star end-to-end fixture. See [`docs/CAMPAIGN_ORCHESTRATOR.md`](docs/CAMPAIGN_ORCHESTRATOR.md).
 
 ---
 

@@ -774,6 +774,70 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 17: Campaign Orchestrator. Session/opportunity/transition state is
+    # orchestrator bookkeeping, never canonical history. It coordinates existing
+    # systems and records auditable reactions without duplicating their rules.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_sessions (
+            session_id TEXT PRIMARY KEY,
+            campaign_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            constellation_id TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            current_opportunity_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_opportunities (
+            opportunity_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            opportunity_type TEXT NOT NULL,
+            eligibility_rule TEXT NOT NULL,
+            source_evidence_json TEXT NOT NULL DEFAULT '[]',
+            involved_entities_json TEXT NOT NULL DEFAULT '[]',
+            visibility_scope TEXT NOT NULL DEFAULT 'public_canon',
+            urgency_class TEXT NOT NULL DEFAULT 'normal',
+            participation TEXT NOT NULL DEFAULT 'optional',
+            lifecycle_state TEXT NOT NULL DEFAULT 'eligible',
+            cooldown_key TEXT,
+            cooldown_until TEXT,
+            domain_action TEXT NOT NULL DEFAULT 'none',
+            domain_action_payload_json TEXT NOT NULL DEFAULT '{}',
+            reasoning_json TEXT NOT NULL DEFAULT '{}',
+            narration TEXT,
+            narration_source TEXT NOT NULL DEFAULT 'deterministic',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_transitions (
+            transition_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            opportunity_id TEXT,
+            canonical_event_id TEXT,
+            transition_type TEXT NOT NULL,
+            systems_invoked_json TEXT NOT NULL DEFAULT '[]',
+            outcomes_json TEXT NOT NULL DEFAULT '[]',
+            canonical_change INTEGER NOT NULL DEFAULT 0,
+            provider_failure TEXT,
+            rejected_invalid_transition INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_reactions (
+            reaction_id TEXT PRIMARY KEY,
+            transition_id TEXT NOT NULL,
+            system_name TEXT NOT NULL,
+            result_kind TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Track which Art Direction Profile/version produced a generated candidate.
     _add_column_if_missing(
         cursor,
@@ -5850,3 +5914,429 @@ def list_world_memory_placements_records(memory_id: str) -> list[dict[str, Any]]
         }
         for r in rows
     ]
+
+
+# Phase 17: Campaign Orchestrator persistence helpers.
+
+
+def _map_campaign_session_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "session_id": r["session_id"],
+        "campaign_id": r["campaign_id"],
+        "soul_id": r["soul_id"],
+        "constellation_id": r["constellation_id"],
+        "status": r["status"],
+        "current_opportunity_id": r["current_opportunity_id"],
+        "created_at": r["created_at"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def _map_campaign_opportunity_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "opportunity_id": r["opportunity_id"],
+        "session_id": r["session_id"],
+        "opportunity_type": r["opportunity_type"],
+        "eligibility_rule": r["eligibility_rule"],
+        "source_evidence": _json_or_none(r["source_evidence_json"]) or [],
+        "involved_entities": _json_or_none(r["involved_entities_json"]) or [],
+        "visibility_scope": r["visibility_scope"],
+        "urgency_class": r["urgency_class"],
+        "participation": r["participation"],
+        "lifecycle_state": r["lifecycle_state"],
+        "cooldown_key": r["cooldown_key"],
+        "cooldown_until": r["cooldown_until"],
+        "domain_action": r["domain_action"],
+        "domain_action_payload": _json_or_none(r["domain_action_payload_json"]) or {},
+        "reasoning": _json_or_none(r["reasoning_json"]) or {},
+        "narration": r["narration"],
+        "narration_source": r["narration_source"],
+        "created_at": r["created_at"],
+        "resolved_at": r["resolved_at"],
+    }
+
+
+def _map_campaign_reaction_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "reaction_id": r["reaction_id"],
+        "transition_id": r["transition_id"],
+        "system_name": r["system_name"],
+        "result_kind": r["result_kind"],
+        "details": _json_or_none(r["details_json"]) or {},
+        "created_at": r["created_at"],
+    }
+
+
+def _map_campaign_transition_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "transition_id": r["transition_id"],
+        "session_id": r["session_id"],
+        "opportunity_id": r["opportunity_id"],
+        "canonical_event_id": r["canonical_event_id"],
+        "transition_type": r["transition_type"],
+        "systems_invoked": _json_or_none(r["systems_invoked_json"]) or [],
+        "outcomes": _json_or_none(r["outcomes_json"]) or [],
+        "canonical_change": bool(r["canonical_change"]),
+        "provider_failure": r["provider_failure"],
+        "rejected_invalid_transition": bool(r["rejected_invalid_transition"]),
+        "created_at": r["created_at"],
+    }
+
+
+def create_campaign_session_record(
+    *, campaign_id: str, soul_id: str, constellation_id: str | None = None
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    session_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO campaign_sessions (session_id, campaign_id, soul_id, constellation_id)
+        VALUES (?, ?, ?, ?)
+    """,
+        (session_id, campaign_id, soul_id, constellation_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_sessions WHERE session_id = ?", (session_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_session_row(row)
+
+
+def get_campaign_session_record(session_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_sessions WHERE session_id = ?", (session_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_session_row(row) if row else None
+
+
+def get_active_campaign_session_record(
+    campaign_id: str, soul_id: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM campaign_sessions
+        WHERE campaign_id = ? AND soul_id = ? AND status = 'active'
+        ORDER BY created_at DESC LIMIT 1
+    """,
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_session_row(row) if row else None
+
+
+def set_campaign_session_current_opportunity(
+    session_id: str, opportunity_id: str | None
+) -> None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE campaign_sessions SET current_opportunity_id = ?, updated_at = CURRENT_TIMESTAMP WHERE session_id = ?",
+        (opportunity_id, session_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def create_campaign_opportunity_record(
+    *,
+    session_id: str,
+    opportunity_type: str,
+    eligibility_rule: str,
+    source_evidence: list[dict[str, Any]],
+    involved_entities: list[dict[str, Any]],
+    visibility_scope: str,
+    urgency_class: str,
+    participation: str,
+    cooldown_key: str | None,
+    domain_action: str,
+    domain_action_payload: dict[str, Any],
+    reasoning: dict[str, Any],
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    opportunity_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO campaign_opportunities (
+            opportunity_id, session_id, opportunity_type, eligibility_rule,
+            source_evidence_json, involved_entities_json, visibility_scope,
+            urgency_class, participation, lifecycle_state, cooldown_key,
+            domain_action, domain_action_payload_json, reasoning_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'eligible', ?, ?, ?, ?)
+    """,
+        (
+            opportunity_id,
+            session_id,
+            opportunity_type,
+            eligibility_rule,
+            json.dumps(source_evidence),
+            json.dumps(involved_entities),
+            visibility_scope,
+            urgency_class,
+            participation,
+            cooldown_key,
+            domain_action,
+            json.dumps(domain_action_payload),
+            json.dumps(reasoning),
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_opportunities WHERE opportunity_id = ?",
+        (opportunity_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_opportunity_row(row)
+
+
+def get_campaign_opportunity_record(opportunity_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_opportunities WHERE opportunity_id = ?",
+        (opportunity_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_opportunity_row(row) if row else None
+
+
+def list_campaign_opportunities_records(
+    session_id: str, lifecycle_state: str | None = None
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if lifecycle_state:
+        cursor.execute(
+            "SELECT * FROM campaign_opportunities WHERE session_id = ? AND lifecycle_state = ? ORDER BY created_at ASC",
+            (session_id, lifecycle_state),
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM campaign_opportunities WHERE session_id = ? ORDER BY created_at ASC",
+            (session_id,),
+        )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_campaign_opportunity_row(r) for r in rows]
+
+
+def update_campaign_opportunity_state_record(
+    opportunity_id: str,
+    lifecycle_state: str,
+    narration: str | None = None,
+    narration_source: str = "deterministic",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if narration is not None:
+        cursor.execute(
+            """
+            UPDATE campaign_opportunities
+            SET lifecycle_state = ?, narration = ?, narration_source = ?, resolved_at = CURRENT_TIMESTAMP
+            WHERE opportunity_id = ?
+        """,
+            (lifecycle_state, narration, narration_source, opportunity_id),
+        )
+    else:
+        cursor.execute(
+            """
+            UPDATE campaign_opportunities
+            SET lifecycle_state = ?, resolved_at = CURRENT_TIMESTAMP
+            WHERE opportunity_id = ?
+        """,
+            (lifecycle_state, opportunity_id),
+        )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_opportunities WHERE opportunity_id = ?",
+        (opportunity_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_opportunity_row(row) if row else None
+
+
+def create_campaign_transaction_record(
+    *,
+    transition_id: str,
+    session_id: str,
+    opportunity_id: str | None,
+    canonical_event_id: str | None,
+    transition_type: str,
+    systems_invoked: list[str],
+    outcomes: list[dict[str, Any]],
+    canonical_change: bool,
+    provider_failure: str | None,
+    rejected_invalid_transition: bool,
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO campaign_transitions (
+            transition_id, session_id, opportunity_id, canonical_event_id,
+            transition_type, systems_invoked_json, outcomes_json,
+            canonical_change, provider_failure, rejected_invalid_transition
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            transition_id,
+            session_id,
+            opportunity_id,
+            canonical_event_id,
+            transition_type,
+            json.dumps(systems_invoked),
+            json.dumps(outcomes),
+            1 if canonical_change else 0,
+            provider_failure,
+            1 if rejected_invalid_transition else 0,
+        ),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_transitions WHERE transition_id = ?", (transition_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_transition_row(row)
+
+
+def create_campaign_reaction_record(
+    *, transition_id: str, system_name: str, result_kind: str, details: dict[str, Any]
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    reaction_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO campaign_reactions (reaction_id, transition_id, system_name, result_kind, details_json)
+        VALUES (?, ?, ?, ?, ?)
+    """,
+        (reaction_id, transition_id, system_name, result_kind, json.dumps(details)),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_reactions WHERE reaction_id = ?", (reaction_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_reaction_row(row)
+
+
+def get_campaign_transition_record(transition_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_transitions WHERE transition_id = ?", (transition_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+    transition = _map_campaign_transition_row(row)
+    cursor.execute(
+        "SELECT * FROM campaign_reactions WHERE transition_id = ? ORDER BY created_at ASC",
+        (transition_id,),
+    )
+    reactions = [_map_campaign_reaction_row(r) for r in cursor.fetchall()]
+    conn.close()
+    transition["reactions"] = reactions
+    return transition
+
+
+def list_campaign_transitions_records(session_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_transitions WHERE session_id = ? ORDER BY created_at ASC",
+        (session_id,),
+    )
+    rows = cursor.fetchall()
+    transitions = [_map_campaign_transition_row(r) for r in rows]
+    for transition in transitions:
+        cursor.execute(
+            "SELECT * FROM campaign_reactions WHERE transition_id = ? ORDER BY created_at ASC",
+            (transition["transition_id"],),
+        )
+        transition["reactions"] = [
+            _map_campaign_reaction_row(r) for r in cursor.fetchall()
+        ]
+    conn.close()
+    return transitions
+
+
+def get_campaign_transition_by_event_record(
+    session_id: str, event_id: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT * FROM campaign_transitions
+        WHERE session_id = ? AND canonical_event_id = ?
+        ORDER BY created_at ASC LIMIT 1
+    """,
+        (session_id, event_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_transition_row(row) if row else None
+
+
+def get_recent_campaign_cooldown_keys(session_id: str, limit: int) -> list[str]:
+    """Cooldown keys of the most recently resolved/rejected/postponed/hidden
+    opportunities in this session. Used by count-based pacing (not wall-clock)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT cooldown_key FROM campaign_opportunities
+        WHERE session_id = ?
+          AND lifecycle_state IN ('resolved', 'rejected', 'postponed', 'hidden')
+          AND cooldown_key IS NOT NULL
+        ORDER BY resolved_at DESC, created_at DESC
+        LIMIT ?
+    """,
+        (session_id, limit),
+    )
+    keys = [r["cooldown_key"] for r in cursor.fetchall()]
+    conn.close()
+    return keys
+
+
+def get_canonical_event_record(event_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM scene_events WHERE id = ?", (event_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "soul_name": row["soul_id"],
+        "outcome_class": row["outcome_class"],
+        "dice_read": _json_or_none(row["dice_read_json"]),
+        "raw_roll": _json_or_none(row["raw_roll_json"]),
+        "interpreted_roll": _json_or_none(row["interpreted_roll_json"]),
+        "grammar_version": row["grammar_version"],
+        "player_intent": row["player_intent"],
+        "chosen_approach": row["chosen_approach"],
+        "resource_investment": _json_or_none(row["resource_investment_json"]),
+        "deterministic_outcome": _json_or_none(row["deterministic_outcome_json"]),
+        "narration": _json_or_none(row["narration_json"]),
+        "canon_facts": _json_or_none(row["canon_facts_json"]) or [],
+        "created_at": row["created_at"],
+    }

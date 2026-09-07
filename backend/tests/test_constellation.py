@@ -1,6 +1,7 @@
 # backend/tests/test_constellation.py
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 client = TestClient(app)
 

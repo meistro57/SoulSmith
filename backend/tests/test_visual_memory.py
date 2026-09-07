@@ -1,9 +1,10 @@
 # backend/tests/test_visual_memory.py
 import uuid
 
+from fastapi.testclient import TestClient
+
 from app import db
 from app.main import app
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

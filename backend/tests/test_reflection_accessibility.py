@@ -1,8 +1,9 @@
 # backend/tests/test_reflection_accessibility.py
 import uuid
 
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 client = TestClient(app)
 

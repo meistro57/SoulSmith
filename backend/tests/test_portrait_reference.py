@@ -1,5 +1,6 @@
 # backend/tests/test_portrait_reference.py
 import pytest
+
 from app.db import create_portrait_version_record
 from app.portrait_reference import SourcePortraitError, resolve_source_portrait
 

@@ -21,12 +21,13 @@ import { WorldAtlasView } from './components/WorldAtlasView';
 import { WorldGalleryView } from './components/WorldGalleryView';
 import { WorldMemoryView } from './components/WorldMemoryView';
 import { BiographyView } from './components/BiographyView';
+import { CampaignView } from './components/CampaignView';
 import { AuthModal } from './components/AuthModal';
 
-import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe, Landmark } from 'lucide-react';
+import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe, Landmark, Map } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art' | 'campaign'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -236,6 +237,7 @@ export function App() {
           <nav className="flex flex-wrap justify-center items-center gap-1.5 bg-[var(--deep)]/90 p-1.5 rounded-2xl border border-[var(--line)] shadow-xl">
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
+              { id: 'campaign', label: 'Campaign', icon: Map },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'constellation', label: 'Constellation', icon: Sparkles },
@@ -462,6 +464,8 @@ export function App() {
             </div>
           </div>
         )}
+
+        {activeTab === 'campaign' && <CampaignView soulName={soulSheet.name} />}
 
         {activeTab === 'scan' && (
           <DiceScanView

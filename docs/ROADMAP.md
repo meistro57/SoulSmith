@@ -743,20 +743,70 @@ See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](LEGENDARY_FIGURES_AND_WORLD_M
 
 ---
 
+### Phase 17: North-Star Playable Loop & Campaign Orchestrator `[Status: Integrated]`
+
+Conduct the orchestra: make Phases 0-16 a single coherent, continuous playable
+experience.
+
+> **THE ORCHESTRATOR DECIDES WHAT GETS AN OPPORTUNITY TO ACT NEXT. IT DOES NOT DECIDE WHAT THE PLAYER'S STORY MEANS.**
+
+- A dedicated `CampaignOrchestrator` service that evaluates campaign state and
+  produces a bounded set of eligible `CampaignOpportunity`s with typed source
+  evidence, eligibility rules, consent scope, pacing/cooldown metadata, and a
+  resulting domain action.
+- Deterministic eligibility computed from structured state before narration; no
+  model may decide that a promise, relationship, Thread, relic history, or
+  cross-Aspect connection exists merely to improve a scene.
+- A reaction pipeline that, after a canonical event is committed, collects
+  structured per-subsystem results (`no_action` / `candidate_created` /
+  `state_updated` / `player_review_required` / `future_opportunity_scheduled`)
+  into an auditable `CampaignTransition`. A derived-subsystem failure never
+  rolls back valid canonical history.
+- Player-controlled recognition/rejection (recognize / reject / rename /
+  reinterpret / postpone / hide) that never punishes or re-injects a refused
+  interpretation as fact.
+- Relic callbacks and awakening candidates coordinated through Relic
+  Recognition; the orchestrator surfaces evidence but never awakens a relic.
+- NPC/world reactions built from Phase 16 NPC-knowledge projection; NPCs never
+  receive raw Chronicle omniscience.
+- A bounded narrative provider (`CampaignNarrativeProvider`) with a
+  deterministic mock that may choose wording but never invent canon.
+- Save/resume idempotency: replaying commit or resolve never duplicates a
+  canonical event or re-applies a domain mutation.
+- A deterministic North-Star end-to-end fixture and comprehensive tests covering
+  provenance, cooldowns, rejection persistence, consent filtering, provider
+  failure, and relic-awakening authority.
+
+**Exit criteria**
+
+- A fresh player can enter SoulSmith and move through a continuous campaign in
+  which symbols recur, relics remember, another Aspect's promise survives into
+  the world, an NPC legitimately knows enough to react, patterns accumulate
+  evidence, the player may recognize/reject/reinterpret/postpone, a changed
+  choice becomes a Chronicle-backed Integration Event, and a relic awakens
+  because its narrative conditions were actually met.
+- Every meaningful callback is traceable to structured source evidence.
+
+See [`docs/CAMPAIGN_ORCHESTRATOR.md`](CAMPAIGN_ORCHESTRATOR.md).
+
+---
+
 ## Near-Term Implementation Priorities
 
-1. Finish the canonical roll contract migration across API, persistence, frontend types, and tests.
-2. Strengthen Chronicle provenance, retrieval, and contradiction handling.
-3. Define schemas for Seeds, Questions, Symbols, Local Threads, and Integration Events.
-4. Prototype the Curiosity Engine using deterministic rules before adding model-driven inference.
-5. Build one vertical slice:
-   - plant a Seed,
-   - echo it across three encounters,
-   - let the player recognize or reject the pattern,
-   - trigger a Chronicle-backed Integration Event,
-   - awaken one relic capability.
-6. Test the vertical slice with players who hold different philosophical interpretations.
-7. Use those sessions to refine pacing, ambiguity, consent, and player control before implementing the full Constellation.
+The phases listed above are **shipped and integrated** (Phases 0-16 plus the
+Phase 17 orchestrator). The remaining work is hardening and optional deepening,
+not foundational:
+
+1. Add a real (non-mock) narrative provider behind `CampaignNarrativeProvider`
+   without changing its contract or authority boundaries.
+2. Add a dedicated relationship/promise data model so `relationship_callback`
+   and `promise_consequence` opportunities can be auto-generated (today the
+   NPC promise-reaction path is exercised through World Memory).
+3. Support multi-Aspect simultaneous sessions within one campaign.
+4. Move the ComfyUI/visual providers from mock to a local instance for art
+   moments, preserving the canonical/Guardian pipelines already built.
+5. Optional wall-clock cooldowns in addition to the deterministic count-based
+   pacing currently used by the orchestrator.
 
 ---
 

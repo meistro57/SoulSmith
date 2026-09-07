@@ -1,8 +1,9 @@
 # backend/tests/test_relic_recognition.py
 import uuid
 
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 client = TestClient(app)
 

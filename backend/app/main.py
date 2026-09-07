@@ -47,6 +47,27 @@ from app.biography import (
     source_visible_to,
 )
 from app.biography_compiler import BiographyCompilationError, compile_biography
+from app.campaign import (
+    CampaignOpportunityModel,
+    CampaignSessionModel,
+    CampaignTransitionModel,
+    CommitEventRequest,
+    EvaluateOpportunitiesRequest,
+    ResolveOpportunityRequest,
+    StartSessionRequest,
+)
+from app.campaign_orchestrator import (
+    CampaignOrchestratorError,
+    commit_canonical_event,
+    evaluate_opportunities,
+    get_aftermath,
+    get_pending_reviews,
+    get_session_state,
+    get_transition_provenance,
+    inspect_opportunity,
+    resolve_opportunity,
+    start_or_resume_session,
+)
 from app.chronicle_paintings import (
     ChroniclePaintingModel,
     CreateChroniclePaintingRequest,
@@ -2753,3 +2774,138 @@ async def convergence_websocket(websocket: WebSocket, room_id: str):
     except WebSocketDisconnect:
         room_manager.disconnect(room_id, websocket)
         await room_manager.broadcast(room_id, {"system": "A Soul departed the room."})
+
+
+# Phase 17: Campaign Orchestrator endpoints. These coordinate existing systems;
+# they never re-implement domain rules or mutate canon directly.
+
+
+def _orchestrator_error(exc: CampaignOrchestratorError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.post("/api/v1/campaign/session")
+def start_campaign_session(req: StartSessionRequest):
+    return start_or_resume_session(soul_id=req.soul_id, campaign_id=req.campaign_id)
+
+
+@app.get("/api/v1/campaign/session/{session_id}")
+def get_campaign_session(session_id: str):
+    try:
+        state = get_session_state(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "session": CampaignSessionModel(**state["session"]).model_dump(),
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in state["opportunities"]
+        ],
+        "transitions": [
+            CampaignTransitionModel(**t).model_dump() for t in state["transitions"]
+        ],
+    }
+
+
+@app.post("/api/v1/campaign/opportunities/evaluate")
+def evaluate_campaign_opportunities(req: EvaluateOpportunitiesRequest):
+    try:
+        result = evaluate_opportunities(
+            session_id=req.session_id, include_encounter=req.include_encounter
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "session_id": result["session_id"],
+        "silence": result["silence"],
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in result["opportunities"]
+        ],
+    }
+
+
+@app.post("/api/v1/campaign/opportunities/{opportunity_id}/resolve")
+def resolve_campaign_opportunity(opportunity_id: str, req: ResolveOpportunityRequest):
+    session = _session_for_opportunity(opportunity_id)
+    try:
+        result = resolve_opportunity(
+            session_id=session,
+            opportunity_id=opportunity_id,
+            decision=req.decision,
+            recognition=req.recognition,
+            player_intent=req.player_intent,
+            note=req.note,
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "transition": CampaignTransitionModel(**result["transition"]).model_dump(),
+        "opportunity": CampaignOpportunityModel(**result["opportunity"]).model_dump(),
+        "idempotent": result["idempotent"],
+    }
+
+
+def _session_for_opportunity(opportunity_id: str) -> str:
+    from app.db import get_campaign_opportunity_record
+
+    opportunity = get_campaign_opportunity_record(opportunity_id)
+    if not opportunity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Opportunity '{opportunity_id}' not found",
+        )
+    return opportunity["session_id"]
+
+
+@app.post("/api/v1/campaign/commit")
+def commit_campaign_event(req: CommitEventRequest):
+    try:
+        result = commit_canonical_event(
+            session_id=req.session_id, event_id=req.event_id
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "transition": CampaignTransitionModel(**result["transition"]).model_dump(),
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in result["opportunities"]
+        ],
+        "idempotent": result["idempotent"],
+    }
+
+
+@app.get("/api/v1/campaign/transitions/{transition_id}/provenance")
+def get_campaign_transition_provenance(transition_id: str):
+    try:
+        return get_transition_provenance(transition_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/session/{session_id}/reviews")
+def get_campaign_pending_reviews(session_id: str):
+    try:
+        reviews = get_pending_reviews(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "pending_reviews": [
+            CampaignOpportunityModel(**o).model_dump()
+            for o in reviews["pending_reviews"]
+        ]
+    }
+
+
+@app.get("/api/v1/campaign/session/{session_id}/aftermath")
+def get_campaign_aftermath(session_id: str):
+    try:
+        return get_aftermath(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/opportunities/{opportunity_id}/inspect")
+def inspect_campaign_opportunity(opportunity_id: str):
+    try:
+        return inspect_opportunity(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)

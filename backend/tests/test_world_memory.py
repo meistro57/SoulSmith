@@ -2,6 +2,8 @@
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app import db
 from app.main import app
 from app.world_memory import (
@@ -11,7 +13,6 @@ from app.world_memory import (
 )
 from app.world_memory_guardian import get_world_memory_guardian
 from app.world_memory_provider import get_world_memory_provider
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

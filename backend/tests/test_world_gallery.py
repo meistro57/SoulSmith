@@ -2,13 +2,14 @@
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
+
 from app import db
 from app.main import app
 from app.world_gallery import (
     conservative_alt_text,
     list_gallery_artifacts,
 )
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

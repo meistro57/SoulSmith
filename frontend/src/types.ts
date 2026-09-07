@@ -898,3 +898,83 @@ export interface NPCKnowledgeProjection {
   entries: NPCKnowledgeEntry[];
   canonical_truth_accessible: boolean;
 }
+
+// Phase 17: Campaign Orchestrator
+
+export interface CampaignSourceEvidence {
+  source_type: string;
+  source_id: string;
+  claim_kind?: string;
+  note?: string;
+}
+
+export interface CampaignInvolvedEntity {
+  entity_type: string;
+  entity_id: string;
+  label?: string;
+}
+
+export type RecognitionDecisionKind = 'recognize' | 'reject' | 'rename' | 'reinterpret' | 'postpone' | 'hide';
+
+export interface RecognitionDecision {
+  decision: RecognitionDecisionKind;
+  new_name?: string;
+  reinterpretation?: string;
+}
+
+export interface CampaignSession {
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  constellation_id?: string;
+  status: string;
+  current_opportunity_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CampaignOpportunity {
+  opportunity_id: string;
+  session_id: string;
+  opportunity_type: string;
+  eligibility_rule: string;
+  source_evidence: CampaignSourceEvidence[];
+  involved_entities: CampaignInvolvedEntity[];
+  visibility_scope: string;
+  urgency_class: string;
+  participation: string;
+  lifecycle_state: string;
+  cooldown_key?: string;
+  cooldown_until?: string;
+  domain_action: string;
+  domain_action_payload: Record<string, any>;
+  reasoning: Record<string, any>;
+  narration?: string;
+  narration_source: string;
+  created_at?: string;
+  resolved_at?: string;
+}
+
+export interface CampaignReaction {
+  reaction_id: string;
+  transition_id: string;
+  system_name: string;
+  result_kind: string;
+  details: Record<string, any>;
+  created_at?: string;
+}
+
+export interface CampaignTransition {
+  transition_id: string;
+  session_id: string;
+  opportunity_id?: string;
+  canonical_event_id?: string;
+  transition_type: string;
+  systems_invoked: string[];
+  outcomes: Array<Record<string, any>>;
+  reactions: CampaignReaction[];
+  canonical_change: boolean;
+  provider_failure?: string;
+  rejected_invalid_transition: boolean;
+  created_at?: string;
+}
