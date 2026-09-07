@@ -293,6 +293,11 @@ class NarrativeContext(BaseModel):
     player_visible_consequences: list[str] = Field(default_factory=list)
     allowed_uncertainty: list[str] = Field(default_factory=list)
 
+    # Phase 22: authorized temporal facts (elapsed intervals, fictional dates,
+    # promise deadlines) the scene may phrase. Providers must never invent
+    # elapsed-time consequences absent from this list.
+    temporal_facts: list[str] = Field(default_factory=list)
+
     # Style/tone hints (interpretation only, never new information).
     style: dict[str, Any] = Field(default_factory=dict)
     art_direction_refs: list[str] = Field(default_factory=list)

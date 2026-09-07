@@ -57,6 +57,15 @@ from app.narrative_context_compiler import (
     compile_npc_narrative_context,
 )
 from app.narrative_runtime import NarrativeRuntime
+from app.temporal import (
+    WALL_CLOCK_COOLDOWN_SECONDS,
+    TemporalContext,
+    build_temporal_context,
+    evaluate_hybrid_rule,
+    iso_now,
+    wall_clock_cooldown_satisfied,
+    wall_clock_cooldown_seconds,
+)
 
 # Each subsystem's follow-up candidate types. The reaction pipeline records one
 # structured result per subsystem so a transition is fully auditable.
@@ -156,6 +165,7 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
         if relationship_visible_to(rel, soul_id)
     ]
     promises = [p for p in db.list_promise_records() if promise_visible_to(p, soul_id)]
+    campaign_id = session["campaign_id"]
     return {
         "soul_id": soul_id,
         "seeds": db.get_seeds_for_soul(soul_id),
@@ -171,8 +181,15 @@ def _gather_state(session: dict[str, Any]) -> dict[str, Any]:
         "promises": promises,
         "events": events,
         "recent_event": events[0] if events else None,
-        "campaign_aspects": db.list_campaign_aspect_records(session["campaign_id"]),
+        "campaign_aspects": db.list_campaign_aspect_records(campaign_id),
         "place_history": db.list_all_place_history_records(),
+        "campaign_time_settings": db.get_or_create_campaign_time_settings_record(
+            campaign_id
+        ),
+        "aspect_temporal_state": db.get_or_create_aspect_temporal_state_record(
+            campaign_id, soul_id
+        ),
+        "campaign_event_count": len(db.get_all_canonical_events()),
     }
 
 
@@ -286,6 +303,49 @@ def _dedupe_existing(
             continue
         seen.add(key)
         result.append(candidate)
+    return result
+
+
+def _temporal_context_for(
+    session: dict[str, Any], state: dict[str, Any]
+) -> TemporalContext:
+    """Assemble the bounded TemporalContext the eligibility systems consume."""
+    return build_temporal_context(
+        session,
+        campaign_time_settings=state.get("campaign_time_settings"),
+        aspect_temporal_state=state.get("aspect_temporal_state"),
+        deterministic_event_count=state.get("campaign_event_count", 0),
+        aspect_event_count=len(state.get("events", [])),
+    )
+
+
+def _wall_clock_filter(
+    session_id: str,
+    candidates: list[dict[str, Any]],
+    context,
+) -> list[dict[str, Any]]:
+    """Drop candidates whose optional wall-clock cooldown has not elapsed. Wall-clock
+    is an *additional* gate; it never creates candidates or forces presentation."""
+    from app import db
+
+    result: list[dict[str, Any]] = []
+    for candidate in candidates:
+        interval = wall_clock_cooldown_seconds(candidate["opportunity_type"])
+        if interval is None:
+            result.append(candidate)
+            continue
+        key = candidate.get("cooldown_key")
+        last_offered_at = None
+        if key:
+            record = db.get_temporal_cooldown_record(key)
+            last_offered_at = record["last_offered_at"] if record else None
+        satisfied, _reason = wall_clock_cooldown_satisfied(
+            candidate["opportunity_type"],
+            last_offered_at=last_offered_at,
+            now_iso=context.now_iso,
+        )
+        if satisfied:
+            result.append(candidate)
     return result
 
 
@@ -421,6 +481,9 @@ def evaluate_opportunities(
     if not include_encounter:
         candidates = [c for c in candidates if c["opportunity_type"] != "new_encounter"]
     candidates = _cooldown_filter(session_id, candidates)
+    candidates = _wall_clock_filter(
+        session_id, candidates, _temporal_context_for(session, state)
+    )
     candidates = _dedupe_existing(session_id, candidates)
 
     for candidate in candidates:
@@ -442,11 +505,13 @@ def _run_reaction_pipeline(
 
     reactions: list[dict[str, Any]] = []
     follow_ups: list[dict[str, Any]] = []
+    context = _temporal_context_for(session, state)
     for system_name in SUBSYSTEM_CANDIDATE_TYPES:
         try:
             matched = _build_subsystem_candidates(state, system_name)
             matched = [c for c in matched if c["opportunity_type"] != "new_encounter"]
             matched = _cooldown_filter(session["session_id"], matched)
+            matched = _wall_clock_filter(session["session_id"], matched, context)
             if matched:
                 reactions.append(
                     {
@@ -544,6 +609,10 @@ def commit_canonical_event(session_id: str, event_id: str) -> dict[str, Any]:
     follow_ups = _dedupe_existing(session_id, follow_ups)
     opportunities = [_persist_opportunity(session, c) for c in follow_ups]
     transition = db.get_campaign_transition_record(transition_id)
+
+    # Phase 22: advance the active Aspect's temporal state after a committed
+    # event. Deterministic event count is pacing metadata, never canon.
+    _advance_aspect_temporal_state(session, len(db.get_all_canonical_events()))
 
     # Phase 21: evaluate Art Director eligibility and queue living visual jobs.
     # This is deferred bookkeeping; a failure here never rolls back canon.
@@ -817,6 +886,7 @@ def resolve_opportunity(
                 narration_source=narration.get("narration_source", "deterministic"),
             )
 
+    _record_temporal_cooldown(opportunity, session)
     transition_id = str(uuid.uuid4())
     transition = db.create_campaign_transaction_record(
         transition_id=transition_id,
@@ -860,6 +930,42 @@ def _system_for_type(opportunity_type: str) -> str:
         "recurring_location": "Wandering",
         "location_bound_seed": "Wandering",
     }.get(opportunity_type, opportunity_type)
+
+
+def _record_temporal_cooldown(
+    opportunity: dict[str, Any], session: dict[str, Any]
+) -> None:
+    """Persist the wall-clock cooldown ledger entry when a callback actually
+    fires. Only relevant when a wall-clock interval is configured for the type;
+    recording is idempotent via the cooldown_key primary key."""
+    from app import db
+
+    if wall_clock_cooldown_seconds(opportunity["opportunity_type"]) is None:
+        return
+    key = opportunity.get("cooldown_key")
+    if not key:
+        return
+    db.record_temporal_cooldown(
+        cooldown_key=key,
+        last_offered_at=iso_now(),
+        last_offered_event_count=len(db.get_all_canonical_events()),
+    )
+
+
+def _advance_aspect_temporal_state(session: dict[str, Any], event_count: int) -> None:
+    """Persist the active Aspect's last-active time and deterministic event count
+    so switches preserve independent temporal context."""
+    from app import db
+    from app.multi_aspect import active_soul_id
+
+    soul_id = active_soul_id(session)
+    db.update_aspect_temporal_state_record(
+        session["campaign_id"],
+        soul_id,
+        last_active_at=iso_now(),
+        deterministic_event_count=event_count,
+    )
+    db.set_campaign_session_last_active(session["session_id"], iso_now())
 
 
 def _find_transition_for_opportunity(
@@ -1179,3 +1285,198 @@ def queue_eligible_art_moments(session_id: str) -> dict[str, Any]:
     from app.living_visual import queue_art_moments
 
     return queue_art_moments(session_id)
+
+
+# ---------------------------------------------------------------------------
+# Phase 22: Temporal Pacing & Living Time surfaces.
+# ---------------------------------------------------------------------------
+
+
+def inspect_temporal_context(session_id: str) -> dict[str, Any]:
+    """Return the active session/Aspect's bounded TemporalContext so the player
+    (or a test) can inspect why something became eligible now. Never mutates."""
+    from app import db
+
+    session = db.get_campaign_session_record(session_id)
+    if not session:
+        raise CampaignOrchestratorError(f"Session '{session_id}' not found")
+    state = _gather_state(session)
+    context = _temporal_context_for(session, state)
+    return {
+        "session_id": session_id,
+        "active_aspect": state["soul_id"],
+        "temporal_context": context.model_dump(),
+        "campaign_time_settings": state["campaign_time_settings"],
+        "aspect_temporal_state": state["aspect_temporal_state"],
+        "time_source": context.time_source,
+        "offline": context.offline,
+    }
+
+
+def evaluate_temporal_eligibility(session_id: str) -> dict[str, Any]:
+    """Evaluate time-based eligibility without mutating anything. Returns cooldown
+    status/reasons for every configured wall-clock cooldown and the current
+    eligibility of scheduled consequences."""
+    from app import db
+
+    session = db.get_campaign_session_record(session_id)
+    if not session:
+        raise CampaignOrchestratorError(f"Session '{session_id}' not found")
+    state = _gather_state(session)
+    context = _temporal_context_for(session, state)
+
+    cooldowns: dict[str, dict[str, Any]] = {}
+    for opportunity_type, interval in sorted(WALL_CLOCK_COOLDOWN_SECONDS.items()):
+        key = opportunity_type
+        record = db.get_temporal_cooldown_record(key)
+        satisfied, reason = wall_clock_cooldown_satisfied(
+            opportunity_type,
+            last_offered_at=record["last_offered_at"] if record else None,
+            now_iso=context.now_iso,
+        )
+        cooldowns[opportunity_type] = {
+            "interval_seconds": interval,
+            "last_offered_at": record["last_offered_at"] if record else None,
+            "satisfied": satisfied,
+            "reason": reason,
+        }
+
+    scheduled = []
+    for consequence in db.list_scheduled_consequence_records(session_id=session_id):
+        eligible, reasoning = _scheduled_consequence_eligibility(
+            consequence, context, state
+        )
+        scheduled.append(
+            {
+                "consequence_id": consequence["consequence_id"],
+                "source_type": consequence["source_type"],
+                "source_id": consequence["source_id"],
+                "rule": consequence["rule"],
+                "lifecycle_state": consequence["lifecycle_state"],
+                "eligible": eligible,
+                "reasoning": reasoning,
+            }
+        )
+
+    return {
+        "session_id": session_id,
+        "now_iso": context.now_iso,
+        "time_source": context.time_source,
+        "fictional_policy": context.fictional_policy,
+        "fictional_now_iso": context.fictional_now_iso,
+        "cooldowns": cooldowns,
+        "scheduled_consequences": scheduled,
+    }
+
+
+def _scheduled_consequence_eligibility(
+    consequence: dict[str, Any], context, state: dict[str, Any]
+) -> tuple[bool, dict[str, Any]]:
+    if consequence["lifecycle_state"] != "scheduled":
+        return False, {"reason": "already resolved/retired"}
+    from app.temporal import elapsed_since
+
+    eligible_after = consequence.get("eligible_after_iso")
+    min_elapsed = consequence.get("min_elapsed_seconds")
+    min_events = consequence.get("min_events")
+    satisfied, reasoning = evaluate_hybrid_rule(
+        event_count_since=state.get("campaign_event_count", 0),
+        elapsed_seconds_since=(
+            elapsed_since(consequence.get("created_at"), now=context.now_iso)
+            if min_elapsed is not None
+            else None
+        ),
+        min_events=min_events,
+        min_elapsed_seconds=min_elapsed,
+        fictional_before_iso=eligible_after,
+        fictional_now_iso=context.fictional_now_iso,
+    )
+    reasoning["source_type"] = consequence["source_type"]
+    reasoning["source_id"] = consequence["source_id"]
+    return satisfied, reasoning
+
+
+def advance_campaign_fictional_time(
+    campaign_id: str,
+    *,
+    delta_seconds: float | None = None,
+    to_iso: str | None = None,
+) -> dict[str, Any]:
+    from app.temporal import advance_fictional_time
+
+    return advance_fictional_time(
+        campaign_id, delta_seconds=delta_seconds, to_iso=to_iso
+    )
+
+
+def list_scheduled_consequences(
+    *, session_id: str | None = None, campaign_id: str | None = None
+) -> dict[str, Any]:
+    from app import db
+
+    records = db.list_scheduled_consequence_records(
+        session_id=session_id, campaign_id=campaign_id
+    )
+    return {"scheduled_consequences": records}
+
+
+def retire_scheduled_consequence(consequence_id: str) -> dict[str, Any]:
+    from app import db
+
+    record = db.get_scheduled_consequence_record(consequence_id)
+    if not record:
+        raise CampaignOrchestratorError(
+            f"Scheduled consequence '{consequence_id}' not found"
+        )
+    if record["lifecycle_state"] != "scheduled":
+        return {"consequence": record, "idempotent": True}
+    updated = db.update_scheduled_consequence_state_record(consequence_id, "retired")
+    return {"consequence": updated, "idempotent": False}
+
+
+def build_return_recap(session_id: str) -> dict[str, Any]:
+    """A gentle, optional return recap. It is a memory service, never a retention
+    trick: no guilt, no streaks, no mandatory chores."""
+    from app import db
+    from app.multi_aspect import active_soul_id
+
+    session = db.get_campaign_session_record(session_id)
+    if not session:
+        raise CampaignOrchestratorError(f"Session '{session_id}' not found")
+    state = _gather_state(session)
+    context = _temporal_context_for(session, state)
+    soul_id = active_soul_id(session)
+
+    unresolved_promises = [
+        p["promise_text"]
+        for p in state["promises"]
+        if p.get("lifecycle_state")
+        in ("made", "acknowledged", "active", "unresolved", "disputed", "inherited")
+    ]
+    active_seeds = [
+        s["symbol"] for s in state["seeds"] if s.get("stage") not in ("retired",)
+    ]
+    active_threads = [
+        t["name"] for t in state["threads"] if t.get("status") != "integrated"
+    ]
+
+    return {
+        "session_id": session_id,
+        "aspect": soul_id,
+        "welcome_back": {
+            "aspect": soul_id,
+            "last_active_at": context.last_active_at,
+            "elapsed_since_last_active_seconds": context.elapsed_since_last_active_seconds,
+            "unresolved_promises": unresolved_promises,
+            "active_threads": active_threads,
+            "active_seeds": active_seeds,
+            "recent_event": (
+                state["recent_event"].get("player_intent")
+                if state["recent_event"]
+                else None
+            ),
+        },
+        "optional_opportunities_now_eligible": [],
+        "no_penalty": True,
+        "no_mandatory_chores": True,
+    }

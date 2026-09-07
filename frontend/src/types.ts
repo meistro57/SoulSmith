@@ -1365,3 +1365,101 @@ export interface HumanCuration {
   provenance_note: string;
   created_at?: string | null;
 }
+
+
+// Phase 22: Temporal Pacing & Living Time.
+
+export type TimePolicy =
+  | 'none'
+  | 'event_driven'
+  | 'manual'
+  | 'real_time_linked'
+  | 'accelerated';
+
+export interface TemporalContext {
+  now_iso: string;
+  timezone: string;
+  time_source: string;
+  confidence: string;
+  offline: boolean;
+  sync_status: string;
+  session_started_at?: string | null;
+  last_active_at?: string | null;
+  elapsed_since_last_active_seconds?: number | null;
+  deterministic_event_count: number;
+  aspect_event_count: number;
+  fictional_policy: TimePolicy;
+  fictional_now_iso?: string | null;
+  fictional_calendar: Record<string, any>;
+  aspect_soul_id?: string | null;
+}
+
+export interface CampaignTimeSettings {
+  campaign_id: string;
+  time_policy: TimePolicy;
+  timezone: string;
+  real_time_ratio?: number | null;
+  fictional_anchor_iso?: string | null;
+  fictional_now_iso?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ScheduledConsequence {
+  consequence_id: string;
+  session_id: string;
+  campaign_id: string;
+  source_type: string;
+  source_id: string;
+  rule: string;
+  eligible_after_iso?: string | null;
+  min_elapsed_seconds?: number | null;
+  min_events?: number | null;
+  note: string;
+  lifecycle_state: string;
+  created_at?: string | null;
+  resolved_at?: string | null;
+}
+
+export interface TemporalCooldownStatus {
+  interval_seconds: number;
+  last_offered_at?: string | null;
+  satisfied: boolean;
+  reason?: string | null;
+}
+
+export interface ScheduledConsequenceEligibility {
+  consequence_id: string;
+  source_type: string;
+  source_id: string;
+  rule: string;
+  lifecycle_state: string;
+  eligible: boolean;
+  reasoning: Record<string, any>;
+}
+
+export interface TemporalEligibility {
+  session_id: string;
+  now_iso: string;
+  time_source: string;
+  fictional_policy: TimePolicy;
+  fictional_now_iso?: string | null;
+  cooldowns: Record<string, TemporalCooldownStatus>;
+  scheduled_consequences: ScheduledConsequenceEligibility[];
+}
+
+export interface ReturnRecap {
+  session_id: string;
+  aspect: string;
+  welcome_back: {
+    aspect: string;
+    last_active_at?: string | null;
+    elapsed_since_last_active_seconds?: number | null;
+    unresolved_promises: string[];
+    active_threads: string[];
+    active_seeds: string[];
+    recent_event?: string | null;
+  };
+  optional_opportunities_now_eligible: string[];
+  no_penalty: boolean;
+  no_mandatory_chores: boolean;
+}

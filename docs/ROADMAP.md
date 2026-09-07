@@ -986,8 +986,13 @@ remaining work is hardening and optional deepening, not foundational:
    moments, preserving the canonical/Guardian pipelines already built~~ —
    **Integrated** as Phase 21 (Living Visual World & ComfyUI Runtime).
    See [`docs/LIVING_VISUAL_WORLD.md`](LIVING_VISUAL_WORLD.md).
-5. Optional wall-clock cooldowns in addition to the deterministic count-based
-   pacing currently used by the orchestrator.
+5. ~~Optional wall-clock cooldowns in addition to the deterministic count-based
+   pacing currently used by the orchestrator~~ — **Integrated** as Phase 22
+   (Temporal Pacing & Living Time): an injectable trusted clock, distinct time
+   domains, wall-clock/hybrid cooldowns, a fictional-time policy foundation,
+   provenance-backed scheduled consequences, aspect-relative time, and a gentle
+   return recap. See
+   [`docs/TEMPORAL_PACING_AND_LIVING_TIME.md`](TEMPORAL_PACING_AND_LIVING_TIME.md).
 
 ---
 

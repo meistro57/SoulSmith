@@ -60,8 +60,11 @@ from app.campaign import (
 )
 from app.campaign_orchestrator import (
     CampaignOrchestratorError,
+    advance_campaign_fictional_time,
+    build_return_recap,
     commit_canonical_event,
     evaluate_opportunities,
+    evaluate_temporal_eligibility,
     get_aftermath,
     get_narrative_provider_status,
     get_pending_reviews,
@@ -70,11 +73,14 @@ from app.campaign_orchestrator import (
     inspect_aspect_view,
     inspect_narrative,
     inspect_opportunity,
+    inspect_temporal_context,
     list_campaign_aspects,
+    list_scheduled_consequences,
     preview_narrative_context,
     regenerate_narrative,
     resolve_cross_aspect_encounter,
     resolve_opportunity,
+    retire_scheduled_consequence,
     start_or_resume_session,
     switch_campaign_aspect,
 )
@@ -354,6 +360,11 @@ from app.soulprint import (
     generate_astrological_soulprint,
 )
 from app.style_reviewer import get_art_direction_reviewer
+from app.temporal import (
+    AdvanceFictionalTimeRequest,
+    EvaluateTemporalEligibilityRequest,
+    ScheduleConsequenceRequest,
+)
 from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
 from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
 from app.visual_memory import (
@@ -3400,6 +3411,104 @@ def resolve_cross_aspect_encounter_endpoint(req: CrossAspectEncounterRequest):
         return resolve_cross_aspect_encounter(req.session_id, req.other_soul_id)
     except (CampaignOrchestratorError, ValueError) as exc:
         raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+# ---------------------------------------------------------------------------
+# Phase 22: Temporal Pacing & Living Time. Time may change what is possible;
+# it never decides what the player's story means.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/campaign/session/{session_id}/temporal-context")
+def get_campaign_temporal_context(session_id: str):
+    try:
+        return inspect_temporal_context(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/time/evaluate")
+def evaluate_campaign_temporal_eligibility(req: EvaluateTemporalEligibilityRequest):
+    try:
+        return evaluate_temporal_eligibility(req.session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/time/advance")
+def advance_campaign_time(req: AdvanceFictionalTimeRequest):
+    try:
+        return advance_campaign_fictional_time(
+            req.campaign_id, delta_seconds=req.delta_seconds, to_iso=req.to_iso
+        )
+    except ValueError as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+@app.post("/api/v1/campaign/scheduled-consequences")
+def schedule_campaign_consequence(req: ScheduleConsequenceRequest):
+    from app import db
+    from app.temporal import schedule_consequence
+
+    session = db.get_campaign_session_record(req.session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    try:
+        return schedule_consequence(
+            session_id=req.session_id,
+            source_type=req.source_type,
+            source_id=req.source_id,
+            rule=req.rule,
+            eligible_after_iso=req.eligible_after_iso,
+            min_elapsed_seconds=req.min_elapsed_seconds,
+            min_events=req.min_events,
+            note=req.note,
+        )
+    except ValueError as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+@app.get("/api/v1/campaign/scheduled-consequences")
+def get_campaign_scheduled_consequences(session_id: str | None = None):
+    return list_scheduled_consequences(session_id=session_id)
+
+
+@app.post("/api/v1/campaign/scheduled-consequences/{consequence_id}/retire")
+def retire_campaign_scheduled_consequence(consequence_id: str):
+    try:
+        return retire_scheduled_consequence(consequence_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/session/{session_id}/resume-recap")
+def get_campaign_resume_recap(session_id: str):
+    try:
+        return build_return_recap(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/debug/freeze-time")
+def debug_freeze_time(req: dict):
+    """Authorized-debug endpoint to evaluate under a deterministic frozen clock.
+    Never rewrites persisted canonical timestamps; the freeze is request-scoped."""
+    from app.temporal import freeze_time
+
+    now_iso = req.get("now_iso")
+    session_id = req.get("session_id")
+    with freeze_time(now_iso):
+        if session_id:
+            return {
+                "frozen_at": now_iso,
+                "context": inspect_temporal_context(session_id),
+            }
+        return {
+            "frozen_at": now_iso,
+            "time_source": "test_frozen" if now_iso else "server_utc",
+        }
 
 
 @app.post("/api/v1/wandering/places")

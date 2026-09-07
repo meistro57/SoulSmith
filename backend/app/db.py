@@ -1225,6 +1225,100 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
+    # Phase 22: Temporal Pacing & Living Time. Time authority columns are
+    # appended lazily (after all tables exist) and never reorder canon.
+    _add_column_if_missing(
+        cursor, "campaign_sessions", "last_active_at", "last_active_at TIMESTAMP"
+    )
+    _add_column_if_missing(
+        cursor, "seeds", "last_echo_at", "last_echo_at TIMESTAMP"
+    )
+    _add_column_if_missing(
+        cursor, "promises", "deadline_iso", "deadline_iso TEXT"
+    )
+    _add_column_if_missing(
+        cursor,
+        "promises",
+        "deadline_source_type",
+        "deadline_source_type TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "promises",
+        "deadline_source_id",
+        "deadline_source_id TEXT",
+    )
+    _add_column_if_missing(
+        cursor,
+        "relationships",
+        "last_interaction_at",
+        "last_interaction_at TIMESTAMP",
+    )
+    _add_column_if_missing(
+        cursor, "places", "last_visited_at", "last_visited_at TIMESTAMP"
+    )
+
+    # Phase 22: Temporal Pacing & Living Time. These are bookkeeping/eligibility
+    # records, never canonical history. Time policy changes never reorder canon.
+
+    # Campaign-level time authority: explicit policy + timezone + fictional clock.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_time_settings (
+            campaign_id TEXT PRIMARY KEY,
+            time_policy TEXT NOT NULL DEFAULT 'none',
+            timezone TEXT NOT NULL DEFAULT 'UTC',
+            real_time_ratio REAL,
+            fictional_anchor_iso TEXT,
+            fictional_now_iso TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Aspect-relative temporal state. Preserved across switches so each Aspect
+    # keeps its own last-active time and deterministic event count.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS aspect_temporal_state (
+            campaign_id TEXT NOT NULL,
+            soul_id TEXT NOT NULL,
+            last_active_at TIMESTAMP,
+            deterministic_event_count INTEGER NOT NULL DEFAULT 0,
+            fictional_now_iso TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (campaign_id, soul_id)
+        )
+    """)
+
+    # Idempotent wall-clock cooldown ledger. Repeated evaluations at the same
+    # effective time never duplicate opportunities.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS temporal_cooldowns (
+            cooldown_key TEXT PRIMARY KEY,
+            last_offered_at TEXT,
+            last_offered_event_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Provenance-backed delayed/scheduled consequences. Each references the
+    # canonical event/rule that created it; the narrator cannot mint timers.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scheduled_consequences (
+            consequence_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            campaign_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            rule TEXT NOT NULL,
+            eligible_after_iso TEXT,
+            min_elapsed_seconds REAL,
+            min_events INTEGER,
+            note TEXT NOT NULL DEFAULT '',
+            lifecycle_state TEXT NOT NULL DEFAULT 'scheduled',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+
     cursor.execute("SELECT COUNT(*) as count FROM worlds")
     if cursor.fetchone()["count"] == 0:
         cursor.execute(
@@ -1374,7 +1468,8 @@ def plant_or_echo_seed(
         cursor.execute(
             """
             UPDATE seeds
-            SET echo_count = ?, stage = ?, updated_at = CURRENT_TIMESTAMP
+            SET echo_count = ?, stage = ?, updated_at = CURRENT_TIMESTAMP,
+                last_echo_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """,
             (new_count, new_stage, existing["id"]),
@@ -1386,8 +1481,8 @@ def plant_or_echo_seed(
         new_count = 1
         cursor.execute(
             """
-            INSERT INTO seeds (id, world_id, soul_id, symbol, thread_type, stage, echo_count, narrative_context)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO seeds (id, world_id, soul_id, symbol, thread_type, stage, echo_count, narrative_context, last_echo_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """,
             (
                 seed_id,
@@ -1485,6 +1580,9 @@ def get_all_seeds() -> list[dict[str, Any]]:
             "narrative_context": row["narrative_context"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "last_echo_at": row["last_echo_at"]
+            if "last_echo_at" in row.keys()
+            else row["updated_at"],
         }
         for row in rows
     ]
@@ -1534,6 +1632,9 @@ def get_seeds_for_soul(soul_id: str) -> list[dict[str, Any]]:
             "narrative_context": row["narrative_context"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "last_echo_at": row["last_echo_at"]
+            if "last_echo_at" in row.keys()
+            else row["updated_at"],
         }
         for row in rows
     ]
@@ -6357,6 +6458,9 @@ def _map_campaign_session_row(r: sqlite3.Row) -> dict[str, Any]:
         "current_opportunity_id": r["current_opportunity_id"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
+        "last_active_at": r["last_active_at"]
+        if "last_active_at" in r.keys()
+        else r["updated_at"],
     }
 
 
@@ -6993,6 +7097,9 @@ def _map_relationship_row(
         "events": events,
         "perspectives": perspectives,
         "entity_links": entity_links,
+        "last_interaction_at": r["last_interaction_at"]
+        if "last_interaction_at" in r.keys()
+        else (events[-1]["created_at"] if events else None),
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -7102,7 +7209,11 @@ def add_relationship_event_record(
         ),
     )
     cursor.execute(
-        "UPDATE relationships SET updated_at = CURRENT_TIMESTAMP WHERE relationship_id = ?",
+        """
+        UPDATE relationships
+        SET updated_at = CURRENT_TIMESTAMP, last_interaction_at = CURRENT_TIMESTAMP
+        WHERE relationship_id = ?
+    """,
         (relationship_id,),
     )
     conn.commit()
@@ -7241,6 +7352,13 @@ def _map_promise_row(
         "participants": participants,
         "state_history": state_history,
         "entity_links": entity_links,
+        "deadline_iso": r["deadline_iso"] if "deadline_iso" in r.keys() else None,
+        "deadline_source_type": r["deadline_source_type"]
+        if "deadline_source_type" in r.keys()
+        else None,
+        "deadline_source_id": r["deadline_source_id"]
+        if "deadline_source_id" in r.keys()
+        else None,
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -7739,6 +7857,9 @@ def _map_place_row(r: sqlite3.Row) -> dict[str, Any]:
         "created_by_soul_id": r["created_by_soul_id"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
+        "last_visited_at": r["last_visited_at"]
+        if "last_visited_at" in r.keys()
+        else None,
     }
 
 
@@ -8633,3 +8754,379 @@ def list_visual_curations_records(
     rows = cursor.fetchall()
     conn.close()
     return [_map_visual_curation_row(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Phase 22: Temporal Pacing & Living Time persistence helpers. These are
+# bookkeeping/eligibility records, never canonical history.
+# ---------------------------------------------------------------------------
+
+
+def _map_campaign_time_settings_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "campaign_id": r["campaign_id"],
+        "time_policy": r["time_policy"],
+        "timezone": r["timezone"],
+        "real_time_ratio": r["real_time_ratio"],
+        "fictional_anchor_iso": r["fictional_anchor_iso"],
+        "fictional_now_iso": r["fictional_now_iso"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def get_or_create_campaign_time_settings_record(campaign_id: str) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM campaign_time_settings WHERE campaign_id = ?", (campaign_id,)
+    )
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return _map_campaign_time_settings_row(row)
+    cursor.execute(
+        """
+        INSERT INTO campaign_time_settings (campaign_id, time_policy, timezone)
+        VALUES (?, 'none', 'UTC')
+    """,
+        (campaign_id,),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM campaign_time_settings WHERE campaign_id = ?", (campaign_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_campaign_time_settings_row(row)
+
+
+def update_campaign_time_settings_record(
+    campaign_id: str,
+    *,
+    time_policy: str | None = None,
+    timezone: str | None = None,
+    real_time_ratio: float | None = None,
+    fictional_anchor_iso: str | None = None,
+    fictional_now_iso: str | None = None,
+) -> dict[str, Any]:
+    settings = get_or_create_campaign_time_settings_record(campaign_id)
+    new_policy = time_policy if time_policy is not None else settings["time_policy"]
+    new_timezone = timezone if timezone is not None else settings["timezone"]
+    new_ratio = (
+        real_time_ratio if real_time_ratio is not None else settings["real_time_ratio"]
+    )
+    new_anchor = (
+        fictional_anchor_iso
+        if fictional_anchor_iso is not None
+        else settings["fictional_anchor_iso"]
+    )
+    new_now = (
+        fictional_now_iso if fictional_now_iso is not None else settings["fictional_now_iso"]
+    )
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE campaign_time_settings
+        SET time_policy = ?, timezone = ?, real_time_ratio = ?,
+            fictional_anchor_iso = ?, fictional_now_iso = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE campaign_id = ?
+    """,
+        (new_policy, new_timezone, new_ratio, new_anchor, new_now, campaign_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_or_create_campaign_time_settings_record(campaign_id)
+
+
+def _map_aspect_temporal_state_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "campaign_id": r["campaign_id"],
+        "soul_id": r["soul_id"],
+        "last_active_at": r["last_active_at"],
+        "deterministic_event_count": r["deterministic_event_count"],
+        "fictional_now_iso": r["fictional_now_iso"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def get_or_create_aspect_temporal_state_record(
+    campaign_id: str, soul_id: str
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM aspect_temporal_state WHERE campaign_id = ? AND soul_id = ?",
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    if row:
+        conn.close()
+        return _map_aspect_temporal_state_row(row)
+    cursor.execute(
+        """
+        INSERT INTO aspect_temporal_state (campaign_id, soul_id, last_active_at, deterministic_event_count)
+        VALUES (?, ?, CURRENT_TIMESTAMP, 0)
+    """,
+        (campaign_id, soul_id),
+    )
+    conn.commit()
+    cursor.execute(
+        "SELECT * FROM aspect_temporal_state WHERE campaign_id = ? AND soul_id = ?",
+        (campaign_id, soul_id),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_aspect_temporal_state_row(row)
+
+
+def update_aspect_temporal_state_record(
+    campaign_id: str,
+    soul_id: str,
+    *,
+    last_active_at: str | None = None,
+    deterministic_event_count: int | None = None,
+) -> dict[str, Any]:
+    existing = get_or_create_aspect_temporal_state_record(campaign_id, soul_id)
+    new_last = last_active_at if last_active_at is not None else existing["last_active_at"]
+    new_count = (
+        deterministic_event_count
+        if deterministic_event_count is not None
+        else existing["deterministic_event_count"]
+    )
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE aspect_temporal_state
+        SET last_active_at = ?, deterministic_event_count = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE campaign_id = ? AND soul_id = ?
+    """,
+        (new_last, new_count, campaign_id, soul_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_or_create_aspect_temporal_state_record(campaign_id, soul_id)
+
+
+def list_aspect_temporal_state_records(campaign_id: str) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM aspect_temporal_state WHERE campaign_id = ? ORDER BY updated_at ASC",
+        (campaign_id,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_aspect_temporal_state_row(r) for r in rows]
+
+
+def _map_temporal_cooldown_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "cooldown_key": r["cooldown_key"],
+        "last_offered_at": r["last_offered_at"],
+        "last_offered_event_count": r["last_offered_event_count"],
+        "updated_at": r["updated_at"],
+    }
+
+
+def get_temporal_cooldown_record(cooldown_key: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM temporal_cooldowns WHERE cooldown_key = ?", (cooldown_key,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_temporal_cooldown_row(row) if row else None
+
+
+def record_temporal_cooldown(
+    *, cooldown_key: str, last_offered_at: str, last_offered_event_count: int
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO temporal_cooldowns (cooldown_key, last_offered_at, last_offered_event_count, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(cooldown_key) DO UPDATE SET
+            last_offered_at = excluded.last_offered_at,
+            last_offered_event_count = excluded.last_offered_event_count,
+            updated_at = CURRENT_TIMESTAMP
+    """,
+        (cooldown_key, last_offered_at, last_offered_event_count),
+    )
+    conn.commit()
+    conn.close()
+    return get_temporal_cooldown_record(cooldown_key)
+
+
+def list_temporal_cooldown_records() -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM temporal_cooldowns ORDER BY updated_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_temporal_cooldown_row(r) for r in rows]
+
+
+def _map_scheduled_consequence_row(r: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "consequence_id": r["consequence_id"],
+        "session_id": r["session_id"],
+        "campaign_id": r["campaign_id"],
+        "source_type": r["source_type"],
+        "source_id": r["source_id"],
+        "rule": r["rule"],
+        "eligible_after_iso": r["eligible_after_iso"],
+        "min_elapsed_seconds": r["min_elapsed_seconds"],
+        "min_events": r["min_events"],
+        "note": r["note"],
+        "lifecycle_state": r["lifecycle_state"],
+        "created_at": r["created_at"],
+        "resolved_at": r["resolved_at"],
+    }
+
+
+def create_scheduled_consequence_record(
+    *,
+    session_id: str,
+    campaign_id: str,
+    source_type: str,
+    source_id: str,
+    rule: str,
+    eligible_after_iso: str | None = None,
+    min_elapsed_seconds: float | None = None,
+    min_events: int | None = None,
+    note: str = "",
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    consequence_id = str(uuid.uuid4())
+    cursor.execute(
+        """
+        INSERT INTO scheduled_consequences (
+            consequence_id, session_id, campaign_id, source_type, source_id,
+            rule, eligible_after_iso, min_elapsed_seconds, min_events, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+        (
+            consequence_id,
+            session_id,
+            campaign_id,
+            source_type,
+            source_id,
+            rule,
+            eligible_after_iso,
+            min_elapsed_seconds,
+            min_events,
+            note,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return get_scheduled_consequence_record(consequence_id)
+
+
+def get_scheduled_consequence_record(consequence_id: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM scheduled_consequences WHERE consequence_id = ?", (consequence_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return _map_scheduled_consequence_row(row) if row else None
+
+
+def list_scheduled_consequence_records(
+    *, session_id: str | None = None, campaign_id: str | None = None
+) -> list[dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if session_id:
+        cursor.execute(
+            "SELECT * FROM scheduled_consequences WHERE session_id = ? ORDER BY created_at ASC",
+            (session_id,),
+        )
+    elif campaign_id:
+        cursor.execute(
+            "SELECT * FROM scheduled_consequences WHERE campaign_id = ? ORDER BY created_at ASC",
+            (campaign_id,),
+        )
+    else:
+        cursor.execute("SELECT * FROM scheduled_consequences ORDER BY created_at ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [_map_scheduled_consequence_row(r) for r in rows]
+
+
+def update_scheduled_consequence_state_record(
+    consequence_id: str, lifecycle_state: str, *, resolved_at: str | None = None
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if resolved_at is not None:
+        cursor.execute(
+            """
+            UPDATE scheduled_consequences
+            SET lifecycle_state = ?, resolved_at = ?
+            WHERE consequence_id = ?
+        """,
+            (lifecycle_state, resolved_at, consequence_id),
+        )
+    else:
+        cursor.execute(
+            "UPDATE scheduled_consequences SET lifecycle_state = ? WHERE consequence_id = ?",
+            (lifecycle_state, consequence_id),
+        )
+    conn.commit()
+    conn.close()
+    return get_scheduled_consequence_record(consequence_id)
+
+
+def set_promise_deadline_record(
+    *, promise_id: str, deadline_iso: str, source_type: str, source_id: str
+) -> dict[str, Any]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE promises
+        SET deadline_iso = ?, deadline_source_type = ?, deadline_source_id = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE promise_id = ?
+    """,
+        (deadline_iso, source_type, source_id, promise_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_promise_record(promise_id)
+
+
+def set_campaign_session_last_active(
+    session_id: str, last_active_at: str
+) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE campaign_sessions SET last_active_at = ?, updated_at = CURRENT_TIMESTAMP WHERE session_id = ?",
+        (last_active_at, session_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_campaign_session_record(session_id)
+
+
+def mark_place_visited(place_id: str, last_visited_at: str) -> dict[str, Any] | None:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE places SET last_visited_at = ?, updated_at = CURRENT_TIMESTAMP WHERE place_id = ?",
+        (last_visited_at, place_id),
+    )
+    conn.commit()
+    conn.close()
+    return get_place_record(place_id)

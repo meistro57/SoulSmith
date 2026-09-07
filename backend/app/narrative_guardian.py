@@ -107,6 +107,22 @@ RELATIONSHIP_INVENTION_MARKERS = (
     "your lifelong friend",
 )
 
+# Markers that assert an elapsed-time *consequence* ("time passed, therefore X
+# changed"). Only an authorized temporal fact may let the scene phrase this; the
+# narrator cannot mint a clock-driven consequence for drama.
+TEMPORAL_CONSEQUENCE_MARKERS = (
+    "because time passed",
+    "because so much time passed",
+    "after all this time",
+    "while you were away",
+    "since you left",
+    "since you were last here",
+    "time has changed",
+    "the years have changed",
+    "the months have changed",
+    "the days have changed",
+)
+
 
 class NarrativeValidationIssue(BaseModel):
     code: str
@@ -156,6 +172,7 @@ def _declared_text(context: NarrativeContext) -> str:
     parts += list(context.allowed_uncertainty)
     parts += list(context.relationships)
     parts += list(context.promises)
+    parts += list(context.temporal_facts)
     if context.continuity:
         parts.append(context.continuity.model_dump_json())
     return " ".join(parts).lower()
@@ -373,6 +390,22 @@ def validate_narrative(
                     )
                 )
     checked.append("relationship_promises")
+
+    # 12. Temporal consequences: time may change what is possible, but the
+    #     narrator may not assert that elapsed time caused a canonical change
+    #     unless an authorized temporal fact authorizes it.
+    if not context.temporal_facts:
+        for marker in TEMPORAL_CONSEQUENCE_MARKERS:
+            if marker in blob:
+                issues.append(
+                    _issue(
+                        "block",
+                        "invented_temporal_consequence",
+                        f"Narration invented an elapsed-time consequence "
+                        f"('{marker}') without an authorized temporal fact.",
+                    )
+                )
+    checked.append("temporal_consequences")
 
     if any(i.severity == "block" for i in issues):
         verdict: Verdict = "block"
