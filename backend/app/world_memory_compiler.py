@@ -13,7 +13,7 @@ or approved visual history.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.world_memory import (
@@ -106,7 +106,7 @@ def compile_world_memory(
             "source_count": len(gathered["source_refs"]),
             "memory_object_count": len(gathered["memory_objects"]),
             "group_significance": gathered["group_significance"],
-            "compiled_at": datetime.now(timezone.utc).isoformat(),
+            "compiled_at": datetime.now(UTC).isoformat(),
         },
     )
 

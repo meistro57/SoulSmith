@@ -11,8 +11,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.living_visual import (
     evaluate_art_moments,
     get_art_moment,
@@ -27,6 +25,7 @@ from app.living_visual_provider import (
     workflow_role_for,
 )
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

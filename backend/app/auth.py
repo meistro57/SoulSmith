@@ -6,7 +6,7 @@ SoulSmith Authentication Module (Password Hashing, JWT Tokens, Auth Dependency).
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -35,7 +35,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(user_id: str, expires_delta: timedelta | None = None) -> str:
-    expire = datetime.now(timezone.utc) + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     )
     to_encode = {"sub": user_id, "exp": expire}

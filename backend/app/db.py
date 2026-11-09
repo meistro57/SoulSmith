@@ -8,7 +8,7 @@ import json
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 DB_FILE = os.environ.get(
@@ -1230,12 +1230,8 @@ def _run_init_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(
         cursor, "campaign_sessions", "last_active_at", "last_active_at TIMESTAMP"
     )
-    _add_column_if_missing(
-        cursor, "seeds", "last_echo_at", "last_echo_at TIMESTAMP"
-    )
-    _add_column_if_missing(
-        cursor, "promises", "deadline_iso", "deadline_iso TEXT"
-    )
+    _add_column_if_missing(cursor, "seeds", "last_echo_at", "last_echo_at TIMESTAMP")
+    _add_column_if_missing(cursor, "promises", "deadline_iso", "deadline_iso TEXT")
     _add_column_if_missing(
         cursor,
         "promises",
@@ -1390,6 +1386,15 @@ def log_canonical_event(
 
 def _json_or_none(value: str | None) -> Any:
     return json.loads(value) if value else None
+
+
+def _row_get(r: sqlite3.Row, key: str, default: Any = None) -> Any:
+    """Read an optional (lazily appended) column from a Row, falling back when the
+    column is absent. sqlite3.Row has no ``.get`` and raises for unknown columns."""
+    try:
+        return r[key]
+    except (IndexError, KeyError):
+        return default
 
 
 def get_all_canonical_events() -> list[dict[str, Any]]:
@@ -1580,9 +1585,7 @@ def get_all_seeds() -> list[dict[str, Any]]:
             "narrative_context": row["narrative_context"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
-            "last_echo_at": row["last_echo_at"]
-            if "last_echo_at" in row.keys()
-            else row["updated_at"],
+            "last_echo_at": _row_get(row, "last_echo_at", row["updated_at"]),
         }
         for row in rows
     ]
@@ -1632,9 +1635,7 @@ def get_seeds_for_soul(soul_id: str) -> list[dict[str, Any]]:
             "narrative_context": row["narrative_context"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
-            "last_echo_at": row["last_echo_at"]
-            if "last_echo_at" in row.keys()
-            else row["updated_at"],
+            "last_echo_at": _row_get(row, "last_echo_at", row["updated_at"]),
         }
         for row in rows
     ]
@@ -2740,7 +2741,7 @@ def add_gathering_contribution(
         "role": role,
         "resonance_amount": resonance_amount,
         "notes": notes,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     contributions.append(new_contrib)
 
@@ -6450,17 +6451,13 @@ def _map_campaign_session_row(r: sqlite3.Row) -> dict[str, Any]:
         "session_id": r["session_id"],
         "campaign_id": r["campaign_id"],
         "soul_id": r["soul_id"],
-        "active_soul_id": r["active_soul_id"]
-        if "active_soul_id" in r.keys()
-        else r["soul_id"],
+        "active_soul_id": _row_get(r, "active_soul_id", r["soul_id"]),
         "constellation_id": r["constellation_id"],
         "status": r["status"],
         "current_opportunity_id": r["current_opportunity_id"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
-        "last_active_at": r["last_active_at"]
-        if "last_active_at" in r.keys()
-        else r["updated_at"],
+        "last_active_at": _row_get(r, "last_active_at", r["updated_at"]),
     }
 
 
@@ -7097,9 +7094,9 @@ def _map_relationship_row(
         "events": events,
         "perspectives": perspectives,
         "entity_links": entity_links,
-        "last_interaction_at": r["last_interaction_at"]
-        if "last_interaction_at" in r.keys()
-        else (events[-1]["created_at"] if events else None),
+        "last_interaction_at": _row_get(
+            r, "last_interaction_at", events[-1]["created_at"] if events else None
+        ),
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -7352,13 +7349,9 @@ def _map_promise_row(
         "participants": participants,
         "state_history": state_history,
         "entity_links": entity_links,
-        "deadline_iso": r["deadline_iso"] if "deadline_iso" in r.keys() else None,
-        "deadline_source_type": r["deadline_source_type"]
-        if "deadline_source_type" in r.keys()
-        else None,
-        "deadline_source_id": r["deadline_source_id"]
-        if "deadline_source_id" in r.keys()
-        else None,
+        "deadline_iso": _row_get(r, "deadline_iso"),
+        "deadline_source_type": _row_get(r, "deadline_source_type"),
+        "deadline_source_id": _row_get(r, "deadline_source_id"),
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     }
@@ -7857,9 +7850,7 @@ def _map_place_row(r: sqlite3.Row) -> dict[str, Any]:
         "created_by_soul_id": r["created_by_soul_id"],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
-        "last_visited_at": r["last_visited_at"]
-        if "last_visited_at" in r.keys()
-        else None,
+        "last_visited_at": _row_get(r, "last_visited_at"),
     }
 
 
@@ -8821,7 +8812,9 @@ def update_campaign_time_settings_record(
         else settings["fictional_anchor_iso"]
     )
     new_now = (
-        fictional_now_iso if fictional_now_iso is not None else settings["fictional_now_iso"]
+        fictional_now_iso
+        if fictional_now_iso is not None
+        else settings["fictional_now_iso"]
     )
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -8889,7 +8882,9 @@ def update_aspect_temporal_state_record(
     deterministic_event_count: int | None = None,
 ) -> dict[str, Any]:
     existing = get_or_create_aspect_temporal_state_record(campaign_id, soul_id)
-    new_last = last_active_at if last_active_at is not None else existing["last_active_at"]
+    new_last = (
+        last_active_at if last_active_at is not None else existing["last_active_at"]
+    )
     new_count = (
         deterministic_event_count
         if deterministic_event_count is not None
@@ -9034,7 +9029,8 @@ def get_scheduled_consequence_record(consequence_id: str) -> dict[str, Any] | No
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT * FROM scheduled_consequences WHERE consequence_id = ?", (consequence_id,)
+        "SELECT * FROM scheduled_consequences WHERE consequence_id = ?",
+        (consequence_id,),
     )
     row = cursor.fetchone()
     conn.close()

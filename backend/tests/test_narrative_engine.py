@@ -11,8 +11,6 @@ surfaces, while keeping the deterministic mock first-class.
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app import campaign_orchestrator
 from app.campaign import (
     NARRATIVE_TEMPLATE_VERSION,
@@ -32,6 +30,7 @@ from app.narrative_context_compiler import (
 )
 from app.narrative_guardian import validate_narrative
 from app.narrative_runtime import NarrativeRuntime
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

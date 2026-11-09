@@ -11,7 +11,7 @@ persists an immutable version. Regenerating always creates a new version.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.biography import (
@@ -144,7 +144,7 @@ def build_biography_spec(
         "latest_event_created_at": ordered[-1].get("created_at"),
         "scope_type": scope_type,
         "scope_ref": scope_ref,
-        "compiled_at": datetime.now(timezone.utc).isoformat(),
+        "compiled_at": datetime.now(UTC).isoformat(),
     }
 
     return BiographySpec(

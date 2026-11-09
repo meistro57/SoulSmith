@@ -13,8 +13,6 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app import campaign_orchestrator
 from app.campaign import (
     build_integration_candidates,
@@ -24,6 +22,7 @@ from app.campaign import (
 )
 from app.main import app
 from app.world_memory import NPCKnowledgeRequest, project_npc_knowledge
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

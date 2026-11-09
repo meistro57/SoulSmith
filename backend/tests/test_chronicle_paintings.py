@@ -2,8 +2,6 @@
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app import db
 from app.chronicle_paintings import SceneSpecModel
 from app.comfyui.storage import ChronicleImageStore
@@ -21,6 +19,7 @@ from app.painting_reference import (
 )
 from app.visual_canon_guardian import MockVisualCanonGuardian
 from app.visual_memory import MemoryObjectModel, ParticipantRefModel
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

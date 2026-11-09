@@ -14,8 +14,6 @@ relationship/promise callbacks with cooldown pacing.
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app import db
 from app.campaign import (
     NarrativeContext,
@@ -30,6 +28,7 @@ from app.relationship import (
     evaluate_promise_resolution,
     project_relationship_promise_npc_knowledge,
 )
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

@@ -55,7 +55,7 @@ npm run build       # tsc -b && vite build
 
 ### CI parity
 
-`.github/workflows/` pins these versions: **Python 3.12** (backend) and **Node 22** (frontend). Backend CI runs `ruff check`, `ruff format --check`, then `pytest --cov`. Frontend CI runs `lint`, `typecheck`, `test`, `build` in that order. `security.yml` runs `pip-audit` (severity high) and `npm audit`.
+`.github/workflows/` pins these versions: **Python 3.12** (backend) and **Node 22** (frontend). Backend CI runs `ruff check`, `ruff format --check`, then `pytest --cov`. Frontend CI runs `lint`, `typecheck`, `test`, `build` in that order. `security.yml` runs `pip-audit` (fails on any known vulnerability) and `npm audit --audit-level=high`.
 
 ---
 

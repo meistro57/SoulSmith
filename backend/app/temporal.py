@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -94,7 +94,7 @@ def now_utc() -> datetime:
     """Return the authoritative current time. Frozen for tests when overridden."""
     if _CLOCK_OVERRIDE is not None:
         return _CLOCK_OVERRIDE
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def iso_now() -> str:
@@ -104,7 +104,7 @@ def iso_now() -> str:
 
 def _ensure_aware(dt: datetime) -> datetime:
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -114,13 +114,11 @@ def parse_timestamp(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(value)
     except ValueError:
         # SQLite CURRENT_TIMESTAMP produces "YYYY-MM-DD HH:MM:SS" (naive UTC).
         try:
-            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
-            )
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
         except ValueError:
             return None
     return _ensure_aware(dt)
@@ -128,7 +126,7 @@ def parse_timestamp(value: str | None) -> datetime | None:
 
 def to_utc_iso(value: datetime) -> str:
     """Normalize any aware datetime to a canonical UTC ISO string."""
-    return _ensure_aware(value).astimezone(timezone.utc).isoformat()
+    return _ensure_aware(value).astimezone(UTC).isoformat()
 
 
 def elapsed_since(value: str | None, *, now: str | None = None) -> float | None:

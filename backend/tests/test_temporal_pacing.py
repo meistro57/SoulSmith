@@ -10,15 +10,14 @@ the existing count-based pacing.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app import temporal
 from app.campaign import NarrativeContext, NarrativeOutput
 from app.main import app
 from app.narrative_guardian import validate_narrative
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -65,7 +64,7 @@ def test_to_utc_iso_normalizes_offsets_without_altering_instant():
     utc = temporal.to_utc_iso(eastern)
     assert utc == "2026-03-08T06:30:00+00:00"
     # An equivalent UTC instant produces the same canonical string.
-    assert temporal.to_utc_iso(datetime(2026, 3, 8, 6, 30, tzinfo=timezone.utc)) == utc
+    assert temporal.to_utc_iso(datetime(2026, 3, 8, 6, 30, tzinfo=UTC)) == utc
 
 
 # --- Wall-clock cooldown + hybrid rules ---------------------------------------
