@@ -1,6 +1,6 @@
 # backend/tests/conftest.py
-import pytest
 import app.db
+import pytest
 
 
 @pytest.fixture(autouse=True)
