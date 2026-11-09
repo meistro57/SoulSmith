@@ -8,7 +8,6 @@ face readings that must be confirmed before interpretation/canon submission.
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -30,27 +29,27 @@ class DetectedDiePrediction(BaseModel):
     poly_type: str
     detected_value: int
     confidence: float
-    alternates: List[int]
+    alternates: list[int]
 
 
 class PhotoIngestRequest(BaseModel):
-    image_base64: Optional[str] = None
+    image_base64: str | None = None
     expected_set: str = "standard_mythic_v1"
 
 
 class PhotoIngestResponse(BaseModel):
     status: str
-    detected_dice: List[DetectedDiePrediction]
-    ui_hints: Dict[str, List[str]]
+    detected_dice: list[DetectedDiePrediction]
+    ui_hints: dict[str, list[str]]
     overall_confidence: float
     simulated: bool = True
 
 
 def process_dice_photo(req: PhotoIngestRequest) -> PhotoIngestResponse:
     """Return simulated numeric face candidates for the seven dice."""
-    predictions: List[DetectedDiePrediction] = []
+    predictions: list[DetectedDiePrediction] = []
     total_conf = 0.0
-    low_conf_roles: List[str] = []
+    low_conf_roles: list[str] = []
 
     for role, die in ROLE_TO_DIE.items():
         limit = DIE_LIMITS[die]

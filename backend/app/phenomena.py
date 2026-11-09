@@ -3,7 +3,6 @@ SoulSmith Phenomena Engine
 Manages non-monster world-scale forces, needs, escalations, and transformation conditions.
 """
 
-from typing import List, Optional
 from pydantic import BaseModel
 
 
@@ -12,7 +11,7 @@ class Phenomenon(BaseModel):
     name: str
     typology: str  # Echo | Knot | Veil | Well | Awakening | Breach | Mirror | Sovereign
     origin: str
-    visible_signs: List[str]
+    visible_signs: list[str]
     hidden_need: str
     escalation_level: int  # 1 to 5
     transformation_condition: str
@@ -30,7 +29,7 @@ PHENOMENON_TYPOLOGY = {
     "Sovereign": "Entity or place-spirit enforcing its own unbending physical laws.",
 }
 
-DEFAULT_ACTIVE_PHENOMENA: List[Phenomenon] = [
+DEFAULT_ACTIVE_PHENOMENA: list[Phenomenon] = [
     Phenomenon(
         id="phen-1",
         name="The Weeping Floodgate of Cinder",
@@ -62,7 +61,7 @@ DEFAULT_ACTIVE_PHENOMENA: List[Phenomenon] = [
 ]
 
 
-def escalate_phenomenon(phenomenon_id: str, delta: int = 1) -> Optional[Phenomenon]:
+def escalate_phenomenon(phenomenon_id: str, delta: int = 1) -> Phenomenon | None:
     for p in DEFAULT_ACTIVE_PHENOMENA:
         if p.id == phenomenon_id:
             p.escalation_level = max(1, min(5, p.escalation_level + delta))

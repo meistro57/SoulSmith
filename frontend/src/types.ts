@@ -346,6 +346,8 @@ export interface PortraitGenerationCandidate {
   status: CandidateStatus;
   failure_reason?: string;
   resulting_portrait_version_id?: string;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
   created_at?: string;
   reviewed_at?: string;
 }
@@ -361,6 +363,375 @@ export interface PromptCompilationResult {
   style: string;
   negative_constraints: string[];
   compiled_prompt: string;
+}
+
+// Phase 4: Visual Worldsmith
+export type WorldEntityType = 'location' | 'relic' | 'phenomenon';
+export type WorldCandidateStatus = 'pending' | 'generated' | 'approved' | 'rejected' | 'failed';
+
+export interface VisualEntityVersion {
+  version_id: string;
+  entity_id: string;
+  entity_type: WorldEntityType;
+  version_number: number;
+  label: string;
+  canonical_snapshot: Record<string, any>;
+  image_url: string;
+  source_version_id?: string;
+  provider: string;
+  provider_model?: string;
+  created_at?: string;
+}
+
+export interface WorldVisualCandidate {
+  candidate_id: string;
+  entity_id: string;
+  entity_type: WorldEntityType;
+  source_visual_version_id?: string;
+  generation_type: string;
+  canonical_snapshot: Record<string, any>;
+  canonical_delta: Record<string, string[]>;
+  compiled_prompt: string;
+  negative_prompt?: string;
+  reference_image_url?: string;
+  workflow_role?: string;
+  provider: string;
+  provider_model?: string;
+  provider_request_id?: string;
+  generation_seed?: number;
+  generated_image_url?: string;
+  status: WorldCandidateStatus;
+  failure_reason?: string;
+  resulting_visual_version_id?: string;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
+  created_at?: string;
+  reviewed_at?: string;
+}
+
+// Phase 12: Chronicle Paintings + Visual Canon Guardian
+export type PaintingStatus = 'candidate' | 'approved' | 'rejected' | 'superseded' | 'failed';
+export type GuardianStatus = 'pending' | 'generating' | 'reviewing' | 'passed' | 'retry' | 'blocked' | 'failed';
+export type PaintingGenerationType = 'initial' | 'retry' | 'composition_change' | 'style_change' | 'reference_upgrade' | 'manual_regeneration';
+export type GuardianVerdict = 'pass' | 'retry' | 'block';
+export type ViolationSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface GuardianViolation {
+  type: string;
+  severity: ViolationSeverity;
+  description: string;
+  canonical_expected: string;
+  observed: string;
+}
+
+export interface GuardianReport {
+  status: GuardianVerdict;
+  confidence: number;
+  violations: GuardianViolation[];
+  correction_instructions: string[];
+}
+
+export interface ProviderCapabilities {
+  provider: string;
+  text_to_image: boolean;
+  single_reference: boolean;
+  multiple_references: boolean;
+  identity_conditioning: boolean;
+  regional_conditioning: boolean;
+  deterministic_seed: boolean;
+  aspect_ratio_control: boolean;
+}
+
+export interface ParticipantAppearance {
+  soul_id: string;
+  character_name: string;
+  role_in_event: string;
+  portrait_version_id?: string;
+  identity_strategy: string;
+  portrait_image_url?: string;
+  story_marks: StoryMark[];
+  equipment?: EquipmentAppearance;
+}
+
+export interface ChroniclePainting {
+  painting_id: string;
+  memory_object_id: string;
+  source_painting_id?: string;
+  generation_type: PaintingGenerationType;
+  status: PaintingStatus;
+  guardian_status: GuardianStatus;
+  compiler_version: string;
+  scene_spec: Record<string, any>;
+  composition: string;
+  historical_participant_refs: Record<string, any>[];
+  compiled_prompt: string;
+  negative_prompt?: string;
+  provider: string;
+  provider_model?: string;
+  provider_request_id?: string;
+  generation_seed?: number;
+  quarantined_image_url?: string;
+  image_url?: string;
+  guardian_report?: GuardianReport;
+  failure_reason?: string;
+  retry_count: number;
+  art_direction_profile_id?: string;
+  art_direction_profile_version_id?: string;
+  created_at?: string;
+  reviewed_at?: string;
+  approved_at?: string;
+  memory_event_id?: string;
+  memory_event_title?: string;
+}
+
+// Phase 13: Group Memories & Tags
+export type GroupTagType = 'person' | 'location' | 'relic' | 'phenomenon' | 'faction' | 'relationship' | 'emotional_theme' | 'event_type' | 'recurring_motif' | 'consequence' | 'thread';
+export type GroupAnchorType = 'portrait' | 'location' | 'relic' | 'phenomenon' | 'chronicle_painting';
+export type GroupSignificanceTier = 'personal' | 'relationship' | 'community' | 'world' | 'legendary';
+
+export interface GroupMemoryMember {
+  memory_object_id: string;
+  soul_id: string;
+  role_in_event?: string;
+  portrait_version_id?: string;
+}
+
+export interface GroupMemoryTag {
+  tag_id: string;
+  tag_type: GroupTagType;
+  value: string;
+  anchor_kind?: GroupAnchorType;
+  anchor_id?: string;
+  is_descriptor: boolean;
+}
+
+export interface GroupMemoryAnchor {
+  anchor_type: GroupAnchorType;
+  anchor_ref: string;
+  entity_id?: string;
+  entity_type?: string;
+  label: string;
+}
+
+export interface GroupMemory {
+  group_id: string;
+  event_id: string;
+  title: string;
+  summary: string;
+  visibility: string;
+  group_significance: GroupSignificanceTier;
+  group_significance_score: number;
+  group_significance_rationale?: string;
+  members: GroupMemoryMember[];
+  tags: GroupMemoryTag[];
+  anchors: GroupMemoryAnchor[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ParticipantPerspective {
+  soul_id: string;
+  character_name: string;
+  role_in_event?: string;
+  memory_object_id: string;
+  event_title: string;
+  location_environment: string;
+  emotional_tone?: string;
+  action_composition?: string;
+  lasting_consequence?: string;
+  is_self: boolean;
+  is_public: boolean;
+}
+
+export interface PerspectiveComparison {
+  group_id: string;
+  event_id: string;
+  perspectives: ParticipantPerspective[];
+  shared_facts: string[];
+  disagreements: Record<string, any>[];
+}
+
+export interface RelatedMemorySuggestion {
+  memory_object_id: string;
+  event_id: string;
+  reason: string;
+  canonical: boolean;
+}
+
+// Phase 14: Living Biography
+export type BiographyStatus = 'draft' | 'current' | 'superseded' | 'rejected' | 'failed';
+export type BiographyGuardianStatus = 'pending' | 'passed' | 'failed';
+export type BiographyClaimKind = 'canonical_fact' | 'participant_perspective' | 'shared_perspective' | 'inferred_theme' | 'narrative_connective' | 'unresolved';
+export type BiographySectionType = 'origins' | 'formative_moments' | 'bonds' | 'discoveries' | 'trials' | 'relics' | 'story_marks' | 'places' | 'phenomena' | 'shared_memories' | 'consequences' | 'unresolved_threads' | 'current_chapter';
+export type BiographySourceType = 'memory_object' | 'group_memory' | 'portrait_version' | 'visual_entity_version' | 'chronicle_painting' | 'story_mark' | 'relic' | 'probable_path';
+
+export interface BiographySourceRef {
+  source_type: BiographySourceType;
+  source_id: string;
+  claim_kind: BiographyClaimKind;
+  note?: string;
+}
+
+export interface BiographySection {
+  section_id: string;
+  biography_id: string;
+  section_type: BiographySectionType;
+  position: number;
+  title: string;
+  narrative: string;
+  claim_kind: BiographyClaimKind;
+  perspective_of?: string;
+  visual_reference?: string;
+  provenance: BiographySourceRef[];
+  created_at?: string;
+}
+
+export interface BiographyGuardianReport {
+  status: 'pass' | 'fail';
+  confidence: number;
+  violations: Array<{ type: string; severity: string; description: string; canonical_expected: string; observed: string }>;
+  correction_instructions: string[];
+}
+
+export interface Biography {
+  biography_id: string;
+  soul_id: string;
+  version_number: number;
+  status: BiographyStatus;
+  title: string;
+  current_chapter?: string;
+  scope_type: string;
+  scope_ref?: string;
+  visibility: string;
+  source_snapshot: Record<string, any>;
+  provider: string;
+  provider_model?: string;
+  compiler_version: string;
+  guardian_status: BiographyGuardianStatus;
+  guardian_report?: BiographyGuardianReport;
+  sections: BiographySection[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Phase 15: Art Director & World Gallery
+export type ArtDirectionProfileStatus = 'draft' | 'current' | 'superseded' | 'archived';
+export type ArtifactType = 'portrait' | 'location' | 'relic' | 'phenomenon' | 'chronicle_painting';
+
+export interface ArtDirectionProfile {
+  profile_id: string;
+  name: string;
+  description: string;
+  status: ArtDirectionProfileStatus;
+  current_version_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ArtDirectionProfileVersion {
+  version_id: string;
+  profile_id: string;
+  version_number: number;
+  medium_style: string;
+  palette_guidance: string;
+  lighting_guidance: string;
+  atmosphere: string;
+  texture_material: string;
+  camera_framing: string;
+  composition_guidance: string;
+  portrait_treatment: string;
+  environment_treatment: string;
+  relic_treatment: string;
+  phenomenon_treatment: string;
+  chronicle_treatment: string;
+  negative_guidance: string;
+  provider_hints: Record<string, any>;
+  accessibility_notes: string;
+  created_at?: string;
+}
+
+export interface ResolvedArtDirection {
+  profile_id: string;
+  version_id: string;
+  artifact_type: ArtifactType;
+  medium_style: string;
+  palette_guidance: string;
+  lighting_guidance: string;
+  atmosphere: string;
+  texture_material: string;
+  camera_framing: string;
+  composition_guidance: string;
+  treatment: string;
+  negative_guidance: string;
+  provider_hints: Record<string, any>;
+  accessibility_notes: string;
+  override_applied: Record<string, string>;
+}
+
+export interface ArtDirectionSpec {
+  artifact_type: string;
+  profile_id: string;
+  profile_version_id: string;
+  canonical: Record<string, any>;
+  historical_references: Record<string, any>[];
+  style: ResolvedArtDirection;
+  provider_capabilities: Record<string, any>;
+  composition_intent: string;
+  accessibility: string[];
+  limitations: string[];
+  provider_prompt: string;
+}
+
+export interface StyleReviewResult {
+  status: 'pass' | 'retry';
+  style_confidence: number;
+  style_deviations: string[];
+  correction_instructions: string[];
+}
+
+export type GalleryArtifactType = 'portrait' | 'visual_entity' | 'chronicle_painting' | 'biography_illustration';
+
+export interface GalleryProvenance {
+  source_type: string;
+  source_id: string;
+  label: string;
+}
+
+export interface GalleryArtifact {
+  artifact_id: string;
+  artifact_type: GalleryArtifactType;
+  image_url: string;
+  title: string;
+  caption: string;
+  alt_text: string;
+  provenance: GalleryProvenance[];
+  art_direction?: { profile_id?: string; profile_version_id?: string };
+  guardian_status?: string;
+  chronology_label?: string;
+  entity_id?: string;
+  entity_type?: string;
+  created_at?: string;
+}
+
+export interface GalleryCollectionItem {
+  item_id: string;
+  collection_id: string;
+  artifact_type: GalleryArtifactType;
+  artifact_ref: string;
+  position: number;
+  caption: string;
+  created_at?: string;
+}
+
+export interface GalleryCollection {
+  collection_id: string;
+  title: string;
+  description: string;
+  visibility: 'public_canon' | 'private';
+  curator_soul_id?: string;
+  items: GalleryCollectionItem[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SoulprintProfile { sun_sign: string; moon_sign: string; ascendant_sign: string; elemental_balance: Record<string, number>; motifs: Array<{ tag: string; weight: number; description: string }>; favored_domains: string[]; favored_threads: string[]; narrative_hooks: string[]; privacy_notice: string; }
@@ -380,3 +751,715 @@ export const isCanonicalDiceRead = (value: unknown): value is CanonicalDiceRead 
 };
 
 export const toNumericDiceRoll = (raw: CanonicalDiceRead['raw'], grammarVersion: string): NumericDiceRoll => ({ ...raw, grammar_version: grammarVersion });
+// Phase 16: Legendary Figures & World Memory
+export type WorldMemoryForm =
+  | 'legend'
+  | 'historical_account'
+  | 'folk_tale'
+  | 'rumor'
+  | 'oral_tradition'
+  | 'song_ballad'
+  | 'inscription'
+  | 'memorial'
+  | 'monument_statue'
+  | 'displayed_artwork'
+  | 'archival_document'
+  | 'festival_tradition'
+  | 'place_name_inheritance'
+  | 'relic_legend'
+  | 'lineage_tradition'
+  | 'religious_mythic_interpretation'
+  | 'forgotten_fragment';
+
+export type InterpretationType =
+  | 'faithful'
+  | 'simplified'
+  | 'selective'
+  | 'symbolic'
+  | 'exaggerated'
+  | 'contradictory'
+  | 'corrupted'
+  | 'fragmented'
+  | 'mythologized'
+  | 'disputed'
+  | 'unknown';
+
+export type MemoryState =
+  | 'widely_remembered'
+  | 'locally_remembered'
+  | 'archived_obscure'
+  | 'fragmented'
+  | 'misattributed'
+  | 'suppressed'
+  | 'forgotten'
+  | 'rediscovered';
+
+export type RemembranceScale = 'personal' | 'local' | 'regional' | 'world_famous' | 'forgotten';
+
+export interface WorldMemorySourceRef {
+  source_type: string;
+  source_id: string;
+  claim_kind: string;
+  note?: string;
+}
+
+export interface WorldMemoryDeviation {
+  deviation_id: string;
+  memory_id: string;
+  deviation_kind: string;
+  canon_supports: string;
+  legend_claims: string;
+  entry_note: string;
+  created_at?: string;
+}
+
+export interface WorldMemoryGuardianReport {
+  status: string;
+  confidence: number;
+  violations: Array<Record<string, any>>;
+  diagnostics: string[];
+  correction_instructions: string[];
+}
+
+export interface WorldMemory {
+  memory_id: string;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  culture: string;
+  era_context: string;
+  memory_form: WorldMemoryForm;
+  interpretation_type: InterpretationType;
+  title: string;
+  narrative: string;
+  memory_state: MemoryState;
+  remembrance_scale: RemembranceScale;
+  visibility: string;
+  perspective: string;
+  status: string;
+  guardian_status: string;
+  guardian_report?: WorldMemoryGuardianReport;
+  version_number: number;
+  compiler_version: string;
+  provider: string;
+  provider_model?: string;
+  significance_rationale: string;
+  source_refs: WorldMemorySourceRef[];
+  deviations: WorldMemoryDeviation[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LegendaryFigureLink {
+  link_id: string;
+  figure_id: string;
+  link_type: string;
+  link_ref: string;
+  link_label: string;
+  is_canonical: boolean;
+  created_at?: string;
+}
+
+export interface LegendaryFigure {
+  figure_id: string;
+  subject_soul_id?: string;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  figure_title: string;
+  later_cultural_titles: string[];
+  remembrance_scale: RemembranceScale;
+  memory_state: MemoryState;
+  eligibility_rationale: string;
+  status: string;
+  links: LegendaryFigureLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorldMemoryPlacement {
+  placement_id: string;
+  memory_id: string;
+  placement_type: string;
+  placement_ref: string;
+  visibility: string;
+  created_at?: string;
+}
+
+export interface NPCKnowledgeEntry {
+  memory: WorldMemory;
+  fidelity: string;
+  canonical_truth_visible: boolean;
+  reason: string;
+}
+
+export interface NPCKnowledgeProjection {
+  npc: Record<string, any>;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  entries: NPCKnowledgeEntry[];
+  canonical_truth_accessible: boolean;
+}
+
+// Phase 17: Campaign Orchestrator
+
+export interface CampaignSourceEvidence {
+  source_type: string;
+  source_id: string;
+  claim_kind?: string;
+  note?: string;
+}
+
+export interface CampaignInvolvedEntity {
+  entity_type: string;
+  entity_id: string;
+  label?: string;
+}
+
+export type RecognitionDecisionKind = 'recognize' | 'reject' | 'rename' | 'reinterpret' | 'postpone' | 'hide';
+
+export interface RecognitionDecision {
+  decision: RecognitionDecisionKind;
+  new_name?: string;
+  reinterpretation?: string;
+}
+
+export interface CampaignSession {
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  active_soul_id?: string | null;
+  constellation_id?: string;
+  status: string;
+  current_opportunity_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CampaignOpportunity {
+  opportunity_id: string;
+  session_id: string;
+  opportunity_type: string;
+  eligibility_rule: string;
+  source_evidence: CampaignSourceEvidence[];
+  involved_entities: CampaignInvolvedEntity[];
+  visibility_scope: string;
+  urgency_class: string;
+  participation: string;
+  lifecycle_state: string;
+  cooldown_key?: string;
+  cooldown_until?: string;
+  domain_action: string;
+  domain_action_payload: Record<string, any>;
+  reasoning: Record<string, any>;
+  narration?: string;
+  narration_source: string;
+  created_at?: string;
+  resolved_at?: string;
+}
+
+export interface CampaignReaction {
+  reaction_id: string;
+  transition_id: string;
+  system_name: string;
+  result_kind: string;
+  details: Record<string, any>;
+  created_at?: string;
+}
+
+export interface CampaignTransition {
+  transition_id: string;
+  session_id: string;
+  opportunity_id?: string;
+  canonical_event_id?: string;
+  transition_type: string;
+  systems_invoked: string[];
+  outcomes: Array<Record<string, any>>;
+  reactions: CampaignReaction[];
+  canonical_change: boolean;
+  provider_failure?: string;
+  rejected_invalid_transition: boolean;
+  created_at?: string;
+}
+
+// Phase 18: Soulkeeper Narrative Engine
+
+export interface NarrativeDialogue {
+  speaker: string;
+  line: string;
+  kind: string;
+}
+
+export interface NarrativeQuestion {
+  prompt: string;
+  kind: string;
+  choice_hint?: string;
+}
+
+export interface NarrativeGeneration {
+  generation_id: string;
+  session_id?: string;
+  opportunity_id?: string;
+  transition_id?: string;
+  provider: string;
+  provider_model: string;
+  template_version: string;
+  generation_timestamp?: string;
+  retry_count: number;
+  validation_outcome: string;
+  latency_ms?: number;
+  used_fallback: boolean;
+  context_stats: Record<string, any>;
+  output: Record<string, any>;
+  error?: string;
+}
+
+// Phase 19: Relationship & Promise Engine
+
+export interface RelationshipSourceRef {
+  source_type: string;
+  source_id: string;
+  claim_kind: string;
+}
+
+export interface RelationshipParticipant {
+  entity_type: string;
+  entity_id: string;
+  role: string;
+}
+
+export interface RelationshipEvent {
+  event_id: string;
+  relationship_id: string;
+  event_type: string;
+  source_type: string;
+  source_id: string;
+  summary: string;
+  created_at?: string;
+}
+
+export interface RelationshipPerspective {
+  perspective_id: string;
+  relationship_id: string;
+  entity_type: string;
+  entity_id: string;
+  kind: string;
+  view: string;
+  is_canonical_interaction: boolean;
+  visibility: string;
+  created_at?: string;
+}
+
+export interface RelationshipEntityLink {
+  link_id: string;
+  relationship_id: string;
+  link_type: string;
+  entity_type: string;
+  entity_id: string;
+  created_at?: string;
+}
+
+export interface Relationship {
+  relationship_id: string;
+  kinds: string[];
+  status: string;
+  visibility: string;
+  creation_context: string;
+  participants: RelationshipParticipant[];
+  source_refs: RelationshipSourceRef[];
+  events: RelationshipEvent[];
+  perspectives: RelationshipPerspective[];
+  entity_links: RelationshipEntityLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PromiseParticipant {
+  participant_type: string;
+  entity_type: string;
+  entity_id: string;
+}
+
+export interface PromiseStateChange {
+  state_id: string;
+  promise_id: string;
+  previous_state: string;
+  new_state: string;
+  evidence_type?: string;
+  evidence_id?: string;
+  reason: string;
+  created_at?: string;
+}
+
+export interface PromiseEntityLink {
+  link_id: string;
+  promise_id: string;
+  link_type: string;
+  entity_type: string;
+  entity_id: string;
+  created_at?: string;
+}
+
+export interface PromiseRecord {
+  promise_id: string;
+  promisor_entity_type: string;
+  promisor_entity_id: string;
+  promise_text: string;
+  structured_meaning: Record<string, any>;
+  conditions: string[];
+  scope: string;
+  visibility: string;
+  source_type: string;
+  source_id: string;
+  source_authorization: string;
+  lifecycle_state: string;
+  inheritable: boolean;
+  transferable: boolean;
+  participants: PromiseParticipant[];
+  state_history: PromiseStateChange[];
+  entity_links: PromiseEntityLink[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RelationshipKnowledgeEntry {
+  relationship?: Relationship;
+  promise?: PromiseRecord;
+  fidelity: string;
+  reason: string;
+}
+
+export interface RelationshipPromiseKnowledgeProjection {
+  npc: Record<string, any>;
+  subject_entity_type: string;
+  subject_entity_id: string;
+  relationships: RelationshipKnowledgeEntry[];
+  promises: RelationshipKnowledgeEntry[];
+}
+
+
+
+// Phase 20: Multi-Aspect Campaign Sessions & Wandering Foundation
+
+export interface CampaignAspect {
+  campaign_id: string;
+  soul_id: string;
+  aspect_id?: string | null;
+  display_name: string;
+  viewpoint_location?: string | null;
+  is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AspectSwitchResult {
+  session: CampaignSession;
+  from_soul_id: string;
+  to_soul_id: string;
+  idempotent: boolean;
+  viewpoint?: string | null;
+}
+
+export interface AspectKnowledgeProjection {
+  aspect_soul_id: string;
+  campaign_id: string;
+  visible_events: string[];
+  seeds: string[];
+  questions: string[];
+  threads: string[];
+  relics: string[];
+  relationships: string[];
+  promises: string[];
+  world_memories: string[];
+  forbidden_events: string[];
+  provenance_ids: string[];
+}
+
+export interface Place {
+  place_id: string;
+  place_name: string;
+  place_kind: string;
+  public_label?: string | null;
+  region_id?: string | null;
+  region_precision: string;
+  coordinate_latitude?: number | null;
+  coordinate_longitude?: number | null;
+  coordinate_precision_m: string;
+  consent_scope: string;
+  safety_status: string;
+  is_active: boolean;
+  created_by_soul_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PlaceHistoryEntry {
+  history_id: string;
+  place_id: string;
+  event_type: string;
+  event_id: string;
+  soul_id?: string | null;
+  provenance_source_type: string;
+  provenance_source_id: string;
+  visibility: string;
+  created_at?: string | null;
+}
+
+export interface LocationConsent {
+  soul_id: string;
+  location_access_granted: boolean;
+  purpose: string;
+  precision_level: string;
+  retention_days?: number | null;
+  updated_at?: string | null;
+}
+
+export interface NearbyPlace {
+  place: Place;
+  distance_m: number;
+}
+
+export interface NearbyDiscoveryResult {
+  authorized: boolean;
+  places: NearbyPlace[];
+  radius_m?: number;
+  reason?: string;
+}
+
+export interface CrossAspectMeeting {
+  shared_event: Record<string, any>;
+  active_aspect: Record<string, any>;
+  other_aspect: Record<string, any>;
+  knowledge_boundary: Record<string, any>;
+}
+
+export type VisualJobType =
+  | 'portrait'
+  | 'portrait_continuity'
+  | 'memory_object'
+  | 'chronicle_painting'
+  | 'relic'
+  | 'relationship'
+  | 'group_memory'
+  | 'legendary_figure'
+  | 'world_memory'
+  | 'place'
+  | 'environment';
+
+export type ArtMomentStatus =
+  | 'eligible'
+  | 'queued'
+  | 'curated'
+  | 'deferred'
+  | 'rejected'
+  | 'completed'
+  | 'hidden';
+
+export type VisualJobState =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'guardian_review'
+  | 'approved'
+  | 'rejected'
+  | 'hidden'
+  | 'blocked'
+  | 'failed'
+  | 'cancelled'
+  | 'deferred';
+
+export interface VisualSceneSpec {
+  visual_type: VisualJobType;
+  spec_version: string;
+  title: string;
+  source_entity_type?: string | null;
+  source_entity_id?: string | null;
+  permitted_participants: Array<{
+    soul_id: string;
+    character_name: string;
+    role_in_event: string;
+    portrait_version_id?: string | null;
+    reference_image_url?: string | null;
+    identity_strategy: string;
+  }>;
+  canonical_objects: string[];
+  relic_state?: string | null;
+  location?: string | null;
+  environment?: string | null;
+  time_context?: string | null;
+  action_facts: string[];
+  outcome_facts: string[];
+  prohibited_additions: string[];
+  unknown_fields: string[];
+  emotional_tone: string;
+  composition: string;
+  style_guidance: string;
+  mood: string;
+  motif: string;
+  symbolism: string;
+  source_evidence: Array<{
+    source_type: string;
+    source_id: string;
+    claim_kind?: string;
+    note?: string | null;
+  }>;
+}
+
+export interface ArtMoment {
+  art_moment_id: string;
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  visual_type: VisualJobType;
+  cooldown_key?: string | null;
+  eligibility_rule: string;
+  source_entity_type?: string | null;
+  source_entity_id?: string | null;
+  title: string;
+  source_evidence: Array<Record<string, any>>;
+  reference_asset_ids: string[];
+  spec: Record<string, any>;
+  status: ArtMomentStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface VisualJob {
+  job_id: string;
+  art_moment_id: string;
+  session_id: string;
+  campaign_id: string;
+  soul_id: string;
+  visual_type: VisualJobType;
+  provider: string;
+  provider_model?: string | null;
+  workflow_role?: string | null;
+  workflow_version: string;
+  provider_request_id?: string | null;
+  generation_seed?: number | null;
+  generation_state: VisualJobState;
+  retry_count: number;
+  spec: Record<string, any>;
+  reference_asset_ids: string[];
+  quarantined_image_url?: string | null;
+  final_image_url?: string | null;
+  guardian_status: string;
+  guardian_report?: Record<string, any> | null;
+  failure_reason?: string | null;
+  superseded_job_id?: string | null;
+  contributor_id?: string | null;
+  contributor_name?: string | null;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface HumanCuration {
+  curation_id: string;
+  art_moment_id: string;
+  contributor_id: string;
+  contributor_name?: string | null;
+  style_guidance: string;
+  composition: string;
+  mood: string;
+  motif: string;
+  symbolism: string;
+  provenance_note: string;
+  created_at?: string | null;
+}
+
+
+// Phase 22: Temporal Pacing & Living Time.
+
+export type TimePolicy =
+  | 'none'
+  | 'event_driven'
+  | 'manual'
+  | 'real_time_linked'
+  | 'accelerated';
+
+export interface TemporalContext {
+  now_iso: string;
+  timezone: string;
+  time_source: string;
+  confidence: string;
+  offline: boolean;
+  sync_status: string;
+  session_started_at?: string | null;
+  last_active_at?: string | null;
+  elapsed_since_last_active_seconds?: number | null;
+  deterministic_event_count: number;
+  aspect_event_count: number;
+  fictional_policy: TimePolicy;
+  fictional_now_iso?: string | null;
+  fictional_calendar: Record<string, any>;
+  aspect_soul_id?: string | null;
+}
+
+export interface CampaignTimeSettings {
+  campaign_id: string;
+  time_policy: TimePolicy;
+  timezone: string;
+  real_time_ratio?: number | null;
+  fictional_anchor_iso?: string | null;
+  fictional_now_iso?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ScheduledConsequence {
+  consequence_id: string;
+  session_id: string;
+  campaign_id: string;
+  source_type: string;
+  source_id: string;
+  rule: string;
+  eligible_after_iso?: string | null;
+  min_elapsed_seconds?: number | null;
+  min_events?: number | null;
+  note: string;
+  lifecycle_state: string;
+  created_at?: string | null;
+  resolved_at?: string | null;
+}
+
+export interface TemporalCooldownStatus {
+  interval_seconds: number;
+  last_offered_at?: string | null;
+  satisfied: boolean;
+  reason?: string | null;
+}
+
+export interface ScheduledConsequenceEligibility {
+  consequence_id: string;
+  source_type: string;
+  source_id: string;
+  rule: string;
+  lifecycle_state: string;
+  eligible: boolean;
+  reasoning: Record<string, any>;
+}
+
+export interface TemporalEligibility {
+  session_id: string;
+  now_iso: string;
+  time_source: string;
+  fictional_policy: TimePolicy;
+  fictional_now_iso?: string | null;
+  cooldowns: Record<string, TemporalCooldownStatus>;
+  scheduled_consequences: ScheduledConsequenceEligibility[];
+}
+
+export interface ReturnRecap {
+  session_id: string;
+  aspect: string;
+  welcome_back: {
+    aspect: string;
+    last_active_at?: string | null;
+    elapsed_since_last_active_seconds?: number | null;
+    unresolved_promises: string[];
+    active_threads: string[];
+    active_seeds: string[];
+    recent_event?: string | null;
+  };
+  optional_opportunities_now_eligible: string[];
+  no_penalty: boolean;
+  no_mandatory_chores: boolean;
+}
