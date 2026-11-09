@@ -5,7 +5,8 @@ SoulSmith Phase 4: Soul Constellation Models & API Logic.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 
 AwakeningStage = Literal[
@@ -17,7 +18,7 @@ AwakeningStage = Literal[
     "lucid",
 ]
 
-AWAKENING_STAGE_DESCRIPTIONS: Dict[AwakeningStage, Dict[str, str]] = {
+AWAKENING_STAGE_DESCRIPTIONS: dict[AwakeningStage, dict[str, str]] = {
     "veiled": {
         "title": "Veiled",
         "description": "One life appears self-contained. The larger Constellation remains unseen.",
@@ -52,19 +53,19 @@ class AspectModel(BaseModel):
     calling: str
     origin: str
     era_or_world: str
-    sheet: Dict[str, Any] = Field(default_factory=dict)
-    created_at: Optional[str] = None
+    sheet: dict[str, Any] = Field(default_factory=dict)
+    created_at: str | None = None
 
 
 class AnchorModel(BaseModel):
     id: str
     constellation_id: str
     anchor_name: str
-    relic_id: Optional[str] = None
-    connected_aspect_ids: List[str] = Field(default_factory=list)
+    relic_id: str | None = None
+    connected_aspect_ids: list[str] = Field(default_factory=list)
     relic_form: str
     status: str = "dormant"
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class CrossAspectBondModel(BaseModel):
@@ -74,7 +75,7 @@ class CrossAspectBondModel(BaseModel):
     target_aspect_id: str
     bond_type: str
     description: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class ConstellationModel(BaseModel):
@@ -82,12 +83,12 @@ class ConstellationModel(BaseModel):
     name: str
     unresolved_pattern: str
     awakening_stage: AwakeningStage = "veiled"
-    deep_threads: List[str] = Field(default_factory=list)
-    aspects: List[AspectModel] = Field(default_factory=list)
-    anchors: List[AnchorModel] = Field(default_factory=list)
-    bonds: List[CrossAspectBondModel] = Field(default_factory=list)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    deep_threads: list[str] = Field(default_factory=list)
+    aspects: list[AspectModel] = Field(default_factory=list)
+    anchors: list[AnchorModel] = Field(default_factory=list)
+    bonds: list[CrossAspectBondModel] = Field(default_factory=list)
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class CreateAspectRequest(BaseModel):
@@ -108,4 +109,4 @@ class CreateBondRequest(BaseModel):
 
 class AdvanceAwakeningRequest(BaseModel):
     constellation_id: str
-    target_stage: Optional[AwakeningStage] = None
+    target_stage: AwakeningStage | None = None

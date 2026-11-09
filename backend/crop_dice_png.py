@@ -4,6 +4,7 @@ Tightly crops out text/labels below each die.
 """
 
 import os
+
 from PIL import Image
 
 DICE_PNG_PATH = "art/dice.png"

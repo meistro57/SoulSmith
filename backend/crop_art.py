@@ -4,6 +4,7 @@ Splits graphics_bundle.png into isolated UI icons, dice assets, portraits, and f
 """
 
 import os
+
 from PIL import Image
 
 BUNDLE_PATH = "art/graphics_bundle.png"
