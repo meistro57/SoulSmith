@@ -17,12 +17,18 @@ import { ProbablePathsView } from './components/ProbablePathsView';
 import { RelicLedgerView } from './components/RelicLedgerView';
 import { ReflectionAccessibilityView } from './components/ReflectionAccessibilityView';
 import { VisualMemoryView } from './components/visual-memory/VisualMemoryView';
+import { WorldAtlasView } from './components/WorldAtlasView';
+import { WorldGalleryView } from './components/WorldGalleryView';
+import { WorldMemoryView } from './components/WorldMemoryView';
+import { BiographyView } from './components/BiographyView';
+import { CampaignView } from './components/CampaignView';
+import { RelationshipsView } from './components/RelationshipsView';
 import { AuthModal } from './components/AuthModal';
 
-import { Dices, Shield, BookMarked, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers } from 'lucide-react';
+import { Dices, Shield, BookMarked, BookOpen, Radio, Moon, Zap, Play, Camera, Flame, Image, Compass, Sparkles, GitBranch, User as UserIcon, LogOut, KeyRound, HeartHandshake, Layers, Globe, Landmark, Map } from 'lucide-react';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'art'>('sanctuary');
+  const [activeTab, setActiveTab] = useState<'sanctuary' | 'scan' | 'sheet' | 'constellation' | 'relics' | 'curiosity' | 'paths' | 'phenomena' | 'chronicle' | 'convergence' | 'reflection' | 'visual_memory' | 'world_atlas' | 'biography' | 'world_gallery' | 'world_memory' | 'art' | 'campaign' | 'relationships'>('sanctuary');
 
   // Core State
   const [currentRead, setCurrentRead] = useState<CanonicalDiceRead>({
@@ -232,6 +238,8 @@ export function App() {
           <nav className="flex flex-wrap justify-center items-center gap-1.5 bg-[var(--deep)]/90 p-1.5 rounded-2xl border border-[var(--line)] shadow-xl">
             {[
               { id: 'sanctuary', label: '3D Sanctuary', icon: Dices },
+              { id: 'campaign', label: 'Campaign', icon: Map },
+              { id: 'relationships', label: 'Relationships', icon: HeartHandshake },
               { id: 'scan', label: 'Dice Camera', icon: Camera },
               { id: 'sheet', label: 'Soul Sheet', icon: Shield },
               { id: 'constellation', label: 'Constellation', icon: Sparkles },
@@ -240,9 +248,13 @@ export function App() {
               { id: 'paths', label: 'Probable Paths', icon: GitBranch },
               { id: 'phenomena', label: 'Phenomena', icon: Flame },
               { id: 'chronicle', label: 'Chronicle', icon: BookMarked },
+              { id: 'biography', label: 'Biography', icon: BookOpen },
               { id: 'convergence', label: 'Convergence', icon: Radio },
               { id: 'reflection', label: 'Reflection', icon: HeartHandshake },
               { id: 'visual_memory', label: 'Visual Memory', icon: Layers },
+              { id: 'world_atlas', label: 'World Atlas', icon: Globe },
+              { id: 'world_gallery', label: 'World Gallery', icon: Landmark },
+              { id: 'world_memory', label: 'World Memory', icon: BookOpen },
               { id: 'art', label: 'Mythic Art', icon: Image }
             ].map((tab) => {
               const Icon = tab.icon;
@@ -455,6 +467,10 @@ export function App() {
           </div>
         )}
 
+        {activeTab === 'campaign' && <CampaignView soulName={soulSheet.name} />}
+
+        {activeTab === 'relationships' && <RelationshipsView soulName={soulSheet.name} />}
+
         {activeTab === 'scan' && (
           <DiceScanView
             onApplyScanRead={(read) => {
@@ -487,6 +503,8 @@ export function App() {
           <ChronicleView history={chronicleHistory} worldFacts={worldFacts} />
         )}
 
+        {activeTab === 'biography' && <BiographyView soulName={soulSheet.name} />}
+
         {activeTab === 'convergence' && (
           <ConvergenceView currentRead={currentRead} soulName={soulSheet.name} />
         )}
@@ -494,6 +512,12 @@ export function App() {
         {activeTab === 'reflection' && <ReflectionAccessibilityView soulName={soulSheet.name} />}
 
         {activeTab === 'visual_memory' && <VisualMemoryView soulName={soulSheet.name} />}
+
+        {activeTab === 'world_atlas' && <WorldAtlasView />}
+
+        {activeTab === 'world_gallery' && <WorldGalleryView soulName={soulSheet.name} />}
+
+        {activeTab === 'world_memory' && <WorldMemoryView soulName={soulSheet.name} />}
 
         {activeTab === 'art' && <MythicGalleryView />}
       </main>

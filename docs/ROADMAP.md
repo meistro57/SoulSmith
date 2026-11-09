@@ -558,7 +558,7 @@ Formalize the `MemoryObject` schema as the first-class bridge between Chronicle 
 - Participants link to the exact `PortraitVersion` they had when the event occurred, with hard rejection of unknown or mismatched portrait references.
 - Private material is excluded unless each affected player permits it, and real-person tags are auto-redacted when consent is absent.
 
-### Phase 12: Chronicle Paintings `[Status: Designed]`
+### Phase 12: Chronicle Paintings `[Status: Integrated]`
 
 Connect `MemoryObject` schemas to the event painting pipeline.
 
@@ -567,65 +567,432 @@ Connect `MemoryObject` schemas to the event painting pipeline.
 - Review and approval workflow.
 - Immutable event-to-image association.
 
+**Purpose & Deliverables:**
+- Dedicated scene compiler (`app/painting_compiler.py`) separating canonical extraction from artistic phrasing into an inspectable `SceneSpec`.
+- Deterministic composition selector (`app/composition_selector.py`) with ten framing modes.
+- Historical participant portrait locking (`app/painting_reference.py`) with non-identifying degradation when appearance is unavailable.
+- Chronicle Painting provider abstraction (`app/painting_provider.py`) extending the existing ComfyUI architecture with honest capability reporting.
+- Mandatory Visual Canon Guardian (`app/visual_canon_guardian.py`) with a deterministic mock exercising PASS/RETRY/BLOCK.
+- Quarantine-then-promote storage (`ChronicleImageStore`) so unreviewed output is never served as a player-visible asset.
+- Lifecycle API (create/list/get/approve/reject/regenerate) and a gallery-ready approved-paintings query under `/api/v1/chronicle-paintings/*`.
+
 **Exit criteria**
 - High-significance events produce approved Chronicle paintings.
 - Historical paintings preserve the exact appearance of participants at the time of the event.
 - Regeneration creates candidate versions without replacing approved history.
+- No generated image reaches the player before the Visual Canon Guardian passes.
 
-### Phase 13: Group Memories, Tags, and Recognition `[Status: Designed]`
+### Phase 13: Group Memories & Tags `[Status: Integrated]`
 
-Implement distinct in-world character tags vs optional real-person profile tags.
+Let SoulSmith recognize that multiple souls can participate in the same
+canonical event while remembering it differently.
 
-- In-World Character Tags (Avatar name, title, role, biography link).
-- Real-Person Group Tags (Profile photo, display name, optional group tagging).
-- World separation: Real photos never become source material for fantasy art unless explicitly opted-in.
+> **SHARED EVENT DOES NOT MEAN SHARED MEMORY.**
+
+- Relational `GroupMemory` model linking participant-specific Memory Objects to
+  a shared event without rewriting or reconciling them into a fabricated
+  consensus.
+- Deterministic grouping by exact shared event ID only; semantic similarity
+  produces *suggestions*, never canonical equivalence.
+- Typed, ID-anchored tags (person, location, relic, phenomenon, faction,
+  relationship, emotional theme, event type, recurring motif, consequence,
+  thread) plus shared canonical anchors locked to historical visual versions.
+- Participant-specific consent filtering that never leaks private identity,
+  StoryMarks, or emotional interpretation through tags, summaries, counts, or
+  APIs.
+- Group-level significance derived from canonical event/participant information
+  without overwriting individual significance.
+- Chronicle Painting integration stays behind the mandatory Visual Canon
+  Guardian; artwork remains interpretation, never canon.
 
 **Exit criteria**
-- Participants approve tagging before publication.
-- Players can hide real photos while retaining character tags.
-- Group event privacy operates independently for text, generated art, and profile photos.
+- Two or more participants can hold separate canonical Memory Objects for the
+  same event and be presented as a Group Memory without merging perspectives.
+- Players can browse permitted perspectives, shared anchors, tags, agreements,
+  and disagreements while private information stays private.
+- Related-memory queries work through typed canonical anchors.
 
-### Phase 14: Living Biography and Portrait Timeline `[Status: Designed]`
+See [`docs/GROUP_MEMORIES.md`](GROUP_MEMORIES.md).
 
-Assemble character history into a chronological portrait timeline.
+### Phase 14: Living Biography `[Status: Integrated]`
 
-- Portrait timeline displaying original avatar, appearance milestones, scars with event links, title changes, relic awakenings, and current appearance.
-- Historical event views display historical portraits; current profiles display current portraits.
+Assemble the Chronicle into a coherent, evolving life story while preserving
+provenance, uncertainty, privacy, and individual perspective.
+
+> **THE BIOGRAPHY IS DERIVED FROM THE CHRONICLE. IT DOES NOT REWRITE IT.**
+
+- Immutable, auditable `BiographyVersion`s with sections and normalized
+  per-section provenance links back to Memory Objects, Group Memories, historical
+  PortraitVersions, VisualEntityVersions, Chronicle Paintings, StoryMarks,
+  relics, and probable paths.
+- Deterministic structured compiler (chronology, recurring threads, consent-safe
+  projection) that produces an inspectable spec before prose generation.
+- Fact vs perspective vs interpretation classification, so themes and participant
+  recollections never silently become objective fact.
+- Deterministic narrative provider (mock) and a Biography Guardian that rejects
+  unknown sources, unsupported claims, invented dates, perspective-as-fact, and
+  unapproved visual references.
+- Draft/current/version lifecycle, player review, and consent-aware public/private
+  publication.
 
 **Exit criteria**
-- Players can navigate a chronological portrait timeline.
-- Every visible change links directly to its originating event.
-- Reinterpreting appearance changes preserves prior historical records.
+- A soul with a meaningful Chronicle can read a coherent life-to-date assembled
+  from canonical records, shared events, relationships, StoryMarks, places,
+  relics, consequences, and approved artwork.
+- Every meaningful claim remains traceable to its source; different perspectives
+  remain different; missing chronology is not fabricated; private information
+  remains private; regeneration creates a new version rather than rewriting
+  history.
 
-### Phase 15: Art Director and World Gallery `[Status: Designed]`
+See [`docs/LIVING_BIOGRAPHY.md`](LIVING_BIOGRAPHY.md).
+
+### Phase 15: Art Director and World Gallery `[Status: Integrated]`
 
 Campaign-level visual voice and world galleries.
 
-- Art Director controlling composition, medium, palette, and recurring motifs.
-- Libraries, settlement galleries, memorial walls, and historical figures.
-- Alternate cultural visual interpretations of the same event.
+> **THE ART DIRECTOR CONTROLS INTERPRETATION. IT DOES NOT CONTROL CANON.**
+
+- Persistent, versioned Art Direction Profiles (medium, palette, lighting,
+  atmosphere, material, framing, composition, per-artifact treatments, negative
+  guidance, provider hints, accessibility) that store no canonical facts.
+- Deterministic style hierarchy: World Art Direction -> artifact-type treatment
+  -> optional scene/collection override.
+- An inspectable Art Direction Spec compiler that keeps canonical and stylistic
+  requirements separate, plus honest provider-capability degradation.
+- Optional Art Direction Reviewer (style compliance) that can never override a
+  Visual Canon Guardian BLOCK.
+- A consent-safe World Gallery curating approved portraits, world visuals,
+  Chronicle Paintings, shared moments, and biography illustrations across modes
+  (The World, The People, The Chronicle, Shared Moments, A Life, Then & Now).
+- Curated Collections/Exhibitions that reference artifacts without mutating
+  canonical records, with captions, provenance, and immutable historical
+  timelines.
+- Privacy-first publication: private participants never leak through images,
+  metadata, captions, tags, provenance, counts, or alt text.
+- Accessible (conservative alt text, keyboard navigation, reduced motion) and
+  performance-aware (lazy loading, immutable asset references).
 
 **Exit criteria**
 - Campaign maintains a coherent visual style.
 - Distinguishes canonical facts from artistic framing.
 - World galleries contain only approved, permission-safe memories.
 
+See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](ART_DIRECTOR_AND_WORLD_GALLERY.md).
+
+### Phase 16: Legendary Figures & World Memory `[Status: Integrated]`
+
+Let the world itself remember, centuries after the original participants are gone.
+
+> **HISTORY MAY BECOME LEGEND. LEGEND MUST NEVER BECOME HISTORY BY ACCIDENT.**
+
+- A persistent, derived `WorldMemory` record (stable ID, source links, subject,
+  culture/faction/region perspective, era, memory form, interpretation type,
+  provenance, declared drift, visibility, in-world placement, version history)
+  that never mutates its canonical sources.
+- Structured memory forms (legend, historical account, folk tale, rumor, oral
+  tradition, song, inscription, memorial, monument/statue, displayed artwork,
+  archival document, festival, place-name inheritance, relic legend, lineage
+  tradition, mythic/religious interpretation, forgotten fragment) kept
+  extensible without becoming arbitrary free text.
+- An explicit truth-distance model (`faithful`, `simplified`, `selective`,
+  `symbolic`, `exaggerated`, `contradictory`, `corrupted`, `fragmented`,
+  `mythologized`, `disputed`, `unknown`) with inspectable per-deviation records
+  (`canon_supports`, `legend_claims`, `deviation_kind`, entry note).
+- Competing histories: multiple cultures may remember one event differently
+  without reconciliation; provenance distinguishes what happened, who says what,
+  and what later culture believes.
+- Legendary Figure records that reference canonical identity, Biography, portrait
+  timeline, Chronicle events, StoryMarks, relationships, relics, locations,
+  Group Memories, and approved artworks without copying or mutating them.
+  Canonical titles and later cultural titles stay visibly distinct.
+- Significance/eligibility derived from canonical importance, group
+  significance, and recurring references only; no popularity counter overrides
+  narrative significance. Remembrance scales range from personal memory to
+  world-famous legend to forgotten/obscure.
+- Forgetting and rediscovery as a derived lifecycle (widely remembered, locally
+  remembered, archived, fragmented, misattributed, suppressed, forgotten,
+  rediscovered) that never deletes canonical records.
+- Consent-safe, provenance-aware NPC historical-knowledge projection scoped by
+  culture, location, era, social role, archive access, education, local
+  tradition, direct relationship, and publication state. NPCs never
+  automatically receive the canonical database truth.
+- Relic legend integration (relic legends stay distinct from relic history) and
+  Soul Constellation integration (cross-Aspect echoes that never force a
+  metaphysical interpretation).
+- World Gallery integration: selected artifacts may be placed in-world while
+  gallery visibility and in-world availability remain independent.
+- Provider-backed cultural-artifact generation (legend, song, inscription, etc.)
+  from a structured, consent-filtered `WorldMemorySpec`, with a deterministic
+  mock and no external AI requirement.
+- A World Memory Guardian (pass/retry/block) that rejects undeclared drift,
+  undeclared hallucinated facts, unknown sources, private information leaks,
+  omniscient claims from scoped perspectives, undeclared participant invention,
+  and unapproved visual references — a declared exaggeration may pass, an
+  undeclared one must fail.
+
+**Exit criteria**
+- A canonical event can become a derived World Memory while its source Chronicle
+  record remains unchanged.
+- A past player or Aspect can become a Legendary Figure whose portrait, relics,
+  and stories survive, with every legend traceable to history and every
+  deviation explicit.
+- Forgetting does not delete canon; rediscovery restores visibility, not canon.
+- NPC knowledge is scoped and never omniscient; privacy remains intact.
+
+See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
+
+---
+
+### Phase 17: North-Star Playable Loop & Campaign Orchestrator `[Status: Integrated]`
+
+Conduct the orchestra: make Phases 0-16 a single coherent, continuous playable
+experience.
+
+> **THE ORCHESTRATOR DECIDES WHAT GETS AN OPPORTUNITY TO ACT NEXT. IT DOES NOT DECIDE WHAT THE PLAYER'S STORY MEANS.**
+
+- A dedicated `CampaignOrchestrator` service that evaluates campaign state and
+  produces a bounded set of eligible `CampaignOpportunity`s with typed source
+  evidence, eligibility rules, consent scope, pacing/cooldown metadata, and a
+  resulting domain action.
+- Deterministic eligibility computed from structured state before narration; no
+  model may decide that a promise, relationship, Thread, relic history, or
+  cross-Aspect connection exists merely to improve a scene.
+- A reaction pipeline that, after a canonical event is committed, collects
+  structured per-subsystem results (`no_action` / `candidate_created` /
+  `state_updated` / `player_review_required` / `future_opportunity_scheduled`)
+  into an auditable `CampaignTransition`. A derived-subsystem failure never
+  rolls back valid canonical history.
+- Player-controlled recognition/rejection (recognize / reject / rename /
+  reinterpret / postpone / hide) that never punishes or re-injects a refused
+  interpretation as fact.
+- Relic callbacks and awakening candidates coordinated through Relic
+  Recognition; the orchestrator surfaces evidence but never awakens a relic.
+- NPC/world reactions built from Phase 16 NPC-knowledge projection; NPCs never
+  receive raw Chronicle omniscience.
+- A bounded narrative provider (`CampaignNarrativeProvider`) with a
+  deterministic mock that may choose wording but never invent canon.
+- Save/resume idempotency: replaying commit or resolve never duplicates a
+  canonical event or re-applies a domain mutation.
+- A deterministic North-Star end-to-end fixture and comprehensive tests covering
+  provenance, cooldowns, rejection persistence, consent filtering, provider
+  failure, and relic-awakening authority.
+
+**Exit criteria**
+
+- A fresh player can enter SoulSmith and move through a continuous campaign in
+  which symbols recur, relics remember, another Aspect's promise survives into
+  the world, an NPC legitimately knows enough to react, patterns accumulate
+  evidence, the player may recognize/reject/reinterpret/postpone, a changed
+  choice becomes a Chronicle-backed Integration Event, and a relic awakens
+  because its narrative conditions were actually met.
+- Every meaningful callback is traceable to structured source evidence.
+
+See [`docs/CAMPAIGN_ORCHESTRATOR.md`](CAMPAIGN_ORCHESTRATOR.md).
+
+---
+
+### Phase 18: Soulkeeper Narrative Engine & Provider Runtime `[Status: Integrated]`
+
+Give SoulSmith a real storyteller without giving the storyteller authority over
+canon.
+
+> **DOMAIN SYSTEMS DECIDE WHAT IS TRUE. THE SOULKEEPER DECIDES HOW IT IS TOLD.**
+
+- A formalized, consent-safe `NarrativeContext` compiled from the smallest
+  authorized evidence set, with explicit structured scene continuity (never
+  provider chat history).
+- A structured `NarrativeOutput` (scene prose, NPC dialogue, Soulkeeper
+  narration, questions, flavor lines, provenance, uncertainty, presentation
+  cues) behind the existing `CampaignNarrativeProvider` abstraction.
+- A provider runtime (`NarrativeRuntime`) with selection/configuration, timeout,
+  bounded retry, deterministic validation, safe deterministic fallback, and
+  generation metadata (provider/model/template/timestamp/retry/validation).
+- A real, configurable OpenAI-compatible provider (no vendor SDK hard-wired)
+  alongside the first-class deterministic mock.
+- A deterministic narrative Guardian distinct from the Visual Canon and World
+  Memory Guardians: pass / retry / block, rejecting unknown participants,
+  invented prior events, dates/durations, relic abilities, Thread/Integration
+  overreach, perspective violations, private leaks, and psychological authority.
+- A fact-free Soulkeeper style layer and NPC-scoped narrative contexts built
+  from Phase 16 knowledge projection.
+- API surfaces for provider status/capabilities, authorized context preview,
+  generation inspection, and re-voicing without changing campaign/domain state.
+- Frontend support for structured narration, NPC dialogue, Soulkeeper
+  questions, provenance, and graceful provider failure/fallback.
+
+**Exit criteria**
+
+- The Phase 17 North-Star loop runs with a real narrative provider that
+  transforms deterministic, provenance-backed campaign state into compelling
+  player-facing storytelling without ever creating new canon.
+- Provider failure never damages canon; the complete system still runs with
+  deterministic local/mock infrastructure.
+
+See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
+
+---
+
+### Phase 19: Relationship & Promise Engine `[Status: Integrated]`
+
+Give relationships and promises first-class, provenance-backed persistence so
+bonds between people can become durable story machinery across encounters,
+Aspects, generations, relics, and World Memory.
+
+> **A RELATIONSHIP IS HISTORY BETWEEN PEOPLE. A PROMISE IS A CLAIM ON THE FUTURE.
+> NEITHER MAY BE INVENTED BY THE NARRATOR.**
+
+- A dedicated relationship domain model with stable IDs, participants, kinds,
+  canonical source-event links, status, an immutable events/history timeline,
+  and participant-specific perspectives that never collapse into objective
+  emotional truth.
+- A dedicated promise domain model with a maker, recipient/beneficiary, original
+  immutable wording, structured meaning, conditions, scope, visibility/secrecy,
+  source provenance, and an immutable lifecycle-state history.
+- A promise lifecycle (`proposed` → `made` → `acknowledged` → `active` →
+  `fulfilled`/`broken`/`released`/`disputed`/`impossible`/`unresolved`, plus
+  `inherited`/`transferred`/`forgotten`/`rediscovered`) where the original
+  wording/source is never rewritten and release is historical, not deletion.
+- Evidence-backed fulfillment/breach/release/inheritance/transfer: canonical
+  events or explicit player authorization of subjective conditions; ambiguous
+  evidence is represented as dispute rather than forced.
+- Relic integration (a relic may witness/record/be the subject of a promise and
+  feed Relic Recognition evidence without the engine ever awakening a relic),
+  Soul Constellation pattern surfacing, and World Memory source tracing that
+  never mutates the relationship/promise rows.
+- Consent-safe NPC knowledge projection for relationships/promises (a secret
+  promise never leaks merely because it exists in the database).
+- First-class `relationship_callback` and `promise_consequence` opportunity
+  generation wired into the Campaign Orchestrator, replacing the old
+  World-Memory-routed promise path.
+- Phase 18 `NarrativeContext`/Guardian extension so the Soulkeeper may phrase
+  relationship/promise material only from structured authority and cannot invent
+  a promise, relationship, or decide a promise outcome.
+
+**Exit criteria**
+
+- SoulSmith can remember not only what happened to people, but what happened
+  *between* them, with every relationship and promise traceable to canonical
+  evidence and every callback deterministically eligible.
+
+See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
+
+---
+
+### Phase 20: Multi-Aspect Campaign Sessions & Wandering Mode Foundation `[Status: Integrated]`
+
+Let multiple Aspects coexist meaningfully inside one campaign while preserving
+strict viewpoint boundaries, and lay the architectural foundation for
+real-world **WANDERING** play.
+
+> **THE PLAYER MAY KNOW THE WHOLE STORY. EACH ASPECT KNOWS ONLY THE LIFE THEY
+> HAVE LIVED.**
+>
+> **THE WORLD MAY SUGGEST WHERE TO LOOK. IT MUST NEVER REQUIRE THE PLAYER TO
+> SURRENDER THEIR PRIVACY OR SAFETY.**
+
+- Campaign-level sessions with multiple registered playable Aspects; each
+  Aspect keeps independent structured state (identity, viewpoint, location,
+  Chronicle visibility, knowledge, relationships, promises, relic history,
+  Threads, Seeds, World Memory exposure, opportunities).
+- Explicit knowledge layers — `CANONICAL TRUTH != PLAYER KNOWLEDGE != ASPECT
+  KNOWLEDGE != NPC KNOWLEDGE != WORLD MEMORY` — enforced by Aspect-scoped
+  Chronicle/Curiosity queries and a bounded `knowledge_projection` with
+  `forbidden_events`.
+- Deterministic, idempotent Aspect switching that persists departing state,
+  loads destination state, rebuilds `NarrativeContext`, recalculates
+  opportunities/NPC projection, and preserves campaign-level history.
+- Cross-Aspect encounters with one shared canonical event and separate
+  participant perspectives; Relationships/Promises/Relics integrated through
+  provenance-backed inheritance/transfer and entity links.
+- WANDERING foundation: persistent place entities that accumulate Chronicle
+  history, consent-safe location sampling (opt-in, minimized precision, no
+  continuous tracking), bounded deterministic nearby discovery, a
+  map-provider abstraction, and privacy/safety rules (retired/restricted places
+  stop new discovery without deleting old history).
+- Frontend Aspect switcher and Wandering discovery shell; the game remains
+  fully usable when location permission is declined.
+
+**Exit criteria**
+
+- A player can maintain multiple Aspects in one campaign, switch between them,
+  and allow them to coexist or meet without collapsing their knowledge into the
+  player's omniscient view; an action by Aspect A can leave a provenance-backed
+  consequence that Aspect B later encounters without automatically
+  understanding it.
+
+See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
+
+---
+
+### Phase 21: Living Visual World & ComfyUI Runtime `[Status: Integrated]`
+
+Turn the completed visual architecture into a living runtime that paints
+meaningful moments during actual play.
+
+> **SOULSMITH DOES NOT ILLUSTRATE EVERYTHING. IT PAINTS WHAT BECOMES WORTH
+> REMEMBERING.**
+>
+> **MEMORY IS CANON. ART IS INTERPRETATION.**
+
+- `CANONICAL STATE -> ART DIRECTOR ELIGIBILITY -> SCENE/PORTRAIT/OBJECT SPEC ->
+  VISUAL PROVIDER -> QUARANTINE -> VISUAL CANON GUARDIAN -> APPROVAL ->
+  GALLERY/MEMORY`; never `GENERATED IMAGE -> NEW CANON`.
+- Persistent `ArtMoment` (what the Art Director found worth painting) and
+  `VisualJob` (auditable, resumable generation lifecycle) tables, with
+  provenance (provider/workflow/version/reference assets/Guardian verdicts).
+- Deterministic Art Director eligibility over structured state (Chronicle
+  importance, Integration/Thread transition, relic state, relationship events,
+  promise outcomes, Group Memory significance, World Memory significance,
+  Wandering place history). Most events produce no Art Moment.
+- A configurable local ComfyUI runtime that reuses the existing
+  `app.comfyui` client/workflow stack (no second image stack), with workflow
+  selection by visual type, timeout/retry, health/capability diagnostics, and a
+  deterministic mock fallback requiring no GPU or internet.
+- Portrait continuity keeps locked historical references and never silently
+  falls back to text-to-image; approved art creates new interpretation, not new
+  canon.
+- A human creative-direction extension point (curation) that may interpret but
+  never rewrite locked canonical facts, laying groundwork for a future
+  Mythmaker Workshop.
+
+**Exit criteria**
+
+- A meaningful canonical moment becomes an Art Moment through deterministic
+  eligibility; a configured local ComfyUI instance renders it asynchronously;
+  raw output is quarantined and validated before any player-visible approval.
+  If ComfyUI disappears, SoulSmith keeps playing.
+
+See [`docs/LIVING_VISUAL_WORLD.md`](LIVING_VISUAL_WORLD.md).
+
 ---
 
 ## Near-Term Implementation Priorities
 
-1. Finish the canonical roll contract migration across API, persistence, frontend types, and tests.
-2. Strengthen Chronicle provenance, retrieval, and contradiction handling.
-3. Define schemas for Seeds, Questions, Symbols, Local Threads, and Integration Events.
-4. Prototype the Curiosity Engine using deterministic rules before adding model-driven inference.
-5. Build one vertical slice:
-   - plant a Seed,
-   - echo it across three encounters,
-   - let the player recognize or reject the pattern,
-   - trigger a Chronicle-backed Integration Event,
-   - awaken one relic capability.
-6. Test the vertical slice with players who hold different philosophical interpretations.
-7. Use those sessions to refine pacing, ambiguity, consent, and player control before implementing the full Constellation.
+The phases listed above are **shipped and integrated** (Phases 0-19). The
+remaining work is hardening and optional deepening, not foundational:
+
+1. ~~Add a real (non-mock) narrative provider behind `CampaignNarrativeProvider`~~
+   — **Integrated** as Phase 18 (Soulkeeper Narrative Engine & Provider Runtime).
+   See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](SOULKEEPER_NARRATIVE_ENGINE.md).
+2. ~~Add a dedicated relationship/promise data model so `relationship_callback`
+   and `promise_consequence` opportunities can be auto-generated (today the
+   NPC promise-reaction path is exercised through World Memory)~~
+   — **Integrated** as Phase 19 (Relationship & Promise Engine).
+   See [`docs/RELATIONSHIPS_AND_PROMISES.md`](RELATIONSHIPS_AND_PROMISES.md).
+3. ~~Support multi-Aspect simultaneous sessions within one campaign~~ — **Integrated**
+   as Phase 20 (Multi-Aspect Campaign Sessions & Wandering Mode Foundation).
+   See [`docs/MULTI_ASPECT_AND_WANDERING.md`](MULTI_ASPECT_AND_WANDERING.md).
+4. ~~Move the ComfyUI/visual providers from mock to a local instance for art
+   moments, preserving the canonical/Guardian pipelines already built~~ —
+   **Integrated** as Phase 21 (Living Visual World & ComfyUI Runtime).
+   See [`docs/LIVING_VISUAL_WORLD.md`](LIVING_VISUAL_WORLD.md).
+5. ~~Optional wall-clock cooldowns in addition to the deterministic count-based
+   pacing currently used by the orchestrator~~ — **Integrated** as Phase 22
+   (Temporal Pacing & Living Time): an injectable trusted clock, distinct time
+   domains, wall-clock/hybrid cooldowns, a fictional-time policy foundation,
+   provenance-backed scheduled consequences, aspect-relative time, and a gentle
+   return recap. See
+   [`docs/TEMPORAL_PACING_AND_LIVING_TIME.md`](TEMPORAL_PACING_AND_LIVING_TIME.md).
 
 ---
 

@@ -2,8 +2,8 @@
 SoulKeeper AI Orchestrator & Canon Guardian Engine
 """
 
-from typing import List, Optional
 from pydantic import BaseModel
+
 from app.grammar import InterpretedDiceRoll
 from app.rules import ResolveSceneResponse
 
@@ -18,9 +18,9 @@ class SoulkeeperNarration(BaseModel):
     title: str
     prose: str
     tone: str
-    scene_beats: List[str]
-    canon_writeback: List[str]
-    guardian_audit: List[CanonGuardianGateResult]
+    scene_beats: list[str]
+    canon_writeback: list[str]
+    guardian_audit: list[CanonGuardianGateResult]
 
 
 def generate_soulkeeper_narration(
@@ -29,7 +29,7 @@ def generate_soulkeeper_narration(
     outcome: ResolveSceneResponse,
     soul_name: str,
     calling: str,
-    active_relic: Optional[str] = None,
+    active_relic: str | None = None,
 ) -> SoulkeeperNarration:
     """
     Simulates / formats the Soulkeeper AI Orchestration pass with Canon Guardian validation gates.

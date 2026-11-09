@@ -6,7 +6,6 @@ SoulSmith FastAPI Main Application.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import Dict, List, Optional
 
 from fastapi import (
     FastAPI,
@@ -17,7 +16,20 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
+from app.art_director import (
+    ArtDirectionProfileModel,
+    ArtDirectionProfileVersionModel,
+    CompileArtDirectionSpecRequest,
+    CreateArtDirectionProfileRequest,
+    ResolveArtDirectionRequest,
+    ResolvedArtDirectionModel,
+    UpdateArtDirectionProfileRequest,
+    apply_art_direction_to_prompt,
+    compile_art_direction_spec,
+    resolve_art_direction,
+)
 from app.auth import (
     AuthResponse,
     UserLoginRequest,
@@ -28,37 +40,135 @@ from app.auth import (
     hash_password,
     verify_password,
 )
-from app.curiosity import (
-    IntegrateThreadRequest,
-    QuestionResolveRequest,
-    SeedPlantRequest,
+from app.biography import (
+    BiographyModel,
+    CompileBiographyRequest,
+    project_biography_for_viewer,
+    source_visible_to,
 )
+from app.biography_compiler import BiographyCompilationError, compile_biography
+from app.campaign import (
+    CampaignOpportunityModel,
+    CampaignSessionModel,
+    CampaignTransitionModel,
+    CommitEventRequest,
+    EvaluateOpportunitiesRequest,
+    PreviewNarrativeContextRequest,
+    ResolveOpportunityRequest,
+    SelectNarrativeProviderRequest,
+    StartSessionRequest,
+)
+from app.campaign_orchestrator import (
+    CampaignOrchestratorError,
+    advance_campaign_fictional_time,
+    build_return_recap,
+    commit_canonical_event,
+    evaluate_opportunities,
+    evaluate_temporal_eligibility,
+    get_aftermath,
+    get_narrative_provider_status,
+    get_pending_reviews,
+    get_session_state,
+    get_transition_provenance,
+    inspect_aspect_view,
+    inspect_narrative,
+    inspect_opportunity,
+    inspect_temporal_context,
+    list_campaign_aspects,
+    list_scheduled_consequences,
+    preview_narrative_context,
+    regenerate_narrative,
+    resolve_cross_aspect_encounter,
+    resolve_opportunity,
+    retire_scheduled_consequence,
+    start_or_resume_session,
+    switch_campaign_aspect,
+)
+from app.chronicle_paintings import (
+    ChroniclePaintingModel,
+    CreateChroniclePaintingRequest,
+    GenerateChroniclePaintingRequest,
+)
+from app.comfyui.storage import get_asset_root
+from app.comfyui.workflow_roles import select_world_workflow_role
 from app.constellation import (
     AWAKENING_STAGE_DESCRIPTIONS,
     AdvanceAwakeningRequest,
     CreateAspectRequest,
     CreateBondRequest,
 )
+from app.convergence import (
+    CanonForkRequest,
+    CanonMergeRequest,
+    CommunitySymbolModel,
+    CreateCommunitySymbolRequest,
+    GatheringContributeRequest,
+    GatheringSessionModel,
+)
+from app.curiosity import (
+    IntegrateThreadRequest,
+    QuestionResolveRequest,
+    SeedPlantRequest,
+)
 from app.db import (
-    create_aspect_record,
-    create_cross_aspect_bond_record,
-    create_user_record,
+    add_gallery_collection_item_record,
     add_gathering_contribution,
+    add_group_memory_anchor_record,
+    add_group_memory_member_record,
+    add_group_memory_tag_record,
+    add_legendary_figure_link_record,
+    add_promise_entity_link_record,
+    add_relationship_entity_link_record,
+    add_relationship_event_record,
+    add_relationship_perspective_record,
     add_story_mark_record,
+    approve_biography_transaction,
+    approve_chronicle_painting_transaction,
     approve_portrait_candidate_transaction,
+    approve_world_memory_record,
+    approve_world_visual_candidate_transaction,
     compile_memory_object_record,
+    create_art_direction_profile_record,
+    create_art_direction_profile_version_record,
+    create_aspect_record,
     create_community_symbol_record,
+    create_cross_aspect_bond_record,
+    create_gallery_collection_record,
+    create_group_memory_record,
+    create_legendary_figure_record,
     create_portrait_candidate_record,
     create_portrait_version_record,
     create_private_note_record,
+    create_promise_record,
     create_reflection_record,
+    create_relationship_record,
+    create_user_record,
+    create_world_memory_placement_record,
+    create_world_visual_candidate_record,
     execute_integration_event,
     get_all_canonical_events,
     get_all_local_threads,
     get_all_open_questions,
     get_all_seeds,
+    get_approved_chronicle_paintings_records,
+    get_art_direction_profile_record,
+    get_art_direction_profile_version_record,
+    get_biography_record,
+    get_chronicle_painting_record,
+    get_chronicle_paintings_records,
     get_community_symbols_records,
+    get_current_art_direction_profile_record,
+    get_current_biography_record,
+    get_db_connection,
+    get_gallery_collection_record,
+    get_group_memory_anchors_records,
+    get_group_memory_by_event_record,
+    get_group_memory_members_records,
+    get_group_memory_record,
+    get_group_memory_tags_records,
+    get_legendary_figure_record,
     get_memory_object_record,
+    get_memory_objects_by_event_record,
     get_memory_objects_records,
     get_or_create_avatar_identity_record,
     get_or_create_equipment_appearance_record,
@@ -73,23 +183,190 @@ from app.db import (
     get_portrait_versions_records,
     get_private_notes_records,
     get_probable_paths_records,
+    get_promise_record,
     get_reflections_records,
+    get_relationship_record,
     get_relic_history_records,
     get_story_marks_records,
     get_user_by_email,
     get_user_by_username,
+    get_visual_entity_version_record,
+    get_visual_entity_versions_records,
+    get_world_memory_record,
+    get_world_memory_state_history_records,
+    get_world_visual_candidate_record,
+    get_world_visual_candidates_records,
     init_database,
+    list_art_direction_profile_versions_records,
+    list_art_direction_profiles_records,
+    list_biography_records,
+    list_gallery_collections_records,
+    list_group_memory_records,
+    list_legendary_figures_records,
+    list_promise_records,
+    list_relationship_records,
+    list_world_memory_placements_records,
+    list_world_memory_records,
+    list_world_memory_versions_records,
     log_canonical_event,
     log_probable_path_record,
+    mark_world_memory_state_record,
     plant_or_echo_seed,
+    promises_for_entity,
+    promises_linked_to_entity,
+    reject_biography_record,
+    reject_chronicle_painting_record,
     reject_portrait_candidate_record,
+    reject_world_memory_record,
+    reject_world_visual_candidate_record,
+    relationships_for_entity,
+    remove_gallery_collection_item_record,
+    remove_group_memory_member_record,
+    remove_group_memory_tag_record,
+    reorder_gallery_collection_items_record,
     resolve_open_question,
+    set_art_direction_profile_status_record,
+    transition_promise_record,
     update_awakening_stage_record,
     update_candidate_generation_result,
+    update_gallery_collection_record,
+    update_group_memory_significance_record,
     update_preferences_record,
     update_probable_path_manifestation,
     update_relic_stage_record,
+    update_world_visual_candidate_result,
 )
+from app.encounters import (
+    EncounterFrame,
+    EncounterFrameRequest,
+    generate_encounter_frame,
+)
+from app.grammar import (
+    CURRENT_GRAMMAR_VERSION,
+    NumericDiceRoll,
+    RollRequest,
+    generate_numeric_roll,
+    get_available_versions,
+    get_versioned_grammar,
+    interpret_numeric_roll,
+)
+from app.group_memories import (
+    AddGroupAnchorRequest,
+    AddGroupTagRequest,
+    AttachMemoryObjectRequest,
+    CreateGroupMemoryRequest,
+    GroupMemoryModel,
+    build_perspective_comparison,
+    derive_group_significance,
+    derive_members_from_memory_objects,
+    derive_title_summary,
+    project_group_for_viewer,
+    suggest_related_by_similarity,
+)
+from app.living_visual import (
+    CurateArtMomentRequest,
+    LivingVisualRuntimeError,
+    ProcessVisualJobRequest,
+    QueueArtMomentsRequest,
+    approve_visual_job,
+    get_art_moment,
+    get_guardian_verdict,
+    get_visual_job,
+    hide_visual_job,
+    inspect_scene_spec,
+    list_art_moments,
+    list_visual_jobs,
+    process_visual_job,
+    queue_art_moments,
+    record_human_curation,
+    regenerate_visual_job,
+    reject_visual_job,
+    visual_history,
+)
+from app.living_visual_provider import get_living_visual_status
+from app.multi_aspect import (
+    CampaignAspectModel,
+    CrossAspectEncounterRequest,
+    RegisterCampaignAspectRequest,
+    SwitchAspectRequest,
+)
+from app.painting_compiler import compile_chronicle_painting_scene
+from app.painting_pipeline import (
+    create_painting_attempt,
+    generate_chronicle_painting,
+)
+from app.painting_provider import get_painting_provider
+from app.painting_reference import (
+    ParticipantResolutionError,
+    resolve_historical_participants,
+)
+from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
+from app.portrait_compiler import PromptCompilationResult, compile_portrait_prompt
+from app.portrait_provider import (
+    ProviderGenerationRequest,
+    get_comfyui_status,
+    get_portrait_provider,
+)
+from app.portrait_reference import SourcePortraitError, resolve_source_portrait
+from app.probable_paths import (
+    CreateProbablePathRequest,
+    ExploreAlternateSceneRequest,
+    ManifestPathRequest,
+    ProbablePathModel,
+    simulate_alternate_scene_exploration,
+)
+from app.reflection import (
+    CreatePrivateNoteRequest,
+    CreateReflectionRequest,
+    PlayerPreferencesModel,
+    PrivateNoteModel,
+    ReflectionSessionModel,
+    UpdatePreferencesRequest,
+)
+from app.relationship import (
+    AddRelationshipEventRequest,
+    AddRelationshipPerspectiveRequest,
+    CreatePromiseRequest,
+    CreateRelationshipRequest,
+    EvaluatePromiseRequest,
+    LinkPromiseEntityRequest,
+    LinkRelationshipEntityRequest,
+    PromiseModel,
+    RelationshipModel,
+    RelationshipPromiseNPCKnowledgeRequest,
+    TransitionPromiseRequest,
+    project_promise_for_viewer,
+    project_relationship_for_viewer,
+    project_relationship_promise_npc_knowledge,
+    promise_visible_to,
+    relationship_visible_to,
+)
+from app.relics import (
+    RelicAttuneRequest,
+    RelicAttuneResponse,
+    RelicEventModel,
+    RelicModel,
+    RelicNarrativeAttuneRequest,
+    RelicOverdrawRequest,
+    RelicRepairRequest,
+    RelicTransfigureRequest,
+    process_relic_attunement,
+)
+from app.rules import ResolveSceneRequest, ResolveSceneResponse, evaluate_scene_outcome
+from app.soulkeeper import SoulkeeperNarration, generate_soulkeeper_narration
+from app.soulprint import (
+    SoulprintProfile,
+    SoulprintRequest,
+    generate_astrological_soulprint,
+)
+from app.style_reviewer import get_art_direction_reviewer
+from app.temporal import (
+    AdvanceFictionalTimeRequest,
+    EvaluateTemporalEligibilityRequest,
+    ScheduleConsequenceRequest,
+)
+from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
+from app.visual_compilers import compile_canonical_delta, compile_visual_prompt
 from app.visual_memory import (
     AddStoryMarkRequest,
     ApproveCandidateRequest,
@@ -108,63 +385,59 @@ from app.visual_memory import (
     RejectCandidateRequest,
     StoryMarkModel,
 )
-from app.portrait_compiler import compile_portrait_prompt, PromptCompilationResult
-from app.portrait_provider import get_portrait_provider, ProviderGenerationRequest
-from app.reflection import (
-    CreatePrivateNoteRequest,
-    CreateReflectionRequest,
-    PlayerPreferencesModel,
-    PrivateNoteModel,
-    ReflectionSessionModel,
-    UpdatePreferencesRequest,
+from app.visual_world import (
+    CreateWorldVisualCandidateRequest,
+    GenerateWorldVisualCandidateRequest,
+    VisualEntityVersionModel,
+    WorldVisualCandidateModel,
 )
-from app.convergence import (
-    CanonForkRequest,
-    CanonMergeRequest,
-    CommunitySymbolModel,
-    CreateCommunitySymbolRequest,
-    GatheringContributeRequest,
-    GatheringSessionModel,
+from app.wandering import (
+    CreatePlaceRequest,
+    LocationConsentRequest,
+    LocationSampleRequest,
+    PlaceModel,
+    RecordDiscoveryRequest,
+    RecordPlaceHistoryRequest,
+    RetirePlaceRequest,
+    inspect_place_history,
+    list_places_visible_to,
+    nearby_eligible_places,
+    record_place_discovery,
+    record_place_history,
+    submit_location_sample,
 )
-from app.relics import (
-    RelicEventModel,
-    RelicModel,
-    RelicNarrativeAttuneRequest,
-    RelicOverdrawRequest,
-    RelicRepairRequest,
-    RelicTransfigureRequest,
+from app.world_gallery import (
+    AddGalleryCollectionItemRequest,
+    CreateGalleryCollectionRequest,
+    GalleryCollectionItemModel,
+    GalleryCollectionModel,
+    ReorderGalleryCollectionRequest,
+    UpdateGalleryCollectionRequest,
+    list_gallery_artifacts,
 )
-from app.probable_paths import (
-    CreateProbablePathRequest,
-    ExploreAlternateSceneRequest,
-    ManifestPathRequest,
-    ProbablePathModel,
-    simulate_alternate_scene_exploration,
+from app.world_memory import (
+    CompileWorldMemoryRequest,
+    LegendaryFigureModel,
+    MarkMemoryStateRequest,
+    NPCKnowledgeRequest,
+    PlaceWorldMemoryRequest,
+    PromoteLegendaryFigureRequest,
+    WorldMemoryDeviationModel,
+    WorldMemoryModel,
+    WorldMemoryPlacementModel,
+    project_npc_knowledge,
+    project_world_memory_for_viewer,
+    world_memory_visible_to,
 )
-from app.encounters import (
-    EncounterFrame,
-    EncounterFrameRequest,
-    generate_encounter_frame,
+from app.world_memory_compiler import (
+    WorldMemoryCompilationError,
+    compile_world_memory,
+    gather_world_memory_sources,
 )
-from app.grammar import (
-    CURRENT_GRAMMAR_VERSION,
-    NumericDiceRoll,
-    RollRequest,
-    generate_numeric_roll,
-    get_available_versions,
-    get_versioned_grammar,
-    interpret_numeric_roll,
+from app.world_visual_provider import (
+    WorldVisualGenerationRequest,
+    get_world_visual_provider,
 )
-from app.phenomena import DEFAULT_ACTIVE_PHENOMENA, Phenomenon
-from app.relics import RelicAttuneRequest, RelicAttuneResponse, process_relic_attunement
-from app.rules import ResolveSceneRequest, ResolveSceneResponse, evaluate_scene_outcome
-from app.soulkeeper import SoulkeeperNarration, generate_soulkeeper_narration
-from app.soulprint import (
-    SoulprintProfile,
-    SoulprintRequest,
-    generate_astrological_soulprint,
-)
-from app.vision import PhotoIngestRequest, PhotoIngestResponse, process_dice_photo
 
 
 @asynccontextmanager
@@ -188,10 +461,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve SoulSmith-owned generated assets (e.g. ComfyUI candidate portraits).
+_asset_root = get_asset_root()
+_asset_root.mkdir(parents=True, exist_ok=True)
+app.mount("/assets", StaticFiles(directory=str(_asset_root)), name="assets")
+
 
 class RoomManager:
     def __init__(self) -> None:
-        self.rooms: Dict[str, List[WebSocket]] = {}
+        self.rooms: dict[str, list[WebSocket]] = {}
 
     async def connect(self, room_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -271,7 +549,7 @@ def login(req: UserLoginRequest):
 
 
 @app.get("/api/v1/auth/me", response_model=UserModel)
-def get_me(authorization: Optional[str] = Header(None)):
+def get_me(authorization: str | None = Header(None)):
     return get_current_user(authorization=authorization)
 
 
@@ -432,7 +710,7 @@ def integrate_local_thread(req: IntegrateThreadRequest):
 
 
 @app.get("/api/v1/phenomena")
-def get_active_phenomena() -> List[Phenomenon]:
+def get_active_phenomena() -> list[Phenomenon]:
     return DEFAULT_ACTIVE_PHENOMENA
 
 
@@ -904,6 +1182,11 @@ def get_memory_object(memory_object_id: str):
 # Phase 10: Portrait Generation & Continuity Endpoints
 
 
+@app.get("/api/v1/visual-memory/providers/comfyui/status")
+def comfyui_provider_status():
+    return get_comfyui_status()
+
+
 @app.post(
     "/api/v1/visual-memory/portraits/compile",
     response_model=PromptCompilationResult,
@@ -945,11 +1228,13 @@ def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
     story_marks = [StoryMarkModel(**m) for m in story_marks_list]
     equipment = EquipmentAppearanceModel(**equipment_dict)
 
-    ref_url = None
-    if req.source_portrait_version_id:
-        source_pv = get_portrait_version_record(req.source_portrait_version_id)
-        if source_pv:
-            ref_url = source_pv["image_url"]
+    try:
+        source_version = resolve_source_portrait(
+            req.soul_id, req.source_portrait_version_id
+        )
+    except SourcePortraitError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    ref_url = source_version["image_url"] if source_version else None
 
     compiled = compile_portrait_prompt(
         identity=identity,
@@ -961,23 +1246,32 @@ def create_portrait_candidate_endpoint(req: CreatePortraitCandidateRequest):
         style_preset=req.style_preset,
     )
 
+    profile_id, profile_version_id, final_prompt = _apply_art_direction_to_compiled(
+        req.art_direction_profile_version_id,
+        "portrait",
+        compiled.compiled_prompt,
+        canonical={"soul_id": req.soul_id, "identity": identity.model_dump()},
+    )
+
     candidate = create_portrait_candidate_record(
         soul_id=req.soul_id,
         generation_type=req.generation_type,
-        compiled_prompt=compiled.compiled_prompt,
+        compiled_prompt=final_prompt,
         canonical_identity_snapshot=identity.model_dump(),
         story_marks_snapshot=[m.model_dump() for m in story_marks],
         equipment_snapshot=equipment.model_dump(),
         source_portrait_version_id=req.source_portrait_version_id,
         reference_image_url=ref_url,
         negative_prompt=", ".join(compiled.negative_constraints),
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
     )
     return {"candidate": PortraitGenerationCandidateModel(**candidate)}
 
 
 @app.post("/api/v1/visual-memory/portraits/candidates/{candidate_id}/generate")
 def generate_portrait_candidate_endpoint(
-    candidate_id: str, req: Optional[GenerateCandidateRequest] = None
+    candidate_id: str, req: GenerateCandidateRequest | None = None
 ):
     candidate = get_portrait_candidate_record(candidate_id)
     if not candidate:
@@ -996,6 +1290,7 @@ def generate_portrait_candidate_endpoint(
         compiled_prompt=candidate["compiled_prompt"],
         generation_type=candidate["generation_type"],
         reference_image_url=candidate.get("reference_image_url"),
+        negative_prompt=candidate.get("negative_prompt"),
         seed=seed,
     )
 
@@ -1135,6 +1430,1731 @@ def get_portrait_version_endpoint(version_id: str):
     return {"portrait_version": PortraitVersionModel(**record)}
 
 
+# Phase 4: Visual Worldsmith Endpoints
+
+
+@app.post("/api/v1/visual-world/candidates")
+def create_world_visual_candidate_endpoint(req: CreateWorldVisualCandidateRequest):
+    source_version = None
+    if req.source_visual_version_id:
+        source_version = get_visual_entity_version_record(req.source_visual_version_id)
+        if not source_version:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Source visual version '{req.source_visual_version_id}' not found",
+            )
+        if (
+            source_version["entity_id"] != req.entity_id
+            or source_version["entity_type"] != req.entity_type
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source visual version does not match the requested entity",
+            )
+
+    previous_snapshot = source_version["canonical_snapshot"] if source_version else None
+    compiled = compile_visual_prompt(
+        entity_type=req.entity_type,
+        name=req.name,
+        canonical_state=req.canonical_state,
+        generation_type=req.generation_type,
+        previous_snapshot=previous_snapshot,
+        style=req.style,
+    )
+    canonical_delta = compile_canonical_delta(previous_snapshot, req.canonical_state)
+    workflow_role = select_world_workflow_role(req.entity_type, req.generation_type)
+
+    profile_id, profile_version_id, final_prompt = _apply_art_direction_to_compiled(
+        req.art_direction_profile_version_id,
+        req.entity_type,
+        compiled.compiled_prompt,
+        canonical=req.canonical_state,
+    )
+
+    candidate = create_world_visual_candidate_record(
+        entity_id=req.entity_id,
+        entity_type=req.entity_type,
+        generation_type=req.generation_type,
+        canonical_snapshot=req.canonical_state,
+        canonical_delta=canonical_delta,
+        compiled_prompt=final_prompt,
+        workflow_role=workflow_role,
+        negative_prompt=", ".join(compiled.negative_constraints),
+        source_visual_version_id=req.source_visual_version_id,
+        reference_image_url=source_version["image_url"] if source_version else None,
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
+    )
+    return {"candidate": WorldVisualCandidateModel(**candidate)}
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/generate")
+def generate_world_visual_candidate_endpoint(
+    candidate_id: str, req: GenerateWorldVisualCandidateRequest | None = None
+):
+    candidate = get_world_visual_candidate_record(candidate_id)
+    if not candidate:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World visual candidate '{candidate_id}' not found",
+        )
+
+    provider = get_world_visual_provider((req and req.provider_type) or None)
+    gen_req = WorldVisualGenerationRequest(
+        candidate_id=candidate["candidate_id"],
+        entity_id=candidate["entity_id"],
+        entity_type=candidate["entity_type"],
+        compiled_prompt=candidate["compiled_prompt"],
+        workflow_role=candidate["workflow_role"],
+        generation_type=candidate["generation_type"],
+        negative_prompt=candidate.get("negative_prompt"),
+        reference_image_url=candidate.get("reference_image_url"),
+        seed=(req and req.seed) or None,
+    )
+    result = provider.generate(gen_req)
+
+    if result.success:
+        updated = update_world_visual_candidate_result(
+            candidate_id=candidate_id,
+            status="generated",
+            generated_image_url=result.generated_image_url,
+            provider=result.provider,
+            provider_model=result.provider_model,
+            provider_request_id=result.provider_request_id,
+            generation_seed=result.generation_seed,
+        )
+    else:
+        updated = update_world_visual_candidate_result(
+            candidate_id=candidate_id,
+            status="failed",
+            provider=result.provider,
+            provider_model=result.provider_model,
+            failure_reason=result.failure_reason,
+        )
+    return {"candidate": WorldVisualCandidateModel(**updated)}
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/approve")
+def approve_world_visual_candidate_endpoint(candidate_id: str):
+    try:
+        version = approve_world_visual_candidate_transaction(candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    candidate = get_world_visual_candidate_record(candidate_id)
+    return {
+        "visual_version": VisualEntityVersionModel(**version),
+        "candidate": WorldVisualCandidateModel(**candidate),
+        "message": "Candidate approved and promoted to an immutable VisualEntityVersion.",
+    }
+
+
+@app.post("/api/v1/visual-world/candidates/{candidate_id}/reject")
+def reject_world_visual_candidate_endpoint(candidate_id: str):
+    try:
+        updated = reject_world_visual_candidate_record(candidate_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "candidate": WorldVisualCandidateModel(**updated),
+        "message": "Candidate rejected. Canonical world state was untouched.",
+    }
+
+
+@app.get("/api/v1/visual-world/{entity_type}/{entity_id}/versions")
+def list_visual_entity_versions_endpoint(entity_type: str, entity_id: str):
+    records = get_visual_entity_versions_records(entity_type, entity_id)
+    return {"versions": [VisualEntityVersionModel(**r) for r in records]}
+
+
+@app.get("/api/v1/visual-world/{entity_type}/{entity_id}/candidates")
+def list_world_visual_candidates_endpoint(entity_type: str, entity_id: str):
+    records = get_world_visual_candidates_records(entity_type, entity_id)
+    return {"candidates": [WorldVisualCandidateModel(**r) for r in records]}
+
+
+# Phase 12: Chronicle Paintings + Visual Canon Guardian
+
+
+def _resolve_memory_for_painting(memory_object_id: str) -> MemoryObjectModel:
+    record = get_memory_object_record(memory_object_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{memory_object_id}' not found",
+        )
+    return MemoryObjectModel(**record)
+
+
+@app.post("/api/v1/chronicle-paintings")
+def create_chronicle_painting_endpoint(req: CreateChroniclePaintingRequest):
+    memory_object = _resolve_memory_for_painting(req.memory_object_id)
+
+    try:
+        participants = resolve_historical_participants(memory_object)
+    except ParticipantResolutionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    scene_spec = compile_chronicle_painting_scene(
+        memory_object=memory_object,
+        participants=participants,
+        composition=req.composition,
+        style=req.style,
+    )
+    historical_refs = [
+        {
+            "soul_id": p.soul_id,
+            "character_name": p.character_name,
+            "portrait_version_id": p.portrait_version_id,
+            "identity_strategy": p.identity_strategy,
+            "portrait_image_url": p.portrait_image_url,
+        }
+        for p in participants
+    ]
+
+    profile_id, profile_version_id, resolved = _resolve_art_direction_profile(
+        req.art_direction_profile_version_id, "chronicle_painting"
+    )
+
+    painting = create_painting_attempt(
+        memory_object=memory_object,
+        scene_spec=scene_spec,
+        historical_participant_refs=historical_refs,
+        generation_type=req.generation_type,
+        composition=scene_spec.composition,
+        source_painting_id=req.source_painting_id,
+        art_direction_profile_id=profile_id,
+        art_direction_profile_version_id=profile_version_id,
+        resolved_art_direction=resolved,
+    )
+    return {"painting": painting}
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/generate")
+def generate_chronicle_painting_endpoint(
+    painting_id: str, req: GenerateChroniclePaintingRequest | None = None
+):
+    painting_record = get_chronicle_painting_record(painting_id)
+    if not painting_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Painting '{painting_id}' not found",
+        )
+    memory_object = _resolve_memory_for_painting(painting_record["memory_object_id"])
+
+    result = generate_chronicle_painting(
+        painting_id,
+        memory_object,
+        provider_type=(req and req.provider_type) or None,
+        seed=(req and req.seed) or None,
+    )
+    return {"painting": result}
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/approve")
+def approve_chronicle_painting_endpoint(painting_id: str):
+    try:
+        approved = approve_chronicle_painting_transaction(painting_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "painting": ChroniclePaintingModel(**approved),
+        "message": "Painting approved as the preferred artistic interpretation.",
+    }
+
+
+@app.post("/api/v1/chronicle-paintings/{painting_id}/reject")
+def reject_chronicle_painting_endpoint(painting_id: str):
+    try:
+        rejected = reject_chronicle_painting_record(painting_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "painting": ChroniclePaintingModel(**rejected),
+        "message": "Painting rejected. Canonical memory was untouched.",
+    }
+
+
+@app.get("/api/v1/chronicle-paintings/gallery")
+def list_approved_chronicle_paintings_endpoint():
+    records = get_approved_chronicle_paintings_records()
+    return {"paintings": records}
+
+
+@app.get("/api/v1/chronicle-paintings/providers/capabilities")
+def chronicle_painting_provider_capabilities_endpoint():
+    provider = get_painting_provider(None)
+    return {"capabilities": provider.capabilities()}
+
+
+@app.get("/api/v1/chronicle-paintings/{painting_id}")
+def get_chronicle_painting_endpoint(painting_id: str):
+    record = get_chronicle_painting_record(painting_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Painting '{painting_id}' not found",
+        )
+    return {"painting": ChroniclePaintingModel(**record)}
+
+
+@app.get("/api/v1/chronicle-paintings")
+def list_chronicle_paintings_endpoint(memory_object_id: str | None = None):
+    if memory_object_id:
+        records = get_chronicle_paintings_records(memory_object_id)
+    else:
+        records = get_approved_chronicle_paintings_records()
+    return {"paintings": [ChroniclePaintingModel(**r) for r in records]}
+
+
+# Phase 13: Group Memories & Tags
+
+
+def _resolve_group_memory(group_id: str) -> dict:
+    group = get_group_memory_record(group_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group memory '{group_id}' not found",
+        )
+    return group
+
+
+def _project_group(group_id: str, viewer_soul_id: str | None) -> GroupMemoryModel:
+    group = _resolve_group_memory(group_id)
+    members = get_group_memory_members_records(group_id)
+    tags = get_group_memory_tags_records(group_id)
+    anchors = get_group_memory_anchors_records(group_id)
+    return project_group_for_viewer(
+        group=group,
+        members=members,
+        tags=tags,
+        anchors=anchors,
+        viewer_soul_id=viewer_soul_id,
+    )
+
+
+def _refresh_group_derived_fields(group_id: str) -> None:
+    members = get_group_memory_members_records(group_id)
+    memory_objects = []
+    for member in members:
+        record = get_memory_object_record(member["memory_object_id"])
+        if record:
+            memory_objects.append(record)
+
+    significance, score, rationale = derive_group_significance(memory_objects)
+    update_group_memory_significance_record(
+        group_id,
+        significance=significance,
+        score=score,
+        rationale=rationale,
+    )
+
+
+@app.post("/api/v1/group-memories")
+def create_group_memory_endpoint(req: CreateGroupMemoryRequest):
+    existing = get_group_memory_by_event_record(req.event_id)
+    if existing:
+        return {"group_memory": _project_group(existing["group_id"], None)}
+
+    title, summary = derive_title_summary([])
+    group = create_group_memory_record(
+        event_id=req.event_id,
+        visibility=req.visibility,
+        title=title,
+        summary=summary,
+    )
+
+    for memory_object_id in req.memory_object_ids:
+        record = get_memory_object_record(memory_object_id)
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Memory object '{memory_object_id}' not found",
+            )
+        if record["event_id"] != req.event_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Memory object '{memory_object_id}' belongs to event "
+                    f"'{record['event_id']}', not '{req.event_id}'"
+                ),
+            )
+        members = derive_members_from_memory_objects([record])
+        if members:
+            add_group_memory_member_record(
+                group_id=group["group_id"],
+                memory_object_id=memory_object_id,
+                soul_id=members[0]["soul_id"],
+                role_in_event=members[0]["role_in_event"],
+                portrait_version_id=members[0]["portrait_version_id"],
+            )
+
+    _refresh_group_derived_fields(group["group_id"])
+    return {"group_memory": _project_group(group["group_id"], None)}
+
+
+@app.post("/api/v1/group-memories/auto-group")
+def auto_group_memories_endpoint(event_id: str):
+    """
+    Deterministically group Memory Objects by exact shared event ID. Never by
+    name, tag, date, or semantic similarity.
+    """
+    memory_objects = get_memory_objects_by_event_record(event_id)
+    if not memory_objects:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No memory objects found for event '{event_id}'",
+        )
+
+    existing = get_group_memory_by_event_record(event_id)
+    if existing:
+        return {
+            "group_memory": _project_group(existing["group_id"], None),
+            "grouped": False,
+            "message": "Group memory already exists for this event.",
+        }
+
+    title, summary = derive_title_summary(memory_objects)
+    group = create_group_memory_record(event_id=event_id, title=title, summary=summary)
+    members = derive_members_from_memory_objects(memory_objects)
+    for member in members:
+        add_group_memory_member_record(
+            group_id=group["group_id"],
+            memory_object_id=member["memory_object_id"],
+            soul_id=member["soul_id"],
+            role_in_event=member["role_in_event"],
+            portrait_version_id=member["portrait_version_id"],
+        )
+
+    _refresh_group_derived_fields(group["group_id"])
+    return {
+        "group_memory": _project_group(group["group_id"], None),
+        "grouped": True,
+        "message": f"Grouped {len(members)} memory object(s) by exact event ID.",
+    }
+
+
+@app.get("/api/v1/group-memories")
+def list_group_memories_endpoint(viewer_soul_id: str | None = None):
+    records = list_group_memory_records()
+    projected = []
+    for record in records:
+        view = _project_group(record["group_id"], viewer_soul_id)
+        # Only surface group memories with at least one visible member.
+        if view.members:
+            projected.append(view)
+    return {"group_memories": [g.model_dump() for g in projected]}
+
+
+@app.get("/api/v1/group-memories/by-event/{event_id}")
+def get_group_memory_by_event_endpoint(
+    event_id: str, viewer_soul_id: str | None = None
+):
+    group = get_group_memory_by_event_record(event_id)
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No group memory found for event '{event_id}'",
+        )
+    return {"group_memory": _project_group(group["group_id"], viewer_soul_id)}
+
+
+@app.get("/api/v1/group-memories/related")
+def find_related_group_memories_endpoint(
+    anchor_type: str | None = None,
+    anchor_ref: str | None = None,
+    tag_type: str | None = None,
+    tag_value: str | None = None,
+    viewer_soul_id: str | None = None,
+):
+    results: set[str] = set()
+    if anchor_type and anchor_ref:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT group_id FROM group_memory_anchors "
+            "WHERE anchor_type = ? AND anchor_ref = ?",
+            (anchor_type, anchor_ref),
+        )
+        results.update(row["group_id"] for row in cursor.fetchall())
+        conn.close()
+    if tag_type or tag_value:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT group_id FROM group_memory_tags WHERE 1=1"
+        params: list[str] = []
+        if tag_type:
+            query += " AND tag_type = ?"
+            params.append(tag_type)
+        if tag_value:
+            query += " AND value = ?"
+            params.append(tag_value)
+        cursor.execute(query, params)
+        results.update(row["group_id"] for row in cursor.fetchall())
+        conn.close()
+
+    projected = []
+    for group_id in sorted(results):
+        projected.append(_project_group(group_id, viewer_soul_id))
+    return {"group_memories": [g.model_dump() for g in projected]}
+
+
+@app.get("/api/v1/group-memories/{group_id}")
+def get_group_memory_endpoint(group_id: str, viewer_soul_id: str | None = None):
+    return {"group_memory": _project_group(group_id, viewer_soul_id)}
+
+
+@app.post("/api/v1/group-memories/{group_id}/members")
+def attach_memory_object_endpoint(group_id: str, req: AttachMemoryObjectRequest):
+    group = _resolve_group_memory(group_id)
+    record = get_memory_object_record(req.memory_object_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{req.memory_object_id}' not found",
+        )
+    if record["event_id"] != group["event_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Memory object '{req.memory_object_id}' belongs to event "
+                f"'{record['event_id']}', not '{group['event_id']}'"
+            ),
+        )
+
+    add_group_memory_member_record(
+        group_id=group_id,
+        memory_object_id=req.memory_object_id,
+        soul_id=req.soul_id,
+        role_in_event=req.role_in_event,
+        portrait_version_id=req.portrait_version_id,
+    )
+    _refresh_group_derived_fields(group_id)
+    return {"group_memory": _project_group(group_id, None)}
+
+
+@app.delete("/api/v1/group-memories/{group_id}/members/{memory_object_id}")
+def detach_memory_object_endpoint(group_id: str, memory_object_id: str):
+    _resolve_group_memory(group_id)
+    removed = remove_group_memory_member_record(group_id, memory_object_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Memory object '{memory_object_id}' is not a member of '{group_id}'",
+        )
+    _refresh_group_derived_fields(group_id)
+    # The Memory Object itself is never deleted.
+    record = get_memory_object_record(memory_object_id)
+    return {
+        "group_memory": _project_group(group_id, None),
+        "memory_object_still_exists": record is not None,
+    }
+
+
+@app.post("/api/v1/group-memories/{group_id}/tags")
+def add_group_tag_endpoint(group_id: str, req: AddGroupTagRequest):
+    _resolve_group_memory(group_id)
+    tag = add_group_memory_tag_record(
+        group_id=group_id,
+        tag_type=req.tag_type,
+        value=req.value,
+        anchor_kind=req.anchor_kind,
+        anchor_id=req.anchor_id,
+        is_descriptor=req.is_descriptor,
+    )
+    return {"tag": tag}
+
+
+@app.delete("/api/v1/group-memories/{group_id}/tags/{tag_id}")
+def remove_group_tag_endpoint(group_id: str, tag_id: str):
+    _resolve_group_memory(group_id)
+    removed = remove_group_memory_tag_record(group_id, tag_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tag '{tag_id}' not found in group '{group_id}'",
+        )
+    return {"removed": True}
+
+
+@app.post("/api/v1/group-memories/{group_id}/anchors")
+def add_group_anchor_endpoint(group_id: str, req: AddGroupAnchorRequest):
+    _resolve_group_memory(group_id)
+    label = req.label
+    entity_id = None
+    entity_type = None
+
+    if req.anchor_type == "portrait":
+        portrait = get_portrait_version_record(req.anchor_ref)
+        if not portrait:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Portrait version '{req.anchor_ref}' not found",
+            )
+        entity_id = portrait["soul_id"]
+        entity_type = "portrait"
+        label = label or portrait.get("label", req.anchor_ref)
+    elif req.anchor_type in ("location", "relic", "phenomenon"):
+        version = get_visual_entity_version_record(req.anchor_ref)
+        if not version:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Visual entity version '{req.anchor_ref}' not found",
+            )
+        if version["entity_type"] != req.anchor_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Visual version '{req.anchor_ref}' is type "
+                    f"'{version['entity_type']}', not '{req.anchor_type}'"
+                ),
+            )
+        entity_id = version["entity_id"]
+        entity_type = version["entity_type"]
+        label = label or version.get("label", req.anchor_ref)
+    elif req.anchor_type == "chronicle_painting":
+        painting = get_chronicle_painting_record(req.anchor_ref)
+        if not painting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Chronicle painting '{req.anchor_ref}' not found",
+            )
+        entity_id = painting["memory_object_id"]
+        entity_type = "chronicle_painting"
+        label = label or painting.get("composition", req.anchor_ref)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported anchor type '{req.anchor_type}'",
+        )
+
+    anchor = add_group_memory_anchor_record(
+        group_id=group_id,
+        anchor_type=req.anchor_type,
+        anchor_ref=req.anchor_ref,
+        entity_id=entity_id,
+        entity_type=entity_type,
+        label=label,
+    )
+    return {"anchor": anchor}
+
+
+@app.get("/api/v1/group-memories/{group_id}/anchors")
+def get_group_anchors_endpoint(group_id: str):
+    _resolve_group_memory(group_id)
+    return {"anchors": get_group_memory_anchors_records(group_id)}
+
+
+@app.get("/api/v1/group-memories/{group_id}/perspectives")
+def get_group_perspectives_endpoint(group_id: str, viewer_soul_id: str | None = None):
+    group = _resolve_group_memory(group_id)
+    members = get_group_memory_members_records(group_id)
+    comparison = build_perspective_comparison(
+        group_id=group_id,
+        event_id=group["event_id"],
+        members=members,
+        viewer_soul_id=viewer_soul_id,
+    )
+    return comparison
+
+
+@app.get("/api/v1/group-memories/suggestions/{memory_object_id}")
+def suggest_related_memories_endpoint(memory_object_id: str):
+    suggestions = suggest_related_by_similarity(memory_object_id=memory_object_id)
+    return {"suggestions": [s.model_dump() for s in suggestions]}
+
+
+# Phase 14: Living Biography
+
+
+def _project_biography(biography: dict, viewer_soul_id: str | None) -> BiographyModel:
+    projected = project_biography_for_viewer(biography, viewer_soul_id)
+    return BiographyModel(**projected)
+
+
+@app.post("/api/v1/biographies/compile")
+def compile_biography_endpoint(req: CompileBiographyRequest):
+    try:
+        result = compile_biography(
+            soul_id=req.soul_id,
+            viewer_soul_id=req.viewer_soul_id,
+            visibility=req.visibility,
+            scope_type=req.scope_type,
+            scope_ref=req.scope_ref,
+        )
+    except BiographyCompilationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    biography = _project_biography(result["biography"], req.viewer_soul_id)
+    return {
+        "biography": biography.model_dump(),
+        "guardian_report": result["guardian_report"],
+    }
+
+
+@app.get("/api/v1/biographies/current")
+def get_current_biography_endpoint(
+    soul_id: str = "Kaelen the Star-Watcher",
+    viewer_soul_id: str | None = None,
+):
+    biography = get_current_biography_record(soul_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No current biography found for soul '{soul_id}'.",
+        )
+    return {"biography": _project_biography(biography, viewer_soul_id).model_dump()}
+
+
+@app.get("/api/v1/biographies/history")
+def list_biography_history_endpoint(soul_id: str = "Kaelen the Star-Watcher"):
+    records = list_biography_records(soul_id)
+    return {"biographies": records}
+
+
+@app.get("/api/v1/biographies/{biography_id}")
+def get_biography_endpoint(biography_id: str, viewer_soul_id: str | None = None):
+    biography = get_biography_record(biography_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Biography '{biography_id}' not found",
+        )
+    return {"biography": _project_biography(biography, viewer_soul_id).model_dump()}
+
+
+@app.post("/api/v1/biographies/{biography_id}/approve")
+def approve_biography_endpoint(
+    biography_id: str, soul_id: str = "Kaelen the Star-Watcher"
+):
+    try:
+        biography = approve_biography_transaction(biography_id, soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "biography": _project_biography(biography, soul_id).model_dump(),
+        "message": "Biography approved as current.",
+    }
+
+
+@app.post("/api/v1/biographies/{biography_id}/reject")
+def reject_biography_endpoint(
+    biography_id: str, soul_id: str = "Kaelen the Star-Watcher"
+):
+    try:
+        biography = reject_biography_record(biography_id, soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "biography": _project_biography(biography, soul_id).model_dump(),
+        "message": "Biography rejected. Canonical Chronicle was untouched.",
+    }
+
+
+@app.get("/api/v1/biographies/{biography_id}/sections/{section_id}/provenance")
+def get_biography_section_provenance_endpoint(
+    biography_id: str,
+    section_id: str,
+    viewer_soul_id: str | None = None,
+):
+    biography = get_biography_record(biography_id)
+    if not biography:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Biography '{biography_id}' not found",
+        )
+    section = next(
+        (s for s in biography["sections"] if s["section_id"] == section_id), None
+    )
+    if not section:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Section '{section_id}' not found in biography '{biography_id}'",
+        )
+    visible = [
+        ref
+        for ref in section["provenance"]
+        if source_visible_to(ref["source_type"], ref["source_id"], viewer_soul_id)
+    ]
+    return {"provenance": visible, "section": section}
+
+
+# Phase 15: Art Director & World Gallery
+
+
+def _resolve_art_direction_profile(
+    profile_version_id: str | None, artifact_type: str
+) -> tuple[str | None, str | None, ResolvedArtDirectionModel | None]:
+    """
+    Resolve an optional profile version into (profile_id, version_id, resolved).
+    Returns (None, None, None) when no profile was requested.
+    """
+    if not profile_version_id:
+        return None, None, None
+    version_record = get_art_direction_profile_version_record(profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, artifact_type)  # type: ignore[arg-type]
+    return version.profile_id, version.version_id, resolved
+
+
+def _apply_art_direction_to_compiled(
+    profile_version_id: str | None,
+    artifact_type: str,
+    compiled_prompt: str,
+    canonical: dict,
+) -> tuple[str | None, str | None, str]:
+    """Resolve a profile and append its treatment to a compiled prompt."""
+    profile_id, version_id, resolved = _resolve_art_direction_profile(
+        profile_version_id, artifact_type
+    )
+    if resolved is None:
+        return None, None, compiled_prompt
+    return (
+        profile_id,
+        version_id,
+        apply_art_direction_to_prompt(compiled_prompt, resolved),
+    )
+
+
+@app.post("/api/v1/art-direction/profiles")
+def create_art_direction_profile_endpoint(req: CreateArtDirectionProfileRequest):
+    result = create_art_direction_profile_record(
+        name=req.name,
+        description=req.description,
+        medium_style=req.medium_style,
+        palette_guidance=req.palette_guidance,
+        lighting_guidance=req.lighting_guidance,
+        atmosphere=req.atmosphere,
+        texture_material=req.texture_material,
+        camera_framing=req.camera_framing,
+        composition_guidance=req.composition_guidance,
+        portrait_treatment=req.portrait_treatment,
+        environment_treatment=req.environment_treatment,
+        relic_treatment=req.relic_treatment,
+        phenomenon_treatment=req.phenomenon_treatment,
+        chronicle_treatment=req.chronicle_treatment,
+        negative_guidance=req.negative_guidance,
+        provider_hints=req.provider_hints,
+        accessibility_notes=req.accessibility_notes,
+    )
+    return {
+        "profile": ArtDirectionProfileModel(**result["profile"]),
+        "version": ArtDirectionProfileVersionModel(**result["version"]),
+    }
+
+
+@app.get("/api/v1/art-direction/profiles")
+def list_art_direction_profiles_endpoint():
+    return {
+        "profiles": [
+            ArtDirectionProfileModel(**p) for p in list_art_direction_profiles_records()
+        ]
+    }
+
+
+@app.get("/api/v1/art-direction/profiles/{profile_id}")
+def get_art_direction_profile_endpoint(profile_id: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    versions = [
+        ArtDirectionProfileVersionModel(**v)
+        for v in list_art_direction_profile_versions_records(profile_id)
+    ]
+    return {
+        "profile": ArtDirectionProfileModel(**profile),
+        "versions": versions,
+    }
+
+
+@app.get("/api/v1/art-direction/profiles/{profile_id}/versions")
+def list_art_direction_profile_versions_endpoint(profile_id: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    return {
+        "versions": [
+            ArtDirectionProfileVersionModel(**v)
+            for v in list_art_direction_profile_versions_records(profile_id)
+        ]
+    }
+
+
+@app.post("/api/v1/art-direction/profiles/{profile_id}/versions")
+def create_art_direction_profile_version_endpoint(
+    profile_id: str, req: UpdateArtDirectionProfileRequest
+):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    version = create_art_direction_profile_version_record(
+        profile_id=profile_id,
+        medium_style=req.medium_style,
+        palette_guidance=req.palette_guidance,
+        lighting_guidance=req.lighting_guidance,
+        atmosphere=req.atmosphere,
+        texture_material=req.texture_material,
+        camera_framing=req.camera_framing,
+        composition_guidance=req.composition_guidance,
+        portrait_treatment=req.portrait_treatment,
+        environment_treatment=req.environment_treatment,
+        relic_treatment=req.relic_treatment,
+        phenomenon_treatment=req.phenomenon_treatment,
+        chronicle_treatment=req.chronicle_treatment,
+        negative_guidance=req.negative_guidance,
+        provider_hints=req.provider_hints,
+        accessibility_notes=req.accessibility_notes,
+    )
+    return {"version": ArtDirectionProfileVersionModel(**version)}
+
+
+@app.post("/api/v1/art-direction/profiles/{profile_id}/status")
+def set_art_direction_profile_status_endpoint(profile_id: str, status_value: str):
+    profile = get_art_direction_profile_record(profile_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile '{profile_id}' not found",
+        )
+    if status_value not in ("draft", "current", "superseded", "archived"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid profile status '{status_value}'",
+        )
+    updated = set_art_direction_profile_status_record(profile_id, status_value)
+    return {"profile": ArtDirectionProfileModel(**updated)}
+
+
+@app.get("/api/v1/art-direction/current")
+def get_current_art_direction_endpoint():
+    profile = get_current_art_direction_profile_record()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No current Art Direction Profile is set.",
+        )
+    version = (
+        get_art_direction_profile_version_record(profile["current_version_id"])
+        if profile.get("current_version_id")
+        else None
+    )
+    return {
+        "profile": ArtDirectionProfileModel(**profile),
+        "version": ArtDirectionProfileVersionModel(**version) if version else None,
+    }
+
+
+@app.post("/api/v1/art-direction/resolve")
+def resolve_art_direction_endpoint(req: ResolveArtDirectionRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, req.artifact_type, req.override)  # type: ignore[arg-type]
+    return {"resolved": resolved}
+
+
+@app.post("/api/v1/art-direction/preview")
+def compile_art_direction_spec_endpoint(req: CompileArtDirectionSpecRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    capabilities = get_painting_provider(None).capabilities()
+    spec = compile_art_direction_spec(
+        artifact_type=req.artifact_type,
+        profile_version=version,
+        canonical=req.canonical,
+        historical_references=req.historical_references,
+        provider_capabilities=capabilities,
+        composition_intent=req.composition_intent,
+        accessibility=req.accessibility,
+        override=req.override,
+    )
+    return {"spec": spec}
+
+
+@app.post("/api/v1/art-direction/review")
+def review_style_endpoint(req: ResolveArtDirectionRequest):
+    version_record = get_art_direction_profile_version_record(req.profile_version_id)
+    if not version_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Art direction profile version '{req.profile_version_id}' not found",
+        )
+    version = ArtDirectionProfileVersionModel(**version_record)
+    resolved = resolve_art_direction(version, req.artifact_type, req.override)  # type: ignore[arg-type]
+    reviewer = get_art_direction_reviewer()
+    result = reviewer.review(resolved=resolved)
+    return {"style_review": result}
+
+
+# World Gallery
+
+
+@app.get("/api/v1/gallery")
+def list_gallery_artifacts_endpoint(
+    viewer_soul_id: str | None = None,
+    mode: str = "all",
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    artifacts = list_gallery_artifacts(
+        viewer_soul_id=viewer_soul_id,
+        mode=mode,  # type: ignore[arg-type]
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    return {"artifacts": [a.model_dump() for a in artifacts]}
+
+
+@app.get("/api/v1/gallery/timeline")
+def gallery_timeline_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    from app.world_gallery import build_timeline
+
+    return {
+        "artifacts": [
+            a.model_dump()
+            for a in build_timeline(
+                viewer_soul_id=viewer_soul_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+        ]
+    }
+
+
+@app.post("/api/v1/gallery/collections")
+def create_gallery_collection_endpoint(req: CreateGalleryCollectionRequest):
+    collection = create_gallery_collection_record(
+        title=req.title,
+        description=req.description,
+        visibility=req.visibility,
+        curator_soul_id=req.curator_soul_id,
+    )
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.get("/api/v1/gallery/collections")
+def list_gallery_collections_endpoint():
+    return {
+        "collections": [
+            GalleryCollectionModel(**c) for c in list_gallery_collections_records()
+        ]
+    }
+
+
+@app.get("/api/v1/gallery/collections/{collection_id}")
+def get_gallery_collection_endpoint(collection_id: str):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.patch("/api/v1/gallery/collections/{collection_id}")
+def update_gallery_collection_endpoint(
+    collection_id: str, req: UpdateGalleryCollectionRequest
+):
+    try:
+        collection = update_gallery_collection_record(
+            collection_id,
+            title=req.title,
+            description=req.description,
+            visibility=req.visibility,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return {"collection": GalleryCollectionModel(**collection)}
+
+
+@app.post("/api/v1/gallery/collections/{collection_id}/items")
+def add_gallery_collection_item_endpoint(
+    collection_id: str, req: AddGalleryCollectionItemRequest
+):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    item = add_gallery_collection_item_record(
+        collection_id=collection_id,
+        artifact_type=req.artifact_type,
+        artifact_ref=req.artifact_ref,
+        caption=req.caption,
+        position=req.position,
+    )
+    return {"item": GalleryCollectionItemModel(**item)}
+
+
+@app.delete("/api/v1/gallery/collections/{collection_id}/items/{item_id}")
+def remove_gallery_collection_item_endpoint(collection_id: str, item_id: str):
+    removed = remove_gallery_collection_item_record(collection_id, item_id)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item '{item_id}' not found in collection '{collection_id}'",
+        )
+    return {"removed": True}
+
+
+@app.post("/api/v1/gallery/collections/{collection_id}/reorder")
+def reorder_gallery_collection_endpoint(
+    collection_id: str, req: ReorderGalleryCollectionRequest
+):
+    collection = get_gallery_collection_record(collection_id)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Collection '{collection_id}' not found",
+        )
+    updated = reorder_gallery_collection_items_record(
+        collection_id, req.ordered_item_ids
+    )
+    return {"collection": GalleryCollectionModel(**updated)}
+
+
+# Phase 16: Legendary Figures & World Memory
+
+
+def _project_world_memory(memory: dict, viewer_soul_id: str | None) -> WorldMemoryModel:
+    projected = project_world_memory_for_viewer(memory, viewer_soul_id)
+    return WorldMemoryModel(**projected)
+
+
+@app.post("/api/v1/world-memory/compile")
+def compile_world_memory_endpoint(req: CompileWorldMemoryRequest):
+    try:
+        result = compile_world_memory(
+            subject_entity_type=req.subject_entity_type,
+            subject_entity_id=req.subject_entity_id,
+            culture=req.culture,
+            era_context=req.era_context,
+            memory_form=req.memory_form,
+            interpretation_type=req.interpretation_type,
+            remembrance_scale=req.remembrance_scale,
+            visibility=req.visibility,
+            perspective=req.perspective,
+            viewer_soul_id=req.viewer_soul_id,
+        )
+    except WorldMemoryCompilationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    memory = _project_world_memory(result["memory"], req.viewer_soul_id)
+    return {"memory": memory.model_dump(), "guardian_report": result["guardian_report"]}
+
+
+@app.get("/api/v1/world-memory")
+def list_world_memory_endpoint(
+    viewer_soul_id: str | None = None,
+    subject_entity_type: str | None = None,
+    subject_entity_id: str | None = None,
+    culture: str | None = None,
+    era_context: str | None = None,
+    memory_form: str | None = None,
+    memory_state: str | None = None,
+):
+    records = list_world_memory_records(
+        subject_entity_type=subject_entity_type,
+        subject_entity_id=subject_entity_id,
+        culture=culture,
+        era_context=era_context,
+        memory_form=memory_form,
+        memory_state=memory_state,
+    )
+    return {
+        "memories": [
+            _project_world_memory(m, viewer_soul_id).model_dump()
+            for m in records
+            if world_memory_visible_to(m, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}")
+def get_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {"memory": _project_world_memory(memory, viewer_soul_id).model_dump()}
+
+
+@app.get("/api/v1/world-memory/{memory_id}/versions")
+def list_world_memory_versions_endpoint(
+    memory_id: str, viewer_soul_id: str | None = None
+):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    versions = list_world_memory_versions_records(
+        memory["subject_entity_type"],
+        memory["subject_entity_id"],
+        memory["culture"],
+        memory["memory_form"],
+    )
+    return {
+        "versions": [
+            _project_world_memory(v, viewer_soul_id).model_dump() for v in versions
+        ]
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}/deviations")
+def get_world_memory_deviations_endpoint(
+    memory_id: str, viewer_soul_id: str | None = None
+):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    if not world_memory_visible_to(memory, viewer_soul_id):
+        return {"deviations": [], "provenance": []}
+    return {
+        "deviations": [WorldMemoryDeviationModel(**d) for d in memory["deviations"]],
+        "provenance": memory["source_refs"],
+    }
+
+
+@app.get("/api/v1/world-memory/query")
+def query_world_memory_endpoint(
+    subject_entity_type: str,
+    subject_entity_id: str,
+    culture: str | None = None,
+    era_context: str | None = None,
+    viewer_soul_id: str | None = None,
+):
+    records = list_world_memory_records(
+        subject_entity_type=subject_entity_type,
+        subject_entity_id=subject_entity_id,
+        culture=culture,
+        era_context=era_context,
+    )
+    return {
+        "memories": [
+            _project_world_memory(m, viewer_soul_id).model_dump()
+            for m in records
+            if world_memory_visible_to(m, viewer_soul_id)
+        ]
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/approve")
+def approve_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    try:
+        memory = approve_world_memory_record(memory_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": "World Memory approved as current. Canonical Chronicle was untouched.",
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/reject")
+def reject_world_memory_endpoint(memory_id: str, viewer_soul_id: str | None = None):
+    try:
+        memory = reject_world_memory_record(memory_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": "World Memory rejected. Canonical Chronicle was untouched.",
+    }
+
+
+@app.post("/api/v1/world-memory/{memory_id}/mark-state")
+def mark_world_memory_state_endpoint(
+    memory_id: str, req: MarkMemoryStateRequest, viewer_soul_id: str | None = None
+):
+    try:
+        memory = mark_world_memory_state_record(memory_id, req.new_state, req.reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "memory": _project_world_memory(memory, viewer_soul_id).model_dump(),
+        "message": f"World Memory state marked '{req.new_state}'. Canon was not deleted.",
+    }
+
+
+@app.get("/api/v1/world-memory/{memory_id}/state-history")
+def get_world_memory_state_history_endpoint(memory_id: str):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {"history": get_world_memory_state_history_records(memory_id)}
+
+
+@app.post("/api/v1/world-memory/{memory_id}/placements")
+def place_world_memory_endpoint(memory_id: str, req: PlaceWorldMemoryRequest):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    placement = create_world_memory_placement_record(
+        memory_id=memory_id,
+        placement_type=req.placement_type,
+        placement_ref=req.placement_ref,
+        visibility=req.visibility,
+    )
+    return {"placement": WorldMemoryPlacementModel(**placement)}
+
+
+@app.get("/api/v1/world-memory/{memory_id}/placements")
+def list_world_memory_placements_endpoint(memory_id: str):
+    memory = get_world_memory_record(memory_id)
+    if not memory:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"World memory '{memory_id}' not found",
+        )
+    return {
+        "placements": [
+            WorldMemoryPlacementModel(**p)
+            for p in list_world_memory_placements_records(memory_id)
+        ]
+    }
+
+
+@app.post("/api/v1/world-memory/npc-knowledge")
+def project_npc_knowledge_endpoint(req: NPCKnowledgeRequest):
+    records = list_world_memory_records(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+    )
+    projection = project_npc_knowledge(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        npc=req,
+        memories=records,
+    )
+    return {"knowledge": projection.model_dump()}
+
+
+@app.post("/api/v1/legendary-figures/promote")
+def promote_legendary_figure_endpoint(req: PromoteLegendaryFigureRequest):
+    from app.world_memory import evaluate_legendary_eligibility
+
+    gathered = gather_world_memory_sources(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        viewer_soul_id=None,
+    )
+    eligible, scale, rationale = evaluate_legendary_eligibility(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        memory_objects=gathered["memory_objects"],
+        group_significance=gathered["group_significance"],
+    )
+    if not eligible:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Subject '{req.subject_entity_id}' is not eligible for "
+            "Legendary Figure status. " + rationale,
+        )
+    figure = create_legendary_figure_record(
+        subject_soul_id=req.subject_soul_id,
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        figure_title=req.figure_title,
+        later_cultural_titles=req.later_cultural_titles,
+        remembrance_scale=req.remembrance_scale or scale,
+        memory_state=req.memory_state,
+        eligibility_rationale=rationale,
+    )
+    # Link canonical identity/portrait/biography sources without copying them.
+    for ref in gathered["source_refs"]:
+        add_legendary_figure_link_record(
+            figure_id=figure["figure_id"],
+            link_type=_link_type_for_source(ref.source_type),
+            link_ref=ref.source_id,
+            link_label=ref.source_type,
+            is_canonical=True,
+        )
+    for title in req.later_cultural_titles:
+        add_legendary_figure_link_record(
+            figure_id=figure["figure_id"],
+            link_type="monument",
+            link_ref=title,
+            link_label=title,
+            is_canonical=False,
+        )
+    return {
+        "figure": LegendaryFigureModel(
+            **get_legendary_figure_record(figure["figure_id"])
+        )
+    }
+
+
+def _link_type_for_source(source_type: str) -> str:
+    return {
+        "memory_object": "chronicle_event",
+        "biography": "biography",
+        "portrait_version": "portrait",
+        "story_mark": "story_mark",
+        "relic_event": "relic",
+        "chronicle_painting": "artwork",
+    }.get(source_type, "identity")
+
+
+@app.get("/api/v1/legendary-figures")
+def list_legendary_figures_endpoint():
+    return {
+        "figures": [LegendaryFigureModel(**f) for f in list_legendary_figures_records()]
+    }
+
+
+@app.get("/api/v1/legendary-figures/{figure_id}")
+def get_legendary_figure_endpoint(figure_id: str):
+    figure = get_legendary_figure_record(figure_id)
+    if not figure:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Legendary figure '{figure_id}' not found",
+        )
+    return {"figure": LegendaryFigureModel(**figure)}
+
+
+# Phase 19: Relationship & Promise Engine. Relationships are canonical history
+# between people; promises are claims on the future. Neither may be invented by
+# the narrator. These endpoints never mutate Chronicle history.
+
+
+def _project_relationship(
+    relationship: dict, viewer_soul_id: str | None
+) -> RelationshipModel:
+    return RelationshipModel(
+        **project_relationship_for_viewer(relationship, viewer_soul_id)
+    )
+
+
+def _project_promise(promise: dict, viewer_soul_id: str | None) -> PromiseModel:
+    return PromiseModel(**project_promise_for_viewer(promise, viewer_soul_id))
+
+
+@app.post("/api/v1/relationships")
+def create_relationship_endpoint(req: CreateRelationshipRequest):
+    relationship = create_relationship_record(
+        kinds=req.kinds,
+        participants=[p.model_dump() for p in req.participants],
+        status=req.status,
+        visibility=req.visibility,
+        creation_context=req.creation_context,
+        source_type=req.source_type,
+        source_id=req.source_id,
+    )
+    return {"relationship": _project_relationship(relationship, None).model_dump()}
+
+
+@app.get("/api/v1/relationships")
+def list_relationships_endpoint(
+    viewer_soul_id: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    records = list_relationship_records()
+    if entity_type and entity_id:
+        records = [
+            r
+            for r in records
+            if any(
+                p.get("entity_type") == entity_type and p.get("entity_id") == entity_id
+                for p in r.get("participants", [])
+            )
+        ]
+    return {
+        "relationships": [
+            _project_relationship(r, viewer_soul_id).model_dump()
+            for r in records
+            if relationship_visible_to(r, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/relationships/query")
+def query_relationships_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    records = relationships_for_entity(entity_type, entity_id)
+    return {
+        "relationships": [
+            _project_relationship(r, viewer_soul_id).model_dump()
+            for r in records
+            if relationship_visible_to(r, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/relationships/{relationship_id}")
+def get_relationship_endpoint(relationship_id: str, viewer_soul_id: str | None = None):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    return {
+        "relationship": _project_relationship(relationship, viewer_soul_id).model_dump()
+    }
+
+
+@app.post("/api/v1/relationships/{relationship_id}/events")
+def add_relationship_event_endpoint(
+    relationship_id: str, req: AddRelationshipEventRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_event_record(
+        relationship_id=relationship_id,
+        event_type=req.event_type,
+        source_type=req.source_type,
+        source_id=req.source_id,
+        summary=req.summary,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/{relationship_id}/perspectives")
+def add_relationship_perspective_endpoint(
+    relationship_id: str, req: AddRelationshipPerspectiveRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_perspective_record(
+        relationship_id=relationship_id,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+        kind=req.kind,
+        view=req.view,
+        is_canonical_interaction=req.is_canonical_interaction,
+        visibility=req.visibility,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/{relationship_id}/links")
+def link_relationship_entity_endpoint(
+    relationship_id: str, req: LinkRelationshipEntityRequest
+):
+    relationship = get_relationship_record(relationship_id)
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relationship '{relationship_id}' not found",
+        )
+    updated = add_relationship_entity_link_record(
+        relationship_id=relationship_id,
+        link_type=req.link_type,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+    )
+    return {"relationship": _project_relationship(updated, None).model_dump()}
+
+
+@app.post("/api/v1/promises")
+def create_promise_endpoint(req: CreatePromiseRequest):
+    promise = create_promise_record(
+        promisor_entity_type=req.promisor_entity_type,
+        promisor_entity_id=req.promisor_entity_id,
+        promise_text=req.promise_text,
+        structured_meaning=req.structured_meaning,
+        conditions=req.conditions,
+        scope=req.scope,
+        visibility=req.visibility,
+        source_type=req.source_type,
+        source_id=req.source_id,
+        source_authorization=req.source_authorization,
+        participants=[p.model_dump() for p in req.participants],
+        inheritable=req.inheritable,
+        transferable=req.transferable,
+    )
+    return {"promise": _project_promise(promise, None).model_dump()}
+
+
+@app.get("/api/v1/promises")
+def list_promises_endpoint(
+    viewer_soul_id: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+):
+    records = list_promise_records()
+    if entity_type and entity_id:
+        records = [
+            p
+            for p in records
+            if (
+                p.get("promisor_entity_type") == entity_type
+                and p.get("promisor_entity_id") == entity_id
+            )
+            or any(
+                part.get("entity_type") == entity_type
+                and part.get("entity_id") == entity_id
+                for part in p.get("participants", [])
+            )
+        ]
+    return {
+        "promises": [
+            _project_promise(p, viewer_soul_id).model_dump()
+            for p in records
+            if promise_visible_to(p, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/promises/query")
+def query_promises_endpoint(
+    entity_type: str, entity_id: str, viewer_soul_id: str | None = None
+):
+    records = promises_for_entity(entity_type, entity_id)
+    linked = promises_linked_to_entity(entity_type, entity_id)
+    by_id = {p["promise_id"]: p for p in records + linked}
+    return {
+        "promises": [
+            _project_promise(p, viewer_soul_id).model_dump()
+            for p in by_id.values()
+            if promise_visible_to(p, viewer_soul_id)
+        ]
+    }
+
+
+@app.get("/api/v1/promises/{promise_id}")
+def get_promise_endpoint(promise_id: str, viewer_soul_id: str | None = None):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    return {"promise": _project_promise(promise, viewer_soul_id).model_dump()}
+
+
+@app.post("/api/v1/promises/{promise_id}/transition")
+def transition_promise_endpoint(promise_id: str, req: TransitionPromiseRequest):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    try:
+        updated = transition_promise_record(
+            promise_id,
+            req.new_state,
+            evidence_type=req.evidence_type,
+            evidence_id=req.evidence_id,
+            reason=req.reason,
+            target_entity_type=req.target_entity_type,
+            target_entity_id=req.target_entity_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "promise": _project_promise(updated, None).model_dump(),
+        "message": "Promise state updated; original wording/source were untouched.",
+    }
+
+
+@app.post("/api/v1/promises/{promise_id}/evaluate")
+def evaluate_promise_endpoint(promise_id: str, req: EvaluatePromiseRequest):
+    from app.relationship import evaluate_promise_resolution
+
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    verdict = evaluate_promise_resolution(
+        promise,
+        req.candidate_state,
+        evidence_type=req.evidence_type,
+        evidence_id=req.evidence_id,
+        player_authorized=req.player_authorized,
+        reason=req.reason,
+    )
+    return verdict
+
+
+@app.post("/api/v1/promises/{promise_id}/links")
+def link_promise_entity_endpoint(promise_id: str, req: LinkPromiseEntityRequest):
+    promise = get_promise_record(promise_id)
+    if not promise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Promise '{promise_id}' not found",
+        )
+    updated = add_promise_entity_link_record(
+        promise_id=promise_id,
+        link_type=req.link_type,
+        entity_type=req.entity_type,
+        entity_id=req.entity_id,
+    )
+    return {"promise": _project_promise(updated, None).model_dump()}
+
+
+@app.post("/api/v1/relationships/npc-knowledge")
+def project_relationship_promise_npc_knowledge_endpoint(
+    req: RelationshipPromiseNPCKnowledgeRequest,
+):
+    relationships = relationships_for_entity(
+        req.subject_entity_type, req.subject_entity_id
+    )
+    promises = promises_for_entity(req.subject_entity_type, req.subject_entity_id)
+    projection = project_relationship_promise_npc_knowledge(
+        subject_entity_type=req.subject_entity_type,
+        subject_entity_id=req.subject_entity_id,
+        npc=req,
+        relationships=relationships,
+        promises=promises,
+    )
+    return {"knowledge": projection.model_dump()}
+
+
 @app.websocket("/ws/v1/convergence/{room_id}")
 async def convergence_websocket(websocket: WebSocket, room_id: str):
     await room_manager.connect(room_id, websocket)
@@ -1152,3 +3172,577 @@ async def convergence_websocket(websocket: WebSocket, room_id: str):
     except WebSocketDisconnect:
         room_manager.disconnect(room_id, websocket)
         await room_manager.broadcast(room_id, {"system": "A Soul departed the room."})
+
+
+# Phase 17: Campaign Orchestrator endpoints. These coordinate existing systems;
+# they never re-implement domain rules or mutate canon directly.
+
+
+def _orchestrator_error(exc: CampaignOrchestratorError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.post("/api/v1/campaign/session")
+def start_campaign_session(req: StartSessionRequest):
+    return start_or_resume_session(soul_id=req.soul_id, campaign_id=req.campaign_id)
+
+
+@app.get("/api/v1/campaign/session/{session_id}")
+def get_campaign_session(session_id: str):
+    try:
+        state = get_session_state(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "session": CampaignSessionModel(**state["session"]).model_dump(),
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in state["opportunities"]
+        ],
+        "transitions": [
+            CampaignTransitionModel(**t).model_dump() for t in state["transitions"]
+        ],
+    }
+
+
+@app.post("/api/v1/campaign/opportunities/evaluate")
+def evaluate_campaign_opportunities(req: EvaluateOpportunitiesRequest):
+    try:
+        result = evaluate_opportunities(
+            session_id=req.session_id, include_encounter=req.include_encounter
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "session_id": result["session_id"],
+        "silence": result["silence"],
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in result["opportunities"]
+        ],
+    }
+
+
+@app.post("/api/v1/campaign/opportunities/{opportunity_id}/resolve")
+def resolve_campaign_opportunity(opportunity_id: str, req: ResolveOpportunityRequest):
+    session = _session_for_opportunity(opportunity_id)
+    try:
+        result = resolve_opportunity(
+            session_id=session,
+            opportunity_id=opportunity_id,
+            decision=req.decision,
+            recognition=req.recognition,
+            player_intent=req.player_intent,
+            note=req.note,
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "transition": CampaignTransitionModel(**result["transition"]).model_dump(),
+        "opportunity": CampaignOpportunityModel(**result["opportunity"]).model_dump(),
+        "idempotent": result["idempotent"],
+    }
+
+
+def _session_for_opportunity(opportunity_id: str) -> str:
+    from app.db import get_campaign_opportunity_record
+
+    opportunity = get_campaign_opportunity_record(opportunity_id)
+    if not opportunity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Opportunity '{opportunity_id}' not found",
+        )
+    return opportunity["session_id"]
+
+
+@app.post("/api/v1/campaign/commit")
+def commit_campaign_event(req: CommitEventRequest):
+    try:
+        result = commit_canonical_event(
+            session_id=req.session_id, event_id=req.event_id
+        )
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "transition": CampaignTransitionModel(**result["transition"]).model_dump(),
+        "opportunities": [
+            CampaignOpportunityModel(**o).model_dump() for o in result["opportunities"]
+        ],
+        "idempotent": result["idempotent"],
+    }
+
+
+@app.get("/api/v1/campaign/transitions/{transition_id}/provenance")
+def get_campaign_transition_provenance(transition_id: str):
+    try:
+        return get_transition_provenance(transition_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/session/{session_id}/reviews")
+def get_campaign_pending_reviews(session_id: str):
+    try:
+        reviews = get_pending_reviews(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+    return {
+        "pending_reviews": [
+            CampaignOpportunityModel(**o).model_dump()
+            for o in reviews["pending_reviews"]
+        ]
+    }
+
+
+@app.get("/api/v1/campaign/session/{session_id}/aftermath")
+def get_campaign_aftermath(session_id: str):
+    try:
+        return get_aftermath(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/opportunities/{opportunity_id}/inspect")
+def inspect_campaign_opportunity(opportunity_id: str):
+    try:
+        return inspect_opportunity(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/narrative/status")
+def get_campaign_narrative_status():
+    return get_narrative_provider_status()
+
+
+@app.post("/api/v1/campaign/narrative/select")
+def select_campaign_narrative_provider(req: SelectNarrativeProviderRequest):
+    # Selection is advisory/debug; the environment determines the active
+    # provider so a client cannot override deployment policy or secrets.
+    from app.campaign_provider import get_campaign_provider
+
+    provider = get_campaign_provider(req.provider)
+    return {
+        "requested": req.provider,
+        "effective": provider.provider,
+        "model": provider.provider_model,
+        "narration_source": provider.narration_source,
+    }
+
+
+@app.post("/api/v1/campaign/narrative/preview-context")
+def preview_campaign_narrative_context(req: PreviewNarrativeContextRequest):
+    try:
+        return preview_narrative_context(req.opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/campaign/opportunities/{opportunity_id}/narrative")
+def get_campaign_opportunity_narrative(opportunity_id: str):
+    try:
+        return inspect_narrative(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/opportunities/{opportunity_id}/regenerate")
+def regenerate_campaign_opportunity_narrative(opportunity_id: str):
+    try:
+        return regenerate_narrative(opportunity_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+# ---------------------------------------------------------------------------
+# Phase 20: multi-Aspect campaign sessions and Wandering foundation.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/campaign/{campaign_id}/aspects")
+def get_campaign_aspects(campaign_id: str):
+    try:
+        result = list_campaign_aspects(campaign_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {
+        "campaign_id": result["campaign_id"],
+        "aspects": [CampaignAspectModel(**a).model_dump() for a in result["aspects"]],
+    }
+
+
+@app.post("/api/v1/campaign/aspects/register")
+def register_campaign_aspect(req: RegisterCampaignAspectRequest):
+    from app.multi_aspect import ensure_campaign_aspect_registered
+
+    aspect = ensure_campaign_aspect_registered(
+        req.campaign_id,
+        req.soul_id,
+        display_name=req.display_name,
+        viewpoint_location=req.viewpoint_location,
+    )
+    return {"aspect": CampaignAspectModel(**aspect).model_dump()}
+
+
+@app.post("/api/v1/campaign/aspects/switch")
+def switch_campaign_aspect_endpoint(req: SwitchAspectRequest):
+    try:
+        result = switch_campaign_aspect(
+            req.campaign_id, req.session_id, req.target_soul_id
+        )
+    except (CampaignOrchestratorError, ValueError) as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+    return {
+        "switch": result["switch"],
+        "active_aspect": result["active_aspect"],
+    }
+
+
+@app.get("/api/v1/campaign/session/{session_id}/aspect-view")
+def get_campaign_aspect_view(session_id: str):
+    try:
+        return inspect_aspect_view(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/encounters/cross-aspect")
+def resolve_cross_aspect_encounter_endpoint(req: CrossAspectEncounterRequest):
+    try:
+        return resolve_cross_aspect_encounter(req.session_id, req.other_soul_id)
+    except (CampaignOrchestratorError, ValueError) as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+# ---------------------------------------------------------------------------
+# Phase 22: Temporal Pacing & Living Time. Time may change what is possible;
+# it never decides what the player's story means.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/campaign/session/{session_id}/temporal-context")
+def get_campaign_temporal_context(session_id: str):
+    try:
+        return inspect_temporal_context(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/time/evaluate")
+def evaluate_campaign_temporal_eligibility(req: EvaluateTemporalEligibilityRequest):
+    try:
+        return evaluate_temporal_eligibility(req.session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/time/advance")
+def advance_campaign_time(req: AdvanceFictionalTimeRequest):
+    try:
+        return advance_campaign_fictional_time(
+            req.campaign_id, delta_seconds=req.delta_seconds, to_iso=req.to_iso
+        )
+    except ValueError as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+@app.post("/api/v1/campaign/scheduled-consequences")
+def schedule_campaign_consequence(req: ScheduleConsequenceRequest):
+    from app import db
+    from app.temporal import schedule_consequence
+
+    session = db.get_campaign_session_record(req.session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
+    try:
+        return schedule_consequence(
+            session_id=req.session_id,
+            source_type=req.source_type,
+            source_id=req.source_id,
+            rule=req.rule,
+            eligible_after_iso=req.eligible_after_iso,
+            min_elapsed_seconds=req.min_elapsed_seconds,
+            min_events=req.min_events,
+            note=req.note,
+        )
+    except ValueError as exc:
+        raise _orchestrator_error(CampaignOrchestratorError(str(exc)))
+
+
+@app.get("/api/v1/campaign/scheduled-consequences")
+def get_campaign_scheduled_consequences(session_id: str | None = None):
+    return list_scheduled_consequences(session_id=session_id)
+
+
+@app.post("/api/v1/campaign/scheduled-consequences/{consequence_id}/retire")
+def retire_campaign_scheduled_consequence(consequence_id: str):
+    try:
+        return retire_scheduled_consequence(consequence_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/session/{session_id}/resume-recap")
+def get_campaign_resume_recap(session_id: str):
+    try:
+        return build_return_recap(session_id)
+    except CampaignOrchestratorError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/campaign/debug/freeze-time")
+def debug_freeze_time(req: dict):
+    """Authorized-debug endpoint to evaluate under a deterministic frozen clock.
+    Never rewrites persisted canonical timestamps; the freeze is request-scoped."""
+    from app.temporal import freeze_time
+
+    now_iso = req.get("now_iso")
+    session_id = req.get("session_id")
+    with freeze_time(now_iso):
+        if session_id:
+            return {
+                "frozen_at": now_iso,
+                "context": inspect_temporal_context(session_id),
+            }
+        return {
+            "frozen_at": now_iso,
+            "time_source": "test_frozen" if now_iso else "server_utc",
+        }
+
+
+@app.post("/api/v1/wandering/places")
+def create_place(req: CreatePlaceRequest):
+    from app.db import create_place_record
+
+    place = create_place_record(
+        place_name=req.place_name,
+        place_kind=req.place_kind,
+        public_label=req.public_label,
+        region_id=req.region_id,
+        region_precision=req.region_precision,
+        coordinate_latitude=req.coordinate_latitude,
+        coordinate_longitude=req.coordinate_longitude,
+        coordinate_precision_m=req.coordinate_precision_m,
+        consent_scope=req.consent_scope,
+        safety_status=req.safety_status,
+        created_by_soul_id=req.created_by_soul_id,
+    )
+    return {"place": PlaceModel(**place).model_dump()}
+
+
+@app.get("/api/v1/wandering/places")
+def list_wandering_places(viewer_soul_id: str | None = None, debug: bool = False):
+    return {"places": list_places_visible_to(viewer_soul_id, debug=debug)}
+
+
+@app.post("/api/v1/wandering/places/retire")
+def retire_wandering_place(req: RetirePlaceRequest):
+    from app.db import update_place_safety_status
+
+    place = update_place_safety_status(req.place_id, req.safety_status)
+    return {"place": PlaceModel(**place).model_dump()}
+
+
+@app.post("/api/v1/wandering/location-consent")
+def update_location_consent(req: LocationConsentRequest):
+    from app.db import update_location_consent_record
+
+    consent = update_location_consent_record(
+        soul_id=req.soul_id,
+        location_access_granted=req.location_access_granted,
+        purpose=req.purpose,
+        precision_level=req.precision_level,
+        retention_days=req.retention_days,
+    )
+    return {"consent": consent}
+
+
+@app.get("/api/v1/wandering/location-consent/{soul_id}")
+def get_location_consent(soul_id: str):
+    from app.db import get_or_create_location_consent_record
+
+    return {"consent": get_or_create_location_consent_record(soul_id)}
+
+
+@app.post("/api/v1/wandering/location-sample")
+def submit_location_sample_endpoint(req: LocationSampleRequest):
+    try:
+        sample = submit_location_sample(req)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    return {"sample": sample}
+
+
+@app.get("/api/v1/wandering/nearby")
+def get_nearby_discoveries(
+    soul_id: str, latitude: float, longitude: float, radius_m: float = 500.0
+):
+    return nearby_eligible_places(
+        soul_id=soul_id, latitude=latitude, longitude=longitude, radius_m=radius_m
+    )
+
+
+@app.post("/api/v1/wandering/discoveries/record")
+def record_wandering_discovery(req: RecordDiscoveryRequest):
+    try:
+        return record_place_discovery(req.soul_id, req.place_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@app.post("/api/v1/wandering/place-history")
+def record_wandering_place_history(req: RecordPlaceHistoryRequest):
+    try:
+        history = record_place_history(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {"history": history}
+
+
+@app.get("/api/v1/wandering/places/{place_id}/history")
+def get_place_history(place_id: str, viewer_soul_id: str | None = None):
+    try:
+        return inspect_place_history(place_id, viewer_soul_id=viewer_soul_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Phase 21: Living Visual World endpoints.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/living-visuals/providers/status")
+def living_visual_provider_status():
+    return get_living_visual_status()
+
+
+@app.get("/api/v1/living-visuals/art-moments")
+def list_living_visual_art_moments(session_id: str | None = None):
+    return list_art_moments(session_id=session_id)
+
+
+@app.get("/api/v1/living-visuals/art-moments/{art_moment_id}")
+def get_living_visual_art_moment(art_moment_id: str):
+    try:
+        return get_art_moment(art_moment_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/art-moments/evaluate")
+def queue_living_visual_art_moments(req: QueueArtMomentsRequest):
+    try:
+        return queue_art_moments(req.session_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/art-moments/{art_moment_id}/curate")
+def curate_living_visual_art_moment(art_moment_id: str, req: CurateArtMomentRequest):
+    try:
+        return record_human_curation(
+            art_moment_id,
+            contributor_id=req.contributor_id,
+            contributor_name=req.contributor_name,
+            style_guidance=req.style_guidance,
+            composition=req.composition,
+            mood=req.mood,
+            motif=req.motif,
+            symbolism=req.symbolism,
+            provenance_note=req.provenance_note,
+        )
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs")
+def list_living_visual_jobs(
+    session_id: str | None = None, art_moment_id: str | None = None
+):
+    return list_visual_jobs(session_id=session_id, art_moment_id=art_moment_id)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}")
+def get_living_visual_job(job_id: str):
+    try:
+        return get_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/process")
+def process_living_visual_job(job_id: str, req: ProcessVisualJobRequest | None = None):
+    try:
+        result = process_visual_job(
+            job_id,
+            provider_type=req.provider_type if req else None,
+            seed=req.seed if req else None,
+        )
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+    return result
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/approve")
+def approve_living_visual_job(job_id: str):
+    try:
+        return approve_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/reject")
+def reject_living_visual_job(job_id: str):
+    try:
+        return reject_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/hide")
+def hide_living_visual_job(job_id: str):
+    try:
+        return hide_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.post("/api/v1/living-visuals/jobs/{job_id}/regenerate")
+def regenerate_living_visual_job(job_id: str):
+    try:
+        return regenerate_visual_job(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}/scene-spec")
+def inspect_living_visual_scene_spec(job_id: str):
+    try:
+        return inspect_scene_spec(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/jobs/{job_id}/guardian")
+def get_living_visual_guardian(job_id: str):
+    try:
+        return get_guardian_verdict(job_id)
+    except LivingVisualRuntimeError as exc:
+        raise _orchestrator_error(exc)
+
+
+@app.get("/api/v1/living-visuals/history")
+def get_living_visual_history(
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    soul_id: str | None = None,
+    session_id: str | None = None,
+):
+    return visual_history(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        soul_id=soul_id,
+        session_id=session_id,
+    )
