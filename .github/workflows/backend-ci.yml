@@ -22,7 +22,7 @@ jobs:
       - run: ruff check backend
       - run: ruff format --check backend
       - run: python -m pytest backend --cov=backend/app --cov-report=xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: coverage.xml
