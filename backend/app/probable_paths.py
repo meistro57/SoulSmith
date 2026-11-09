@@ -5,7 +5,8 @@ SoulSmith Phase 5: Probable Paths Models & What-If Simulation Engine.
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 ManifestationType = Literal["dream", "rumor", "alternate_scene", "echo_aspect"]
@@ -14,7 +15,7 @@ ProbablePathStatus = Literal["dormant", "echoing", "manifested", "reconciled"]
 
 class ProbablePathModel(BaseModel):
     id: str
-    event_id: Optional[str] = None
+    event_id: str | None = None
     soul_id: str
     path_title: str
     chosen_path: str
@@ -23,7 +24,7 @@ class ProbablePathModel(BaseModel):
     manifestation_type: ManifestationType = "dream"
     status: ProbablePathStatus = "dormant"
     provenance_summary: str
-    created_at: Optional[str] = None
+    created_at: str | None = None
 
 
 class CreateProbablePathRequest(BaseModel):
@@ -32,9 +33,9 @@ class CreateProbablePathRequest(BaseModel):
     chosen_path: str
     unchosen_approach: str
     potential_outcome_class: str = "marked_success"
-    event_id: Optional[str] = None
+    event_id: str | None = None
     manifestation_type: ManifestationType = "dream"
-    provenance_summary: Optional[str] = None
+    provenance_summary: str | None = None
 
 
 class ManifestPathRequest(BaseModel):
@@ -55,7 +56,7 @@ class AlternateSceneResult(BaseModel):
     alternate_prose: str
     divergence_notes: str
     canonical_integrity_preserved: bool = True
-    suggested_insights: List[str] = Field(default_factory=list)
+    suggested_insights: list[str] = Field(default_factory=list)
 
 
 def simulate_alternate_scene_exploration(
