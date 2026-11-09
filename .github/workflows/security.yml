@@ -33,4 +33,4 @@ jobs:
       - run: npm audit --audit-level=high
         working-directory: frontend
       - run: python -m pip install --upgrade pip pip-audit
-      - run: pip-audit -r backend/requirements.txt --severity high
+      - run: pip-audit -r backend/requirements.txt
