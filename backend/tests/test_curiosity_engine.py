@@ -1,9 +1,9 @@
 # backend/tests/test_curiosity_engine.py
 import importlib
-import pytest
-from fastapi.testclient import TestClient
 
+import pytest
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -23,7 +23,7 @@ VALID_DICE_PAYLOAD = {
 def setup_test_db(monkeypatch, tmp_path):
     db = importlib.import_module("app.db")
     monkeypatch.setattr(db, "DB_FILE", str(tmp_path / "test_curiosity.db"))
-    import app.main as main
+    from app import main
 
     monkeypatch.setattr(main, "init_database", db.init_database)
     monkeypatch.setattr(main, "plant_or_echo_seed", db.plant_or_echo_seed)

@@ -6,7 +6,6 @@ SoulSmith structured encounter framing service.
 from __future__ import annotations
 
 import hashlib
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +15,7 @@ from app.grammar import InterpretedDiceRoll
 class EncounterFrameRequest(BaseModel):
     dice_read: InterpretedDiceRoll
     soul_name: str = "Unbound Soul"
-    world_context: List[str] = Field(default_factory=list)
+    world_context: list[str] = Field(default_factory=list)
 
 
 class EncounterFrame(BaseModel):
@@ -26,8 +25,8 @@ class EncounterFrame(BaseModel):
     hidden_need: str
     stakes: str
     pressure_clock: int = Field(..., ge=1, le=6)
-    questions: List[str]
-    suggested_actions: List[str]
+    questions: list[str]
+    suggested_actions: list[str]
 
 
 PHENOMENA_BY_PRESSURE = {
@@ -63,9 +62,7 @@ def _stable_clock(dice_read: InterpretedDiceRoll) -> int:
     seed = ":".join(
         str(raw[die]) for die in ("d20", "d12", "d10", "percentile", "d8", "d6", "d4")
     )
-    digest = hashlib.sha256(
-        f"{dice_read.grammar_version}:{seed}".encode("utf-8")
-    ).digest()
+    digest = hashlib.sha256(f"{dice_read.grammar_version}:{seed}".encode()).digest()
     return digest[0] % 5 + 1
 
 

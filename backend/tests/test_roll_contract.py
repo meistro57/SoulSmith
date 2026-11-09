@@ -2,11 +2,10 @@
 import importlib
 
 import pytest
-from fastapi.testclient import TestClient
-from pydantic import ValidationError
-
 from app.grammar import NumericDiceRoll, generate_numeric_roll, interpret_numeric_roll
 from app.main import app
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 client = TestClient(app)
 
@@ -102,7 +101,7 @@ def test_d4_has_only_four_valid_threads():
 def test_scene_resolution_preserves_raw_values_and_chronicle(monkeypatch, tmp_path):
     db = importlib.import_module("app.db")
     monkeypatch.setattr(db, "DB_FILE", str(tmp_path / "chronicle.db"))
-    import app.main as main
+    from app import main
 
     monkeypatch.setattr(main, "log_canonical_event", db.log_canonical_event)
     monkeypatch.setattr(main, "get_all_canonical_events", db.get_all_canonical_events)

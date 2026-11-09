@@ -1,6 +1,7 @@
 // frontend/src/components/visual-memory/PortraitCandidateCard.tsx
 import React, { useState } from 'react';
 import type { PortraitGenerationCandidate } from '../../types';
+import { resolveAssetUrl } from '../../lib/api';
 import { Camera, CheckCircle2, XCircle, AlertCircle, RefreshCw, Eye } from 'lucide-react';
 
 interface PortraitCandidateCardProps {
@@ -54,6 +55,11 @@ export const PortraitCandidateCard: React.FC<PortraitCandidateCardProps> = ({
           <p className="text-[11px] text-purple-300">
             Type: <strong>{candidate.generation_type.replace('_', ' ').toUpperCase()}</strong>
           </p>
+          {candidate.source_portrait_version_id && (
+            <p className="text-[11px] text-amber-300">
+              Based on <strong>{candidate.source_portrait_version_id.replace('_', ' ').replace('pv ', 'Portrait v')}</strong>
+            </p>
+          )}
         </div>
         <span className="text-[10px] text-slate-500">Provider: {candidate.provider} ({candidate.provider_model})</span>
       </div>
@@ -65,7 +71,7 @@ export const PortraitCandidateCard: React.FC<PortraitCandidateCardProps> = ({
           {candidate.generated_image_url ? (
             <div className="relative rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-950 aspect-square max-w-[220px]">
               <img
-                src={candidate.generated_image_url}
+                src={resolveAssetUrl(candidate.generated_image_url)}
                 alt="Candidate Portrait"
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -86,8 +92,19 @@ export const PortraitCandidateCard: React.FC<PortraitCandidateCardProps> = ({
 
         <div className="space-y-2 text-[11px]">
           <div>
-            <span className="text-slate-500 block text-[10px]">SOURCE BASELINE REFERENCE</span>
-            <span className="text-slate-300 font-mono text-[10px]">{candidate.source_portrait_version_id || 'Initial Avatar (None)'}</span>
+            <span className="text-slate-500 block text-[10px] mb-1">SOURCE BASELINE REFERENCE</span>
+            {candidate.reference_image_url ? (
+              <div className="relative rounded-lg overflow-hidden border border-amber-500/40 bg-slate-950 aspect-square max-w-[120px]">
+                <img
+                  src={resolveAssetUrl(candidate.reference_image_url)}
+                  alt="Source Portrait"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <span className="text-slate-500 text-[10px]">Initial Avatar (None)</span>
+            )}
+            <span className="text-slate-300 font-mono text-[10px] block mt-1">{candidate.source_portrait_version_id || 'No source version'}</span>
           </div>
 
           <div>
