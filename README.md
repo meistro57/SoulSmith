@@ -315,7 +315,7 @@ A small group gathers around a table and creates a shared Chronicle.
 
 ### Wandering
 
-Players roll in real-world locations and allow those places to enter the mythology.
+Players roll in real-world locations and allow those places to enter the mythology. Phase 20 ships the consent-safe, provider-independent domain foundation for this mode: persistent place entities, opt-in location sampling, bounded deterministic nearby discovery, and a map-provider abstraction. The world may suggest where to look; it never requires the player to surrender privacy or safety.
 
 ### Chronicle
 
@@ -386,7 +386,7 @@ npm run dev
 
 ## Project Status
 
-SoulSmith is at **Advanced Playable Production Engine (Phase 1–4 Complete Core)**.
+SoulSmith is at **Advanced Playable Production Engine (Phase 0–20 Complete)**.
 
 Key Features Built:
 1. **3D STL Polyhedral Dice Sanctuary**: Real-time Three.js `STLLoader` engine for 6 custom polyhedral STL dice (`d20.stl`, `d12.stl`, `d10.stl`, `d8.stl`, `d6.stl`, `d4.stl`) with translucent sapphire resin optics, clearcoat gloss, transparent glass mode toggle, custom hex color picker, and opacity slider.
@@ -409,6 +409,20 @@ Key Features Built:
 18. **Visual Identity Foundation & Timeline Canon**: Structured avatar identity persistence (*Face, Hair, Body, Species, Eyes*), provenance-backed Story Marks linked to canonical event IDs, equipment appearance layers, and immutable portrait timeline snapshots that preserve historical states.
 19. **Portrait Generation & Continuity Workflow**: Deterministic portrait prompt compilation, provider-abstracted candidate generation, review states (*pending → generated → approved/rejected/failed*), idempotent approval into canonical versions, and continuity safeguards that keep earlier portraits unchanged.
 20. **Chronicle Memory Object Pipeline**: Auditable `MemoryObject` compilation with participant event-time portrait locking, strict portrait reference validation, significance scoring for painting eligibility, public-canon consent enforcement, and automatic real-person tag redaction when consent is missing.
+21. **ComfyUI Portrait Generation**: Pluggable image provider (`mock`, `external`, `comfyui`) with static API-format workflows, a workflow-role selector (`initial` vs `reference`), deterministic seed handling, and SoulSmith-owned image storage — generated PNGs are archived under `/assets/` rather than left on ComfyUI `/view`.
+22. **Reference-Image Character Continuity**: Approved historical `PortraitVersion`s are resolved, uploaded, and bound into an img2img workflow with a configurable reference strength, so story-mark, equipment, and age updates keep the same recognisable character while only applying the canonical change.
+23. **Visual Worldsmith (World Atlas)**: Persistent visual identities for locations, relics, and phenomena — immutable `VisualEntityVersion`s, deterministic world-entity compilers with visual anchors, a canonical-delta diff, environment/object workflow roles, and a reviewable candidate flow that never rewrites history.
+24. **Chronicle Paintings & Visual Canon Guardian**: Canonical Memory Objects compiled into generated scene paintings through a `CANON → SCENE → IMAGE → VISUAL CANON GUARDIAN → CANDIDATE` pipeline — historical participant portrait locking, a deterministic composition selector, quarantine-then-promote storage, mandatory vision review with a deterministic mock Guardian (PASS/RETRY/BLOCK), and an approval flow that supersedes prior art without deleting history.
+25. **Group Memories & Tags**: A relational `GroupMemory` linking participant-specific Memory Objects to the same shared event without rewriting them — deterministic exact-event-ID grouping, typed ID-anchored tags, shared anchors locked to historical visual versions, participant-specific consent filtering, and a narrative "everyone remembers the same moment differently" perspective view. See [`docs/GROUP_MEMORIES.md`](docs/GROUP_MEMORIES.md).
+26. **Living Biography**: An evolving, provenance-aware life story derived from the Chronicle (never rewriting it) — a deterministic structured compiler, immutable version/section/provenance model, chronology without invented dates, recurring-thread extraction, fact-vs-perspective classification, a deterministic narrative provider, a Biography Guardian, draft/current/version lifecycle, consent-aware public/private publication, and a reading experience with expandable "From the Chronicle" provenance. See [`docs/LIVING_BIOGRAPHY.md`](docs/LIVING_BIOGRAPHY.md).
+27. **Art Director & World Gallery**: Persistent, versioned Art Direction Profiles that give portraits, world visuals, and Chronicle artwork a coherent visual language *without changing what they depict* — a deterministic style hierarchy and inspectable Art Direction Spec, honest provider-capability degradation, an optional style reviewer that can never override a Visual Canon Guardian BLOCK, and a consent-safe, accessible World Gallery with curated Collections and immutable timelines. See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
+28. **Legendary Figures & World Memory**: The world itself remembers — preserved Chronicle, Group Memory, Biography, relic, and Gallery history becomes derived in-world cultural memory (legends, monuments, songs, festivals, relic legends, NPC knowledge) under the invariant **history may become legend, legend must never become history by accident**. Every legend carries normalized provenance and declared drift, Legendary Figures reference canonical identity without mutating it, forgetting never deletes canon, and a World Memory Guardian rejects undeclared hallucinations while letting declared exaggeration pass. See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
+29. **Campaign Orchestrator (North-Star Playable Loop)**: The conductor that turns Phases 0-16 into one continuous playable experience. A dedicated orchestrator evaluates deterministic, provenance-carrying `CampaignOpportunity`s before narration, runs an auditable reaction pipeline after each canonical event, enforces count-based cooldowns, preserves player recognition/rejection without punishment, coordinates relic memory/awakening candidates without claiming awakening authority, projects scoped NPC knowledge, and exposes traceable transition provenance and a deterministic North-Star end-to-end fixture. See [`docs/CAMPAIGN_ORCHESTRATOR.md`](docs/CAMPAIGN_ORCHESTRATOR.md).
+30. **Soulkeeper Narrative Engine & Provider Runtime**: A real storyteller with no authority over canon. A consent-safe `NarrativeContext` compiler, structured `NarrativeOutput`, a provider runtime with timeout/bounded retry/deterministic fallback, a real configurable OpenAI-compatible provider alongside the deterministic mock, a narrative Guardian (pass/retry/block) distinct from the Visual Canon and World Memory Guardians, NPC-scoped narration from Phase 16 knowledge projection, a fact-free style layer, and API/frontend surfaces for narration, dialogue, Soulkeeper questions, provenance, and re-voicing without changing campaign state. See [`docs/SOULKEEPER_NARRATIVE_ENGINE.md`](docs/SOULKEEPER_NARRATIVE_ENGINE.md).
+31. **Relationship & Promise Engine**: First-class, provenance-backed persistence for bonds and oaths under the invariant **a relationship is history between people, a promise is a claim on the future, and neither may be invented by the narrator**. Relationships derive from canonical interactions with participant-specific perspectives that never become objective truth; promises carry immutable original wording, a source event or player authorization, an evidence-backed lifecycle (kept/broken/fulfilled/released/inherited/transferred/disputed/forgotten/rediscovered), relic/World Memory/NPC knowledge integration, and first-class `relationship_callback`/`promise_consequence` opportunities in the Campaign Orchestrator. See [`docs/RELATIONSHIPS_AND_PROMISES.md`](docs/RELATIONSHIPS_AND_PROMISES.md).
+32. **Multi-Aspect Campaign Sessions & Wandering Mode Foundation**: Multiple playable Aspects coexist in one campaign under the invariant **the player may know the whole story, each Aspect knows only the life it has lived**. Explicit knowledge layers (`canonical truth != player knowledge != Aspect knowledge != NPC knowledge != World Memory`) are enforced by Aspect-scoped Chronicle/Curiosity queries; deterministic idempotent Aspect switching rebuilds `NarrativeContext` and opportunities from the destination viewpoint; cross-Aspect encounters share one canonical event with separate participant perspectives. A safe WANDERING foundation adds persistent places that accumulate Chronicle history, consent-safe location sampling, bounded deterministic nearby discovery, and a map-provider abstraction — the world may suggest where to look, never requiring the player to surrender privacy or safety. See [`docs/MULTI_ASPECT_AND_WANDERING.md`](docs/MULTI_ASPECT_AND_WANDERING.md).
+33. **Living Visual World & ComfyUI Runtime**: The completed visual architecture becomes a living loop that paints what becomes worth remembering. Under the invariants **SoulSmith does not illustrate everything — it paints what becomes worth remembering** and **memory is canon, art is interpretation**, a deterministic Art Director decides which structured canonical moments become eligible `ArtMoment`s, persistent `VisualJob`s track an auditable, resumable generate → quarantine → Guardian → approval lifecycle, and a configurable local ComfyUI runtime (reusing the existing `app.comfyui` client/workflow stack) renders asynchronously with a deterministic mock fallback. Portrait continuity keeps locked historical references; Chronicle Paintings cite canonical evidence; relics, relationships, promises, Group Memories, and Wandering places each acquire a consent-safe visual history; human creative direction may interpret but never rewrite locked facts. See [`docs/LIVING_VISUAL_WORLD.md`](docs/LIVING_VISUAL_WORLD.md).
+34. **Temporal Pacing & Living Time**: SoulSmith gains a trustworthy sense of elapsed time under the invariants **time may change what is possible, it must never decide what the player's story means** and **the world may wait for you, it must never punish you for having a life outside the game**. An injectable trusted clock and a bounded `TemporalContext` separate canonical event time, server wall-clock, session time, elapsed real time, fictional time, Aspect-relative time, and place/history time. Count-based pacing stays authoritative for offline fixtures while optional wall-clock/hybrid cooldowns, an explicit fictional-time policy foundation, provenance-backed scheduled consequences, and per-Aspect temporal state add time as an *additional* eligibility input — never a substitute for domain evidence, and never an engagement weapon. A gentle, optional return recap reopens the world like an old journal. See [`docs/TEMPORAL_PACING_AND_LIVING_TIME.md`](docs/TEMPORAL_PACING_AND_LIVING_TIME.md).
 
 ---
 
@@ -462,6 +476,210 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+## Running with ComfyUI
+
+SoulSmith renders portrait candidates through a pluggable image provider. By default it uses the deterministic `mock` provider (no external service). To generate real images locally, point it at a running [ComfyUI](https://github.com/comfyanonymous/ComfyUI) instance:
+
+```bash
+# 1. Start ComfyUI separately on port 8188 (outside this repo).
+
+# 2. Point SoulSmith at it.
+export SOULSMITH_IMAGE_PROVIDER=comfyui
+export COMFYUI_SERVER_URL=http://127.0.0.1:8188
+export COMFYUI_PORTRAIT_INITIAL_WORKFLOW=portrait_initial_v1_api.json
+export COMFYUI_PORTRAIT_REFERENCE_WORKFLOW=portrait_reference_v1_api.json
+export COMFYUI_PORTRAIT_REFERENCE_STRENGTH=0.75
+
+# 3. Start the backend.
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The Visual Memory "Synthesize Imagery" action then submits the compiled prompt to ComfyUI, polls for completion, copies the generated PNG into SoulSmith-owned storage, and returns a candidate `generated_image_url` for the existing Approve/Reject flow.
+
+### ComfyUI details
+
+- **Workflow files** live at `backend/app/comfyui/workflows/`. They must be ComfyUI **API-format** JSON (a top-level map of `node_id -> {class_type, inputs}`), not the default UI export (which carries `nodes`/`links` arrays). Two roles are bundled:
+  - `portrait_initial_v1_api.json` — plain text-to-image (no reference).
+  - `portrait_reference_v1_api.json` — reference image-to-image continuity (`LoadImage` → `VAEEncode` → `KSampler` with a `denoise` derived from reference strength → `VAEDecode` → `SaveImage`).
+- **Workflow roles** are selected centrally in `backend/app/comfyui/workflow_roles.py`: `initial` → `portrait_initial`; `story_mark_update` / `equipment_update` / `age_update` / `manual_regeneration` → `portrait_reference`. Continuity types *require* a source portrait and fail cleanly (never silently fall back to text-to-image).
+- **Node bindings** map SoulSmith concepts to workflow inputs and are declared in `backend/app/comfyui/workflow_binder.py`:
+  - Base `DEFAULT_PORTRAIT_BINDINGS`:
+    - `positive_prompt` -> node `6` `CLIPTextEncode.text`
+    - `negative_prompt` -> node `7` `CLIPTextEncode.text`
+    - `seed` -> node `10` `KSampler.seed`
+    - `filename_prefix` -> node `24` `SaveImage.filename_prefix`
+  - `REFERENCE_PORTRAIT_BINDINGS` add:
+    - `reference_image` -> node `11` `LoadImage.image` (uploaded reference filename)
+    - `denoise` -> node `10` `KSampler.denoise` (derived from `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` as `denoise = 1 - strength`)
+- **Reference-image continuity**: when a continuity candidate carries a `reference_image_url` (resolved from its `source_portrait_version_id` at creation), the provider uploads the approved historical portrait to ComfyUI (`/upload/image`) and binds it into the reference workflow. Files are resolved from `SOULSMITH_ASSET_ROOT` with path-traversal protection.
+- **Reference strength** (`COMFYUI_PORTRAIT_REFERENCE_STRENGTH`, `0..1`, default `0.75`) controls how strongly the reference is preserved; higher = closer to the source portrait. It maps to `KSampler.denoise = 1 - strength`.
+- **Diagnostics** are exposed at `GET /api/v1/visual-memory/providers/comfyui/status` (reachability, workflow availability, output-storage writability).
+- **Generated images** are saved to `backend/assets/portraits/candidates/` (configurable via `SOULSMITH_ASSET_ROOT`) and served by the backend at `/assets/...`. ComfyUI `/view` URLs are never stored as canonical image URLs.
+- **Switch back to mock mode** with `unset SOULSMITH_IMAGE_PROVIDER` (or set it to `mock`).
+- **Living Visual runtime** (Phase 21) reuses this same ComfyUI client/workflow stack through a `VisualJob`-type → workflow-role mapping in `backend/app/living_visual_provider.py`. Its status is exposed at `GET /api/v1/living-visuals/providers/status`; generation is async/auditable via `POST /api/v1/living-visuals/art-moments/evaluate` and `POST /api/v1/living-visuals/jobs/{job_id}/process`, with raw output quarantined under `/assets/living-visuals/quarantine/` until the Visual Canon Guardian passes. See [`docs/LIVING_VISUAL_WORLD.md`](docs/LIVING_VISUAL_WORLD.md).
+
+### ComfyUI environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SOULSMITH_IMAGE_PROVIDER` | `mock` | Selects the provider (`mock`, `external`, or `comfyui`). |
+| `COMFYUI_SERVER_URL` | `http://127.0.0.1:8188` | ComfyUI server base URL. |
+| `COMFYUI_PORTRAIT_INITIAL_WORKFLOW` | `portrait_initial_v1_api.json` | Text-to-image workflow (resolved under `workflows/`) or absolute path. |
+| `COMFYUI_PORTRAIT_REFERENCE_WORKFLOW` | `portrait_reference_v1_api.json` | Reference img2img workflow for continuity generations. |
+| `COMFYUI_PORTRAIT_REFERENCE_STRENGTH` | `0.75` | How strongly the reference is preserved (0..1); maps to `denoise = 1 - strength`. |
+| `COMFYUI_TIMEOUT_SECONDS` | `180` | Maximum time to wait for a generation. |
+| `COMFYUI_POLL_INTERVAL_SECONDS` | `1` | Delay between completion polls. |
+| `SOULSMITH_ASSET_ROOT` | `backend/assets` | SoulSmith-owned directory for generated images. |
+
+### Reference-image technique
+
+The bundled reference workflow uses a dependency-free **img2img** approach (`LoadImage` + `VAEEncode` + `KSampler` with `denoise < 1`), so it works on a stock ComfyUI install with no custom nodes. The checkpoint (`v1-5-pruned-emaonly.safetensors`) must exist in your `models/checkpoints/` directory, or you can export your own workflow and update the node bindings.
+
+For stronger identity preservation you may later swap in an IPAdapter / InstantID / FaceID workflow (which require custom nodes under `ComfyUI/custom_nodes/`). SoulSmith only cares that a generation *has* a reference portrait; the workflow owns the technique. Administrators install those custom nodes explicitly — the application never auto-installs them.
+
+## Character continuity
+
+SoulSmith keeps a character visually recognisable across time:
+
+```text
+Initial Portrait
+    → approve → PortraitVersion v1 (immutable)
+        → later generations reference v1 as visual guidance
+            → new candidate → approve → PortraitVersion v2
+```
+
+- **Continuity generations** (`story_mark_update`, `equipment_update`, `age_update`, `manual_regeneration`) require a `source_portrait_version_id` and render through the reference workflow, preserving facial structure, species, eyes, hair, and existing canonical marks while applying only the requested change.
+- **Historical integrity** is preserved: approving a candidate creates a *new* `PortraitVersion` and never mutates the referenced one, so `v1` remains independently retrievable and events referencing `v1` keep using it.
+- The compiled prompt is sectioned into `CANONICAL IDENTITY`, `CANONICAL CHANGES`, `MUST PRESERVE`, `MUST NOT INVENT`, and `ARTISTIC FRAMING`, with reinforced continuity instructions and negative constraints for reference generations.
+
+## Visual Worldsmith (World Atlas)
+
+Beyond character portraits, SoulSmith gives world entities a persistent visual memory: **locations**, **relics**, and **phenomena** each have immutable visual versions that evolve only through canonical state changes.
+
+```text
+CANON → visual snapshot → candidate → ComfyUI → generated representation
+        → human approval → immutable VisualEntityVersion
+```
+
+- **Entity types**: `location` (environment workflows), `relic` (object workflows), `phenomenon` (environment workflows). NPCs reuse the portrait pipeline.
+- **Visual anchors** (landmarks, persistent details, motifs) are compiled into every prompt so an evolved version stays recognisably the same place/object/phenomenon.
+- **Canonical delta** diffs the previous vs current snapshot into `PRESERVE` / `CHANGE` / `REMOVE` so continuity generations apply only the recorded change.
+- **Historical integrity**: approving a new version creates a new immutable `VisualEntityVersion` and never mutates older versions.
+
+### World API
+
+```text
+POST /api/v1/visual-world/candidates
+POST /api/v1/visual-world/candidates/{candidate_id}/generate
+POST /api/v1/visual-world/candidates/{candidate_id}/approve
+POST /api/v1/visual-world/candidates/{candidate_id}/reject
+GET  /api/v1/visual-world/{entity_type}/{entity_id}/versions
+GET  /api/v1/visual-world/{entity_type}/{entity_id}/candidates
+```
+
+Generated assets are stored under `/assets/world/{entity_type}/candidates/` (SoulSmith-owned, never ComfyUI `/view` URLs).
+
+### World workflow roles & configuration
+
+| Role | Workflow file | Used by |
+|---|---|---|
+| `environment_initial` / `environment_reference` | `environment_*_v1_api.json` | locations, phenomena |
+| `object_initial` / `object_reference` | `object_*_v1_api.json` | relics |
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `COMFYUI_ENVIRONMENT_INITIAL_WORKFLOW` | `environment_initial_v1_api.json` | Landscape environment text-to-image. |
+| `COMFYUI_ENVIRONMENT_REFERENCE_WORKFLOW` | `environment_reference_v1_api.json` | Landscape environment img2img continuity. |
+| `COMFYUI_OBJECT_INITIAL_WORKFLOW` | `object_initial_v1_api.json` | Square object text-to-image. |
+| `COMFYUI_OBJECT_REFERENCE_WORKFLOW` | `object_reference_v1_api.json` | Square object img2img continuity. |
+| `COMFYUI_WORLD_REFERENCE_STRENGTH` | `0.6` | Reference preservation strength (maps to `denoise = 1 - strength`). |
+
+## Art Director & World Gallery
+
+Phase 15 unifies the approved visual history (portraits, world visuals, Chronicle
+Paintings, Group Memories, and the Living Biography) into a coherent art-direction
+system and an explorable World Gallery, without letting style rewrite canon.
+
+```text
+CANON + HISTORICAL VISUAL REFERENCES + ART DIRECTION
+    -> GENERATION -> VISUAL CANON GUARDIAN -> APPROVAL -> WORLD GALLERY
+```
+
+- **Art Direction Profiles** are persistent and versioned; updating always creates
+  a new version and older artwork keeps its original instructions. Profiles store
+  only stylistic treatment, never canonical facts.
+- **Style hierarchy** (`World -> artifact-type treatment -> override`) resolves
+  deterministically into an inspectable Art Direction Spec with canonical and
+  stylistic requirements kept separate.
+- **Provider capability awareness** degrades honestly instead of pretending
+  unsupported capabilities exist.
+- **Optional style reviewer** checks profile compliance but can never override a
+  Visual Canon Guardian BLOCK.
+- **World Gallery** curates only approved, consent-safe artifacts across modes
+  (The World, The People, The Chronicle, Shared Moments, A Life, Then & Now), with
+  provenance, curated Collections, immutable timelines, conservative alt text,
+  keyboard navigation, reduced motion, and lazy-loaded images.
+
+```text
+POST  /api/v1/art-direction/profiles
+POST  /api/v1/art-direction/profiles/{profile_id}/versions
+POST  /api/v1/art-direction/resolve
+POST  /api/v1/art-direction/preview
+GET   /api/v1/gallery?mode=world|people|chronicle|shared|life|all
+GET   /api/v1/gallery/timeline?entity_type=...&entity_id=...
+POST  /api/v1/gallery/collections
+POST  /api/v1/gallery/collections/{id}/reorder
+```
+
+See [`docs/ART_DIRECTOR_AND_WORLD_GALLERY.md`](docs/ART_DIRECTOR_AND_WORLD_GALLERY.md).
+
+## Legendary Figures & World Memory
+
+Phase 16 lets the world itself remember. Preserved canonical history — Chronicle
+Memory Objects, Group Memories, Living Biographies, relic history, and approved
+visual history — becomes derived in-world cultural memory: legends, monuments,
+books, festivals, renamed places, inherited relic stories, memorials, statues,
+songs, oral traditions, archives, and NPC knowledge.
+
+```text
+CANONICAL HISTORY -> WORLD MEMORY COMPILER -> CULTURAL MEMORY ARTIFACTS -> IN-WORLD PRESENCE
+```
+
+> **HISTORY MAY BECOME LEGEND. LEGEND MUST NEVER BECOME HISTORY BY ACCIDENT.**
+
+- **World Memory** is derived, never authoritative. Every record carries normalized
+  source links, an interpretation type (`faithful` … `mythologized`), and declared
+  deviations (`canon_supports` vs `legend_claims`) so drift is explicit and traceable.
+- **Competing histories** coexist: multiple cultures may remember one event
+  differently, and provenance distinguishes what happened from what later culture
+  believes happened.
+- **Legendary Figures** reference canonical identity, Biography, portraits,
+  Chronicle events, StoryMarks, relics, locations, Group Memories, and approved
+  artworks without copying or mutating them; canonical titles stay distinct from
+  later cultural titles.
+- **Forgetting and rediscovery** are derived lifecycle states; forgetting never
+  deletes canon.
+- **NPC historical knowledge** is consent-safe and scoped by culture, location,
+  era, role, archive access, education, tradition, and relationship — an NPC never
+  automatically receives the canonical database truth.
+- **World Memory Guardian** (pass/retry/block) rejects undeclared drift,
+  undeclared hallucinated facts, private leaks, scoped-perspective omniscience, and
+  unapproved visual references. A declared exaggeration passes; an undeclared one
+  fails.
+
+```text
+POST /api/v1/world-memory/compile
+GET  /api/v1/world-memory?subject_entity_type=...&subject_entity_id=...
+GET  /api/v1/world-memory/{memory_id}/deviations
+POST /api/v1/world-memory/{memory_id}/mark-state
+POST /api/v1/world-memory/npc-knowledge
+POST /api/v1/legendary-figures/promote
+GET  /api/v1/legendary-figures
+```
+
+See [`docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md`](docs/LEGENDARY_FIGURES_AND_WORLD_MEMORY.md).
 
 ## Canonical Roll Contract
 
