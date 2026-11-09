@@ -4,8 +4,8 @@ SoulSmith Deterministic Rules Engine
 Calculates outcome classes, resource deltas, and state progression.
 """
 
-from typing import List
 from pydantic import BaseModel, Field, model_validator
+
 from app.grammar import InterpretedDiceRoll
 
 
@@ -50,7 +50,7 @@ class ResolveSceneResponse(BaseModel):
     thread_delta: int
     new_resources: SoulSheetResources
     fracture_triggered: bool
-    canon_facts: List[str]
+    canon_facts: list[str]
 
 
 VERDICT_OUTCOME_MAP = {
